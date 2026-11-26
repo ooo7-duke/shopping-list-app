@@ -1,13 +1,21 @@
 import { describePrediction } from '../lib/predict.js';
-import { fmtMoney, fmtQty, fmtDate, firstName } from '../lib/format.js';
+import { fmtMoney, fmtQty, fmtDate } from '../lib/format.js';
+import { seenPrices } from '../lib/prices.js';
 import { ClockIcon, TrashIcon } from './Icons.jsx';
 
-export default function ItemRow({ item, pred, done, showStore = true, showCategory = false, onToggle, onOpen, onSnooze, onRemove, readOnly, extra }) {
+export default function ItemRow({ item, pred, done, last, showHistory = false, onPrices, showStore = true, showCategory = false, onToggle, onOpen, onSnooze, onRemove, readOnly, extra }) {
   const qty = fmtQty(item.qty, item.unit);
   const predText = pred && pred.basis !== 'off' && pred.basis !== 'learning' ? describePrediction(pred) : '';
   const overdue = pred?.daysLeft != null && pred.daysLeft < 1;
   const price = item.lastPrice != null ? Number(item.lastPrice) : null;
   const total = price != null && Number(item.qty) > 1 ? price * Number(item.qty) : null;
+  const { best } = seenPrices(item);
+  const lastParts = last ? [
+    fmtDate(last.at),
+    last.qty != null ? fmtQty(last.qty, last.unit) || '1' : '',
+    last.unitPrice != null ? `${fmtMoney(last.unitPrice)} ea` : '',
+    last.store,
+  ].filter(Boolean) : [];
 
   const onKeyDown = (e) => {
     if (e.target !== e.currentTarget) return;
@@ -28,7 +36,6 @@ export default function ItemRow({ item, pred, done, showStore = true, showCatego
         <div className="name ellipsis">{item.name}{qty && <span className="muted" style={{ fontWeight: 400 }}> · {qty}</span>}</div>
         <div className="meta">
           {item.urgent && !done && <span className="chip warn">Needed now</span>}
-          {item.status === 'requested' && <span className="chip gold">Requested by {firstName(item.addedByName) || 'staff'}</span>}
           {item.status === 'ordered' && <span className="chip blue">Ordered</span>}
           {showStore && item.store && <span>{item.store}</span>}
           {showCategory && item.category && <span>{item.category}</span>}
@@ -36,6 +43,15 @@ export default function ItemRow({ item, pred, done, showStore = true, showCatego
           {done && item.lastPurchasedAt && <span>Bought {fmtDate(item.lastPurchasedAt)}</span>}
           {extra}
         </div>
+        {showHistory && (
+          <div className="history">
+            {last ? <span>Last bought {lastParts.join(' · ')}</span> : <span className="muted">Not bought yet</span>}
+            {best && <span className={`chip${best.stale ? '' : ' gold'}`}>{best.store} {fmtMoney(best.price)}{best.stale ? ' (old)' : ''}</span>}
+            {onPrices && (
+              <button type="button" className="chip blue" onClick={(e) => { e.stopPropagation(); onPrices(); }} aria-label={`Check prices for ${item.name}`}>Check price</button>
+            )}
+          </div>
+        )}
       </div>
       {!readOnly && (onSnooze || onRemove) && (
         <div className="hover-actions">

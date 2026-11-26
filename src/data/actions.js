@@ -3,7 +3,6 @@
 import { normalizeName } from '../lib/parse.js';
 import { guessCategory, HOUSEHOLD_CATEGORIES } from '../lib/categories.js';
 import { DAY } from '../lib/predict.js';
-import { can } from '../lib/config.js';
 
 const clean = (o) => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined));
 
@@ -13,14 +12,16 @@ export function findItem(items, name) {
 }
 
 export function isOnList(it, now = Date.now()) {
+  // 'requested' is a status from before the approval step was removed; treat it as needed.
   if (it.status === 'needed' || it.status === 'requested' || it.status === 'ordered') return true;
   return it.status === 'snoozed' && (it.snoozeUntil || 0) <= now;
 }
 
 export async function addEntries(ctx, entries) {
-  const { backend, accountId, user, role, items, account } = ctx;
+  const { backend, accountId, user, items, account } = ctx;
   const cats = account?.categories || HOUSEHOLD_CATEGORIES;
-  const status = can(role, 'edit') ? 'needed' : 'requested';
+  // Everyone with access to the list is trusted to add to it directly.
+  const status = 'needed';
   const ops = [];
   const undoOps = [];
   const added = [];
@@ -77,13 +78,13 @@ export async function markBought(ctx, item, opts = {}) {
     { type: 'set', coll: 'purchases', id: pid, data: purchase },
     {
       type: 'update', coll: 'items', id: item.id,
-      data: clean({ status: 'stocked', lastPurchasedAt: at, urgent: false, needBy: null, batchId: null, snoozeUntil: null, ...(unitPrice != null ? { lastPrice: unitPrice } : {}) }),
+      data: clean({ status: 'stocked', lastPurchasedAt: at, lastQty: qty, lastStore: purchase.store, urgent: false, needBy: null, batchId: null, snoozeUntil: null, ...(unitPrice != null ? { lastPrice: unitPrice } : {}) }),
     },
   ];
   await backend.commit(accountId, ops);
   return { purchaseId: pid, undo: () => backend.commit(accountId, [
     { type: 'remove', coll: 'purchases', id: pid },
-    { type: 'update', coll: 'items', id: item.id, data: clean({ status: item.status, lastPurchasedAt: item.lastPurchasedAt ?? null, lastPrice: item.lastPrice ?? null, batchId: item.batchId ?? null }) },
+    { type: 'update', coll: 'items', id: item.id, data: clean({ status: item.status, lastPurchasedAt: item.lastPurchasedAt ?? null, lastPrice: item.lastPrice ?? null, lastQty: item.lastQty ?? null, lastStore: item.lastStore ?? null, batchId: item.batchId ?? null }) },
   ]) };
 }
 
@@ -96,13 +97,19 @@ export async function setStatus(ctx, item, status, extra = {}) {
 export const snooze = (ctx, item, days = 7) => setStatus(ctx, item, 'snoozed', { snoozeUntil: Date.now() + days * DAY });
 export const takeOffList = (ctx, item) => setStatus(ctx, item, 'stocked');
 export const putOnList = (ctx, item) => setStatus(ctx, item, 'needed', { addedAt: Date.now(), addedBy: ctx.user.uid, addedByName: ctx.user.name });
-export const approve = (ctx, item) => setStatus(ctx, item, 'needed');
 
-export async function decline(ctx, item) {
-  if (item.lastPurchasedAt) return setStatus(ctx, item, 'stocked');
-  await ctx.backend.remove(ctx.accountId, 'items', item.id);
-  const { id, ...data } = item;
-  return () => ctx.backend.commit(ctx.accountId, [{ type: 'set', coll: 'items', id, data: clean(data) }]);
+// Record a price someone saw at a store (after tapping Check price). Undo restores the old one.
+export async function setSeenPrice(ctx, item, storeId, price) {
+  const prev = item.seenPrices?.[storeId] ?? null;
+  const next = price == null || price === '' || Number.isNaN(Number(price)) ? null
+    : { price: Math.round(Number(price) * 100) / 100, at: Date.now(), by: ctx.user.name || '' };
+  const write = (val) => {
+    const all = { ...(item.seenPrices || {}) };
+    if (val) all[storeId] = val; else delete all[storeId];
+    return ctx.backend.update(ctx.accountId, 'items', item.id, { seenPrices: all });
+  };
+  await write(next);
+  return () => write(prev);
 }
 
 export async function markOrdered(ctx, store, items) {
@@ -126,7 +133,7 @@ export async function markArrived(ctx, batch, items, date = Date.now()) {
       type: 'set', coll: 'purchases', id: backend.newId(accountId, 'purchases'),
       data: clean({ itemId: it.id, name: it.name, category: it.category || 'Other', store: batch.store || it.store || '', qty, unit: it.unit || '', unitPrice, total: unitPrice != null ? Math.round(unitPrice * qty * 100) / 100 : null, purchasedAt: date, purchasedBy: user.uid, purchasedByName: user.name, source: 'order', batchId: batch.id }),
     });
-    ops.push({ type: 'update', coll: 'items', id: it.id, data: { status: 'stocked', lastPurchasedAt: date, batchId: null, urgent: false, needBy: null } });
+    ops.push({ type: 'update', coll: 'items', id: it.id, data: { status: 'stocked', lastPurchasedAt: date, lastQty: qty, lastStore: batch.store || it.store || '', batchId: null, urgent: false, needBy: null } });
   }
   await backend.commit(accountId, ops);
 }
@@ -152,11 +159,12 @@ export async function saveReceipt(ctx, receipt, lines) {
       const id = backend.newId(accountId, 'items');
       const name = ln.newName || ln.name || ln.rawText;
       item = { id, name, category: ln.category && cats.includes(ln.category) ? ln.category : guessCategory(name, cats), store: receipt.store || '', qty: 1, unit: '', cadence: { mode: 'auto' } };
-      ops.push({ type: 'set', coll: 'items', id, data: { ...item, id: undefined, status: 'stocked', addedAt: Date.now(), addedBy: user.uid, addedByName: user.name, lastPrice: unitPrice, lastPurchasedAt: date } });
+      ops.push({ type: 'set', coll: 'items', id, data: { ...item, id: undefined, status: 'stocked', addedAt: Date.now(), addedBy: user.uid, addedByName: user.name, lastPrice: unitPrice, lastPurchasedAt: date, lastQty: qty, lastStore: receipt.store || '' } });
     } else {
       matched++;
       const keep = item.status === 'ordered' && item.batchId; // an online order arriving via its receipt
-      ops.push({ type: 'update', coll: 'items', id: item.id, data: clean({ lastPrice: unitPrice ?? item.lastPrice ?? null, lastPurchasedAt: Math.max(item.lastPurchasedAt || 0, date), status: keep || isOnList(item) || item.status === 'snoozed' ? 'stocked' : item.status, batchId: null, urgent: false, needBy: null }) });
+      const newer = date >= (item.lastPurchasedAt || 0);
+      ops.push({ type: 'update', coll: 'items', id: item.id, data: clean({ lastPrice: newer ? unitPrice ?? item.lastPrice ?? null : item.lastPrice ?? null, lastPurchasedAt: Math.max(item.lastPurchasedAt || 0, date), ...(newer ? { lastQty: qty, lastStore: receipt.store || item.store || '' } : {}), status: keep || isOnList(item) || item.status === 'snoozed' ? 'stocked' : item.status, batchId: null, urgent: false, needBy: null }) });
     }
     ops.push({
       type: 'set', coll: 'purchases', id: backend.newId(accountId, 'purchases'),

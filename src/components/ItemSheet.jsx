@@ -1,13 +1,15 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useApp } from '../AppContext.jsx';
 import Sheet from './Sheet.jsx';
-import { markBought, putOnList, isOnList } from '../data/actions.js';
+import { markBought, putOnList, isOnList, setSeenPrice } from '../data/actions.js';
+import { storeLinks, seenPrices } from '../lib/prices.js';
+import { lastPurchaseMap, lastBuy } from '../lib/history.js';
 import { fmtMoney, fmtDate, toInputDate, fromInputDate, fmtQty } from '../lib/format.js';
 import { HOUSEHOLD_CATEGORIES } from '../lib/categories.js';
 import { can } from '../lib/config.js';
 
 // Every field saves as soon as it changes, so there is no Save button to forget.
-export default function ItemSheet({ item, onClose }) {
+export default function ItemSheet({ item, focus, onClose }) {
   const { ctx, backend, account, purchases, predictions, role, items, showToast } = useApp();
   const editor = can(role, 'edit');
   const [logDate, setLogDate] = useState(toInputDate());
@@ -20,6 +22,11 @@ export default function ItemSheet({ item, onClose }) {
   const cadence = item.cadence || { mode: 'auto' };
   const [days, setDays] = useState(cadence.days || Math.round(pred?.intervalDays || 14));
   const [qty, setQty] = useState(item.qty ?? 1);
+  const pricesRef = useRef(null);
+  useEffect(() => { if (focus === 'prices') pricesRef.current?.scrollIntoView({ block: 'start' }); }, [focus]);
+  const last = lastBuy(item, lastPurchaseMap(history)[item.id]);
+  const links = storeLinks(item);
+  const { best } = seenPrices(item);
 
   const save = (patch) => backend.update(ctx.accountId, 'items', item.id, patch);
   const num = (v) => (v === '' || v == null ? null : Number(v));
@@ -86,6 +93,42 @@ export default function ItemSheet({ item, onClose }) {
               <input type="checkbox" checked={!!item.urgent} onChange={(e) => save({ urgent: e.target.checked, needBy: e.target.checked ? Date.now() : null })} style={{ width: 22, height: 22 }} />
               Needed now (can't wait for the next combined trip)
             </label>
+
+            <div className="card" style={{ background: '#fff' }}>
+              <h3 style={{ marginBottom: 6 }}>Last time</h3>
+              {last ? (
+                <div className="grid3 small">
+                  <div><span className="muted tiny">Date</span><div><strong>{fmtDate(last.at, { withYear: true })}</strong></div></div>
+                  <div><span className="muted tiny">Quantity</span><div><strong>{last.qty != null ? fmtQty(last.qty, last.unit) || '1' : 'Not recorded'}</strong></div></div>
+                  <div><span className="muted tiny">Price each</span><div><strong>{last.unitPrice != null ? fmtMoney(last.unitPrice) : 'Not recorded'}</strong></div></div>
+                </div>
+              ) : <p className="small muted">Not bought yet. Check it off or log a receipt and the date, quantity and price show here.</p>}
+              {last?.store && <p className="tiny muted" style={{ marginTop: 6 }}>Bought at {last.store}</p>}
+            </div>
+
+            <div className="card" style={{ background: '#fff', scrollMarginTop: 12 }} ref={pricesRef}>
+              <h3 style={{ marginBottom: 4 }}>Check today's price</h3>
+              <p className="small muted" style={{ marginBottom: 8 }}>Tap a store to search it, then type the price you see. {best ? `Best so far: ${best.store} at ${fmtMoney(best.price)}.` : ''}</p>
+              <div className="price-list">
+                {links.filter((l) => l.id !== 'any').map((l) => {
+                  const seen = item.seenPrices?.[l.id];
+                  return (
+                    <div key={l.id} className="price-line">
+                      <a className="chip blue" href={l.href} target="_blank" rel="noopener noreferrer">{l.name} ↗</a>
+                      <span className="grow tiny muted">{seen?.at ? `seen ${fmtDate(seen.at)}` : ''}</span>
+                      <input className="input price-input" inputMode="decimal" aria-label={`Price at ${l.name}`} placeholder="$" defaultValue={seen?.price ?? ''}
+                        onBlur={async (e) => {
+                          const v = e.target.value.replace(/[$,\s]/g, '');
+                          if (String(seen?.price ?? '') === v) return;
+                          const undo = await setSeenPrice(ctx, item, l.id, v === '' ? null : v);
+                          showToast(v === '' ? `Cleared the ${l.name} price` : `Saved ${l.name}: ${fmtMoney(v)}`, undo);
+                        }} />
+                    </div>
+                  );
+                })}
+              </div>
+              <a className="small" href={links.find((l) => l.id === 'any').href} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block', marginTop: 8, minHeight: 44, lineHeight: '44px' }}>Compare every store on Google Shopping ↗</a>
+            </div>
 
             <div className="card" style={{ background: '#fff' }}>
               <h3 style={{ marginBottom: 6 }}>When will we need it?</h3>

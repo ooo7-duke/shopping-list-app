@@ -31,7 +31,7 @@ export function AppProvider({ children }) {
     return accounts.find((a) => a.id === activeId) || accounts[0];
   }, [accounts, activeId]);
 
-  const role = account && user ? account.members?.[user.uid]?.role || 'requester' : null;
+  const role = account && user ? account.members?.[user.uid]?.role || 'editor' : null;
 
   useEffect(() => {
     if (!account) return undefined;

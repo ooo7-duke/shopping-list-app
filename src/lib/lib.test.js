@@ -85,3 +85,39 @@ describe('category guess', () => {
     expect(guessCategory('mystery thing')).toBe('Other');
   });
 });
+
+import { lastPurchaseMap, lastBuy } from './history.js';
+import { storeLinks, seenPrices, PRICE_STORES } from './prices.js';
+
+describe('purchase history', () => {
+  const purchases = [
+    { itemId: 'a', purchasedAt: 100, qty: 2, unitPrice: 3.5, store: 'Giant' },
+    { itemId: 'a', purchasedAt: 300, qty: 1, total: 4.2, store: "Sam's Club" },
+    { itemId: 'b', purchasedAt: 200, qty: 6, unitPrice: 0.69 },
+  ];
+  it('picks the latest purchase per item', () => {
+    const m = lastPurchaseMap(purchases);
+    expect(m.a.purchasedAt).toBe(300);
+    expect(lastBuy({ id: 'a' }, m.a)).toMatchObject({ at: 300, qty: 1, unitPrice: 4.2, store: "Sam's Club" });
+  });
+  it('falls back to item fields, and to nothing for new items', () => {
+    expect(lastBuy({ lastPurchasedAt: 50, lastQty: 3, lastPrice: 2 }, undefined)).toMatchObject({ at: 50, qty: 3, unitPrice: 2 });
+    expect(lastBuy({ name: 'New thing' }, undefined)).toBeNull();
+  });
+});
+
+describe('price checks', () => {
+  it("lists Sam's Club, Amazon, Walmart first and encodes the search", () => {
+    const links = storeLinks({ name: 'Paper towels', note: 'Bounty' });
+    expect(links.slice(0, 3).map((l) => l.name)).toEqual(["Sam's Club", 'Amazon', 'Walmart']);
+    expect(links[1].href).toBe('https://www.amazon.com/s?k=Paper+towels+Bounty');
+    expect(links.length).toBe(PRICE_STORES.length);
+  });
+  it('flags the cheapest recent price and ignores stale ones when fresh exist', () => {
+    const now = 100 * 86400e3;
+    const item = { seenPrices: { walmart: { price: 20, at: now }, samsclub: { price: 18, at: now - 60 * 86400e3 }, amazon: { price: 22, at: now } } };
+    const { rows, best } = seenPrices(item, now);
+    expect(rows.map((r) => r.storeId)).toEqual(['samsclub', 'amazon', 'walmart']);
+    expect(best.storeId).toBe('walmart');
+  });
+});

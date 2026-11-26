@@ -1,7 +1,8 @@
 rules_version = '2';
 
-// Roles: owner (everything, manages people), editor (list, purchases, receipts, spending),
-// requester (sees the list, can only request items).
+// Everyone with access is trusted: any member can add to the list, buy, log receipts and
+// see spending, with no approval step. Owners also manage the account and its people.
+// Members still holding the old 'requester' role get the same access as editors.
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -10,7 +11,7 @@ service cloud.firestore {
     function account(id) { return get(/databases/$(database)/documents/accounts/$(id)).data; }
     function isMember(id) { return signedIn() && request.auth.uid in account(id).memberUids; }
     function roleIn(id) { return account(id).members[request.auth.uid].role; }
-    function canEdit(id) { return isMember(id) && roleIn(id) in ['owner', 'editor']; }
+    function canEdit(id) { return isMember(id); }
     function isOwner(id) { return isMember(id) && roleIn(id) == 'owner'; }
     function changed() { return request.resource.data.diff(resource.data).affectedKeys(); }
 
@@ -26,8 +27,8 @@ service cloud.firestore {
         // Owners manage the account and its people.
         (signedIn() && resource.data.members[request.auth.uid].role == 'owner'
           && request.auth.uid in request.resource.data.memberUids)
-        // Editors may change settings only.
-        || (signedIn() && resource.data.members[request.auth.uid].role == 'editor'
+        // Other members may change settings only.
+        || (signedIn() && resource.data.members[request.auth.uid].role in ['editor', 'requester']
           && changed().hasOnly(['settings']))
         // Accepting an invite: add yourself, with exactly the invited role.
         || joining(accountId);
@@ -49,14 +50,7 @@ service cloud.firestore {
 
       match /items/{itemId} {
         allow read: if isMember(accountId);
-        allow create: if canEdit(accountId)
-          || (isMember(accountId) && request.resource.data.status == 'requested' && request.resource.data.addedBy == request.auth.uid);
-        allow update: if canEdit(accountId)
-          || (isMember(accountId)
-            && resource.data.status in ['stocked', 'snoozed']
-            && request.resource.data.status == 'requested'
-            && changed().hasOnly(['status', 'qty', 'unit', 'store', 'category', 'urgent', 'needBy', 'addedAt', 'addedBy', 'addedByName', 'lastPrice']));
-        allow delete: if canEdit(accountId);
+        allow create, update, delete: if canEdit(accountId);
       }
 
       match /batches/{id} {
@@ -65,7 +59,7 @@ service cloud.firestore {
       }
 
       match /{coll}/{id} {
-        // purchases, receipts, receiptImages: spending data for owners and editors only.
+        // purchases, receipts, receiptImages: spending data, shared with every member.
         allow read, write: if coll in ['purchases', 'receipts', 'receiptImages'] && canEdit(accountId);
       }
     }
@@ -74,7 +68,7 @@ service cloud.firestore {
       allow read: if signedIn() && (resource.data.email == myEmail() || resource.data.invitedByUid == request.auth.uid);
       allow create: if signedIn()
         && request.resource.data.invitedByUid == request.auth.uid
-        && request.resource.data.role in ['owner', 'editor', 'requester']
+        && request.resource.data.role in ['owner', 'editor']
         && account(request.resource.data.accountId).members[request.auth.uid].role == 'owner';
       allow delete: if signedIn() && (resource.data.email == myEmail() || resource.data.invitedByUid == request.auth.uid
         || account(resource.data.accountId).members[request.auth.uid].role == 'owner');

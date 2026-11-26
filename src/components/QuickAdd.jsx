@@ -45,8 +45,7 @@ export default function QuickAdd() {
     if (!entries.length) return;
     const { added, undo } = await addEntries(ctx, entries);
     const names = added.map((a) => a.name);
-    const verb = can(role, 'edit') ? 'Added' : 'Requested';
-    showToast(label || `${verb} ${names.length > 3 ? `${names.slice(0, 3).join(', ')} and ${names.length - 3} more` : names.join(', ')}`, undo);
+    showToast(label || `Added ${names.length > 3 ? `${names.slice(0, 3).join(', ')} and ${names.length - 3} more` : names.join(', ')}`, undo);
   }
 
   async function onSubmit(e) {

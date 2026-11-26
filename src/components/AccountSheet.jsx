@@ -9,7 +9,7 @@ export default function AccountSheet({ onClose }) {
   const { backend, user, accounts, account, role, switchAccount, showToast } = useApp();
   const [invites, setInvites] = useState([]);
   const [email, setEmail] = useState('');
-  const [inviteRole, setInviteRole] = useState(account?.type === 'household' ? 'editor' : 'requester');
+  const [inviteRole, setInviteRole] = useState('editor');
   const [creating, setCreating] = useState(false);
   const owner = can(role, 'members');
 
@@ -58,7 +58,7 @@ export default function AccountSheet({ onClose }) {
               {owner && uid !== user.uid ? (
                 <>
                   <select className="input" style={{ width: 'auto' }} value={m.role} onChange={(e) => backend.updateAccount(account.id, { [`members.${uid}`]: { ...m, role: e.target.value } })} aria-label={`Role for ${m.name}`}>
-                    {Object.entries(ROLES).map(([k, r]) => <option key={k} value={k}>{r.label}</option>)}
+                    {Object.entries(ROLES).filter(([k, r]) => !r.legacy || k === m.role).map(([k, r]) => <option key={k} value={k}>{r.label}</option>)}
                   </select>
                   <button type="button" className="chip" onClick={() => backend.removeMember(account, uid)}>Remove</button>
                 </>
@@ -78,7 +78,6 @@ export default function AccountSheet({ onClose }) {
                 <label className="field"><span>Role</span>
                   <select className="input" value={inviteRole} onChange={(e) => setInviteRole(e.target.value)}>
                     <option value="editor">Editor: edits the list and sees spending</option>
-                    <option value="requester">Requester: can only request items</option>
                     <option value="owner">Owner: also manages people</option>
                   </select>
                 </label>
@@ -124,7 +123,7 @@ export function CreateAccount({ onDone }) {
         <button type="button" aria-pressed={type === 'household'} onClick={() => setType('household')}>Household</button>
         <button type="button" aria-pressed={type === 'organization'} onClick={() => setType('organization')}>Organization</button>
       </div>
-      <p className="small muted">{type === 'household' ? 'Everyone you invite can edit the list and see spending.' : 'Invite staff as Requesters. They can ask for supplies, and an Editor such as the office manager approves and buys.'}</p>
+      <p className="small muted">{type === 'household' ? 'Everyone you invite can edit the list and see spending.' : 'Everyone you invite can add to the list directly, mark items bought and see spending. Only owners manage people.'}</p>
       <label className="field"><span>Name</span><input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder={type === 'household' ? 'Our household' : 'Main office'} /></label>
       <button type="submit" className="btn primary">Create list</button>
     </form>

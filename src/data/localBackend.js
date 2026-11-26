@@ -86,9 +86,12 @@ function seed() {
     }
     if (lastBought[id]) d.items[id].lastPurchasedAt = lastBought[id];
   }
-  // A requested item from the spouse so the approval flow is visible.
+  // An item the spouse added a moment ago, never bought, so the "not bought yet" state shows.
   const rq = uid();
-  d.items[rq] = { id: rq, name: 'Sticky notes', category: 'Office & stationery', store: 'Amazon', qty: 1, unit: 'pack', status: 'requested', addedAt: now - 3600e3, addedBy: 'demo-spouse', addedByName: 'Spouse', cadence: { mode: 'auto' } };
+  d.items[rq] = { id: rq, name: 'Sticky notes', category: 'Office & stationery', store: 'Amazon', qty: 1, unit: 'pack', status: 'needed', addedAt: now - 3600e3, addedBy: 'demo-spouse', addedByName: 'Spouse', cadence: { mode: 'auto' } };
+  // A couple of prices someone checked, so the price comparison shows.
+  const towels = Object.values(d.items).find((i) => i.name === 'Paper towels');
+  if (towels) towels.seenPrices = { samsclub: { price: 22.98, at: now - 2 * DAY, by: 'Demo user' }, amazon: { price: 27.49, at: now - 2 * DAY, by: 'Demo user' }, walmart: { price: 24.97, at: now - 2 * DAY, by: 'Demo user' } };
   return s;
 }
 

@@ -19,7 +19,7 @@ export default function TripsView() {
   const groups = useMemo(() => {
     const m = new Map();
     for (const it of items) {
-      if (!isOnList(it, now) || it.status === 'requested' || it.status === 'ordered') continue;
+      if (!isOnList(it, now) || it.status === 'ordered') continue;
       const k = it.store || '';
       if (!m.has(k)) m.set(k, []);
       m.get(k).push(it);
@@ -152,7 +152,7 @@ function ShopMode({ store, onClose }) {
   const { ctx, items, predictions, showToast } = useApp();
   const [got, setGot] = useState([]);
   const now = Date.now();
-  const list = items.filter((it) => (it.store || '') === store && isOnList(it, now) && it.status !== 'requested' && it.status !== 'ordered');
+  const list = items.filter((it) => (it.store || '') === store && isOnList(it, now) && it.status !== 'ordered');
   const gotItems = items.filter((it) => got.includes(it.id));
 
   async function buy(it) {

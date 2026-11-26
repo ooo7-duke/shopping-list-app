@@ -6,10 +6,11 @@ A shared shopping list for households and organizations. You add items the momen
 
 - Quick add: Type `2 gal milk @costco $3.49` and the app reads the quantity, unit, store and price. Separate items with commas, paste a whole list, or tap the mic and say "eggs and bread and milk." Put `!` at the end when something can't wait.
 - Gestures in place of buttons: Swipe right when you've got an item. Swipe left to snooze it for a week, or swipe further to take it off the list. Every action shows an Undo. On a desktop you can tap the circle or use the icons that appear on hover.
-- Shared accounts: Sign in with Google. A household can have both spouses as editors. An organization can have an office manager as editor and staff as requesters: requesters can ask for items, and an editor approves them.
+- Shared accounts: Sign in with Google. Everyone you invite is trusted: they add items straight to the list, check things off and see spending, with no approval step. Owners also manage who has access.
 - Trips and orders: The list is grouped by store with an estimated total. Each store card offers items that will be due soon at the same store, so one trip covers both. Online orders can be marked "Ordered" and then "It arrived," which logs the purchases.
 - Predictions: After two or more purchases, the app estimates how long an item lasts, adjusted for how much you bought. Items due within your chosen window appear under "Running low soon." On any item you can switch to a fixed schedule ("every 14 days") or turn predictions off.
 - Receipts: Snap a photo or paste a screenshot. Gemini reads each line, matches it to items on your list, and shows you the matches to confirm before anything is saved. Prices then appear next to items on the list.
+- Last time and price checks: Each item on the list shows when you last bought it, how many and what you paid. Tap Check price to search Sam's Club, Amazon, Walmart, Target, Costco or Google Shopping, then type the price you see. The cheapest recent one shows on the list. The app doesn't fetch store prices on its own, because those retailers don't offer an open price feed. `src/lib/prices.js` has a hook for adding a paid price service later.
 - Insights: Spending by week or month, by category, by store, and top items, plus a 30-day forecast. Filter by date, category, store, cost, quantity or item name, and export to CSV.
 
 Without Firebase settings the app runs in demo mode with sample data stored on the device. Adding `?demo` to any URL forces demo mode, which is handy on deploy previews.
@@ -80,5 +81,7 @@ npm test
 | `src/data/actions.js` | Every write the app makes (add, buy, snooze, order, save receipt) |
 | `src/data/firebaseBackend.js` | Firestore and Google sign-in |
 | `src/data/localBackend.js` | Demo mode, stored in the browser |
-| `firestore.rules` | Server-side permissions for owners, editors and requesters |
+| `firestore.rules` | Server-side permissions: members edit everything, owners also manage people |
+| `src/lib/history.js` | Last date, quantity and price bought for each item |
+| `src/lib/prices.js` | Store price-check links (Sam's Club, Amazon, Walmart first) and the price-provider hook |
 | `scripts/netlify-ignore.sh` | Production deploy guard |

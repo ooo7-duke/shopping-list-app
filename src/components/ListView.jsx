@@ -4,7 +4,8 @@ import QuickAdd from './QuickAdd.jsx';
 import SwipeRow from './SwipeRow.jsx';
 import ItemRow from './ItemRow.jsx';
 import ItemSheet from './ItemSheet.jsx';
-import { isOnList, markBought, snooze, takeOffList, putOnList, approve, decline, estimate } from '../data/actions.js';
+import { isOnList, markBought, snooze, takeOffList, putOnList, estimate } from '../data/actions.js';
+import { lastPurchaseMap, lastBuy } from '../lib/history.js';
 import { describePrediction, DAY } from '../lib/predict.js';
 import { can } from '../lib/config.js';
 import { fmtMoney } from '../lib/format.js';
@@ -15,13 +16,15 @@ export default function ListView() {
   const { ctx, items, purchases, predictions, role, account, showToast, backend } = useApp();
   const [groupBy, setGroupBy] = useState(() => localStorage.getItem(GROUP_KEY) || 'category');
   const [openId, setOpenId] = useState(null);
+  const [openFocus, setOpenFocus] = useState(null);
+  const latest = useMemo(() => lastPurchaseMap(purchases), [purchases]);
+  const open = (id, focus = null) => { setOpenId(id); setOpenFocus(focus); };
   const [showSnoozed, setShowSnoozed] = useState(false);
   const editor = can(role, 'edit');
   const now = Date.now();
   const lookahead = account?.settings?.lookaheadDays ?? 10;
 
-  const onList = items.filter((it) => isOnList(it, now) && it.status !== 'requested' && it.status !== 'ordered');
-  const requested = items.filter((it) => it.status === 'requested');
+  const onList = items.filter((it) => isOnList(it, now) && it.status !== 'ordered');
   const ordered = items.filter((it) => it.status === 'ordered');
   const snoozed = items.filter((it) => it.status === 'snoozed' && (it.snoozeUntil || 0) > now);
   const recent = items.filter((it) => it.status === 'stocked' && it.lastPurchasedAt && now - it.lastPurchasedAt < DAY).sort((a, b) => b.lastPurchasedAt - a.lastPurchasedAt);
@@ -71,24 +74,6 @@ export default function ListView() {
     <>
       <QuickAdd />
 
-      {editor && requested.length > 0 && (
-        <section aria-labelledby="req-h">
-          <div className="section-h"><h2 id="req-h">Requests to approve</h2><span className="small muted">{requested.length}</span></div>
-          <div className="list">
-            {requested.map((it) => (
-              <SwipeRow key={it.id} onRight={() => act(approve, (x) => `Approved ${x.name}`)(it)} rightLabel="Approve" onLeft={() => act(decline, (x) => `Declined ${x.name}`)(it)} leftLabel="Decline">
-                <ItemRow item={it} readOnly onOpen={() => setOpenId(it.id)} extra={
-                  <span className="row" style={{ gap: 6 }}>
-                    <button type="button" className="chip blue" onClick={(e) => { e.stopPropagation(); act(approve, (x) => `Approved ${x.name}`)(it); }}>Approve</button>
-                    <button type="button" className="chip" onClick={(e) => { e.stopPropagation(); act(decline, (x) => `Declined ${x.name}`)(it); }}>Decline</button>
-                  </span>
-                } />
-              </SwipeRow>
-            ))}
-          </div>
-        </section>
-      )}
-
       {editor && suggestions.length > 0 && (
         <section aria-labelledby="sug-h">
           <div className="section-h"><h2 id="sug-h">Running low soon</h2><span className="small muted">tap to add</span></div>
@@ -127,7 +112,8 @@ export default function ListView() {
             {list.map((it) => (
               <SwipeRow key={it.id} disabled={!editor} onRight={() => bought(it)} onLeft={() => doSnooze(it)} onFarLeft={() => doRemove(it)}>
                 <ItemRow item={it} pred={predictions[it.id]} showStore={groupBy !== 'store'} showCategory={groupBy === 'store'} readOnly={!editor}
-                  onToggle={() => bought(it)} onOpen={() => setOpenId(it.id)} onSnooze={editor ? () => doSnooze(it) : null} onRemove={editor ? () => doRemove(it) : null} />
+                  showHistory last={lastBuy(it, latest[it.id])} onPrices={() => open(it.id, 'prices')}
+                  onToggle={() => bought(it)} onOpen={() => open(it.id)} onSnooze={editor ? () => doSnooze(it) : null} onRemove={editor ? () => doRemove(it) : null} />
               </SwipeRow>
             ))}
           </div>
@@ -138,7 +124,7 @@ export default function ListView() {
         <section aria-labelledby="ord-h">
           <div className="section-h"><h2 id="ord-h">On order</h2><span className="small muted">mark arrived in Trips</span></div>
           <div className="list">
-            {ordered.map((it) => <ItemRow key={it.id} item={it} readOnly onOpen={() => setOpenId(it.id)} />)}
+            {ordered.map((it) => <ItemRow key={it.id} item={it} readOnly showHistory last={lastBuy(it, latest[it.id])} onOpen={() => open(it.id)} />)}
           </div>
         </section>
       )}
@@ -147,7 +133,7 @@ export default function ListView() {
         <section aria-labelledby="got-h">
           <div className="section-h"><h2 id="got-h">Got it today</h2><span className="small muted">tap a check to undo</span></div>
           <div className="list">
-            {recent.map((it) => <ItemRow key={it.id} item={it} done onToggle={() => unbuy(it)} onOpen={() => setOpenId(it.id)} />)}
+            {recent.map((it) => <ItemRow key={it.id} item={it} done onToggle={() => unbuy(it)} onOpen={() => open(it.id)} />)}
           </div>
         </section>
       )}
@@ -163,7 +149,7 @@ export default function ListView() {
             <div className="list">
               {snoozed.map((it) => (
                 <SwipeRow key={it.id} onRight={() => doAdd(it)} rightLabel="Back on list">
-                  <ItemRow item={it} onToggle={() => doAdd(it)} onOpen={() => setOpenId(it.id)} extra={<span>until {new Date(it.snoozeUntil).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>} />
+                  <ItemRow item={it} onToggle={() => doAdd(it)} onOpen={() => open(it.id)} extra={<span>until {new Date(it.snoozeUntil).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>} />
                 </SwipeRow>
               ))}
             </div>
@@ -177,7 +163,7 @@ export default function ListView() {
         </p>
       )}
 
-      {openItem && <ItemSheet item={openItem} onClose={() => setOpenId(null)} />}
+      {openItem && <ItemSheet item={openItem} focus={openFocus} onClose={() => setOpenId(null)} />}
     </>
   );
 }

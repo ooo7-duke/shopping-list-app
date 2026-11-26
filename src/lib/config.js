@@ -19,10 +19,12 @@ export const DEMO_MODE =
   !firebaseConfig.apiKey ||
   (typeof location !== 'undefined' && new URLSearchParams(location.search).has('demo'));
 
+// Everyone with access is trusted: there is no approval step. Owners also manage people.
+// 'requester' is kept only so members invited under the old role keep full access.
 export const ROLES = {
   owner: { label: 'Owner', can: ['edit', 'spend', 'members'] },
   editor: { label: 'Editor', can: ['edit', 'spend'] },
-  requester: { label: 'Requester', can: [] },
+  requester: { label: 'Editor', can: ['edit', 'spend'], legacy: true },
 };
 
 export const can = (role, action) => !!ROLES[role]?.can.includes(action);
