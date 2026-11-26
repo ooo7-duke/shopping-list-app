@@ -1,0 +1,84 @@
+# Shopping List
+
+A shared shopping list for households and organizations. You add items the moment you notice something is running low, the app groups them into store runs so you make fewer trips, and it learns how often you buy things so it can remind you before you run out.
+
+## What it does
+
+- Quick add: Type `2 gal milk @costco $3.49` and the app reads the quantity, unit, store and price. Separate items with commas, paste a whole list, or tap the mic and say "eggs and bread and milk." Put `!` at the end when something can't wait.
+- Gestures in place of buttons: Swipe right when you've got an item. Swipe left to snooze it for a week, or swipe further to take it off the list. Every action shows an Undo. On a desktop you can tap the circle or use the icons that appear on hover.
+- Shared accounts: Sign in with Google. A household can have both spouses as editors. An organization can have an office manager as editor and staff as requesters: requesters can ask for items, and an editor approves them.
+- Trips and orders: The list is grouped by store with an estimated total. Each store card offers items that will be due soon at the same store, so one trip covers both. Online orders can be marked "Ordered" and then "It arrived," which logs the purchases.
+- Predictions: After two or more purchases, the app estimates how long an item lasts, adjusted for how much you bought. Items due within your chosen window appear under "Running low soon." On any item you can switch to a fixed schedule ("every 14 days") or turn predictions off.
+- Receipts: Snap a photo or paste a screenshot. Gemini reads each line, matches it to items on your list, and shows you the matches to confirm before anything is saved. Prices then appear next to items on the list.
+- Insights: Spending by week or month, by category, by store, and top items, plus a 30-day forecast. Filter by date, category, store, cost, quantity or item name, and export to CSV.
+
+Without Firebase settings the app runs in demo mode with sample data stored on the device. Adding `?demo` to any URL forces demo mode, which is handy on deploy previews.
+
+## Setup
+
+You need a Google account for Firebase and the Netlify account you already have.
+
+### 1. Firebase project
+
+1. Go to [console.firebase.google.com](https://console.firebase.google.com) and create a project. Google Analytics is optional.
+2. In **Project settings > General > Your apps**, add a Web app. Copy the `firebaseConfig` values. You will paste them into Netlify in step 2.
+3. **Authentication > Sign-in method:** enable **Google**.
+4. **Authentication > Settings > Authorized domains:** add your Netlify addresses. Firebase does not accept wildcards, so add each one exactly:
+   - `your-site.netlify.app` (production)
+   - `preview--your-site.netlify.app` (the preview branch)
+5. **Firestore Database:** create a database in production mode. Choose a US location such as `us-east1` (nam5 also works).
+6. **Firestore Database > Rules:** replace the contents with the file `firestore.rules` from this repository and click **Publish**.
+7. **AI Services > AI Logic:** click Get started and choose the **Gemini Developer API**. It works on the free Spark plan. The guided setup turns on App Check, which needs a reCAPTCHA v3 site key:
+   - Create a v3 key at [google.com/recaptcha/admin](https://www.google.com/recaptcha/admin) for both Netlify domains above.
+   - In **App Check**, register the web app with the reCAPTCHA v3 provider and paste the secret key there.
+   - Keep the site key for step 2.
+
+Receipt images are compressed and stored in Firestore, so you do not need Cloud Storage. Cloud Storage would require the paid Blaze plan.
+
+### 2. Netlify
+
+1. In Netlify, **Add new project > Import an existing project**, and pick this GitHub repository. The build settings come from `netlify.toml`.
+2. **Project configuration > Environment variables:** add every variable listed in `.env.example`, using the values from Firebase.
+3. **Project configuration > Build & deploy > Continuous deployment > Branches and deploy contexts > Configure:**
+   - Production branch: `main`
+   - Branch deploys: **Let me add individual branches**, then add `preview`
+   - Deploy Previews: on
+
+The preview branch then lives at `preview--your-site.netlify.app`.
+
+## How changes reach production
+
+Netlify charges 15 credits for each production deploy. Branch deploys and Deploy Previews are free. The workflow keeps unfinished work off production:
+
+1. All work happens on the `preview` branch. Every push rebuilds `preview--your-site.netlify.app` at no cost.
+2. When you like what you see, open a pull request from `preview` to `main` (the GitHub mobile app works) and merge it. That merge is the only thing that triggers a production deploy.
+3. `scripts/netlify-ignore.sh` is a safety net. Netlify skips a production build when a commit lands on `main` without coming from a merged pull request (or a commit message starting with `release:`). It also skips any build where only documentation changed.
+
+GitHub can enforce "no direct pushes to main" through branch protection, but on a free account that only works for public repositories. The ignore script covers the private case.
+
+### Editing from your phone
+
+Open the repository in Claude Code from the Claude app on your phone and describe the change. `CLAUDE.md` tells Claude to work only on `preview`, run the tests and the build before pushing, and never merge to `main` until you say "release."
+
+## Local development
+
+```bash
+npm install
+cp .env.example .env.local   # fill in values, or leave empty for demo mode
+npm run dev
+npm test
+```
+
+## Project layout
+
+| Path | Purpose |
+| --- | --- |
+| `src/lib/parse.js` | Quick-add parsing (quantity, unit, @store, #category, $price, !) |
+| `src/lib/predict.js` | Purchase-interval predictions and overrides |
+| `src/lib/match.js` | Matching receipt lines to list items |
+| `src/lib/receipts.js` | Image compression and Gemini receipt reading |
+| `src/data/actions.js` | Every write the app makes (add, buy, snooze, order, save receipt) |
+| `src/data/firebaseBackend.js` | Firestore and Google sign-in |
+| `src/data/localBackend.js` | Demo mode, stored in the browser |
+| `firestore.rules` | Server-side permissions for owners, editors and requesters |
+| `scripts/netlify-ignore.sh` | Production deploy guard |
