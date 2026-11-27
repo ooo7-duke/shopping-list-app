@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { parseQuickAdd, parseEntry } from './parse.js';
 import { predictItem, DAY } from './predict.js';
 import { bestMatch, expandLine } from './match.js';
-import { guessCategory, ORG_CATEGORIES } from './categories.js';
+import { guessCategory, ORG_CATEGORIES, foldCategory, householdCategories } from './categories.js';
 
 describe('quick add parser', () => {
   it('reads quantity, unit, store, category and price', () => {
@@ -79,8 +79,15 @@ describe('receipt matching', () => {
 
 describe('category guess', () => {
   it('guesses common categories', () => {
-    expect(guessCategory('2% milk')).toBe('Dairy & eggs');
-    expect(guessCategory('Paper towels')).toBe('Paper goods');
+    expect(guessCategory('2% milk')).toBe('Meat, dairy & eggs');
+    expect(guessCategory('Paper towels')).toBe('Household');
+    expect(guessCategory('Tissue paper')).toBe('Household');
+    expect(guessCategory('Bread')).toBe('Pantry');
+    expect(guessCategory('Shampoo')).toBe('Health & personal care');
+    expect(foldCategory('Snacks')).toBe('Pantry');
+    expect(foldCategory('Snacks', ORG_CATEGORIES)).toBe('Snacks');
+    expect(householdCategories(['Produce', 'Dairy & eggs', 'Paper goods', 'Garden', 'Other'])).toEqual(['Produce', 'Meat, dairy & eggs', 'Frozen', 'Pantry', 'Household', 'Health & personal care', 'Pets', 'Garden', 'Other']);
+    expect(guessCategory('Paper towels', ORG_CATEGORIES)).toBe('Paper goods');
     expect(guessCategory('HP toner', ORG_CATEGORIES)).toBe('Printing');
     expect(guessCategory('mystery thing')).toBe('Other');
   });
@@ -342,7 +349,7 @@ describe('theme groups', () => {
   });
   it('places cereal and deli meat', () => {
     expect(guessCategory('Cheerios')).toBe('Pantry');
-    expect(guessCategory('Deli sandwich meat')).toBe('Meat & seafood');
+    expect(guessCategory('Deli sandwich meat')).toBe('Meat, dairy & eggs');
   });
 });
 
@@ -387,9 +394,9 @@ describe('sorting items into types', () => {
     expect(guessCategory('French Fries')).toBe('Frozen');
     expect(guessCategory('Cheerios')).toBe('Pantry');
     expect(guessCategory('Eggplant')).toBe('Produce');
-    expect(guessCategory('Sports drink')).toBe('Beverages');
-    expect(guessCategory('Aluminum foil')).toBe('Kitchen & breakroom');
-    expect(guessCategory('Canon PG-240XL ink')).toBe('Office & stationery');
+    expect(guessCategory('Sports drink')).toBe('Pantry');
+    expect(guessCategory('Aluminum foil')).toBe('Household');
+    expect(guessCategory('Canon PG-240XL ink')).toBe('Household');
   });
   it('keeps only AI answers for items asked about and types on the list', () => {
     const m = pickCategories({ items: [

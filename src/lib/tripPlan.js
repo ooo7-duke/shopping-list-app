@@ -2,7 +2,7 @@
 // (with how far each is from home). It needs no searches: what a store sells comes from a
 // table of store types by department, plus any price the app already found at that store.
 
-import { guessCategory, HOUSEHOLD_CATEGORIES, ORG_CATEGORIES } from './categories.js';
+import { guessCategory, ALL_FINE_CATEGORIES } from './categories.js';
 
 // Departments a store type carries.
 const GROCERY = ['grocery'];
@@ -50,6 +50,7 @@ const CATEGORY_DEPT = {
   'Household': 'household', 'Cleaning': 'household', 'Paper goods': 'household', 'Kitchen & breakroom': 'household',
   'Personal care': 'personal', 'Health': 'personal', 'Safety & first aid': 'personal',
   'Baby': 'baby', 'Pets': 'pets',
+  'Meat, dairy & eggs': 'grocery', 'Health & personal care': 'personal',
   'Office & stationery': 'office', 'Printing': 'office', 'Mailing & shipping': 'office', 'Event supplies': 'office',
   'Tech & electronics': 'electronics', 'Automotive': 'auto',
 };
@@ -61,7 +62,7 @@ const AUTO = /\b(motor|engine)\s*oil\b|\boil filter\b|\bwiper|antifreeze|coolant
 export function deptOf(item) {
   const name = [item.name, item.note].filter(Boolean).join(' ');
   if (AUTO.test(name)) return 'auto';
-  const guessed = guessCategory(name, [...new Set([...HOUSEHOLD_CATEGORIES, ...ORG_CATEGORIES])]);
+  const guessed = guessCategory(name, ALL_FINE_CATEGORIES);
   if (guessed && guessed !== 'Other') return CATEGORY_DEPT[guessed] || null;
   return CATEGORY_DEPT[item.category] || null;
 }

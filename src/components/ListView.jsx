@@ -84,7 +84,10 @@ export default function ListView() {
     return { map, themes: new Set(themed.values()) };
   }, [onList, account]);
   const rank = (k) => (typeInfo.themes.has(k) ? 0 : k === 'Anywhere' || k === 'Other' ? 2 : 1);
-  const byRank = (a, b) => rank(a) - rank(b) || a.localeCompare(b);
+  // Types follow the list's own order, which for households is the way you walk a store.
+  const catOrder = account?.categories || HOUSEHOLD_CATEGORIES;
+  const pos = (k) => { const i = catOrder.indexOf(k); return i < 0 ? 999 : i; };
+  const byRank = (a, b) => rank(a) - rank(b) || pos(a) - pos(b) || a.localeCompare(b);
 
   // Type filter: tap one or more types to show only those. None picked shows everything.
   const [typeFilter, setTypeFilter] = useState(() => {
