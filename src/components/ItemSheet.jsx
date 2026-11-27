@@ -122,6 +122,12 @@ export default function ItemSheet({ item, focus, onClose }) {
       <div className="stack">
         {editor ? (
           <>
+            {isOnList(item) && (
+              <div>
+                <button type="button" className="btn block" onClick={removeFromList}>Remove from list</button>
+                <p className="tiny muted" style={{ marginTop: 6 }}>Changed your mind? This takes it off the list without logging a purchase.</p>
+              </div>
+            )}
             <label className="field"><span>Name</span>
               <input className="input" defaultValue={item.name} onBlur={(e) => e.target.value.trim() && e.target.value !== item.name && save({ name: e.target.value.trim(), pricesCheckedAt: null })} />
             </label>
@@ -298,9 +304,7 @@ export default function ItemSheet({ item, focus, onClose }) {
               <div className="row" style={{ marginTop: 10 }}>
                 <button type="button" className="btn primary grow" onClick={logPurchase}>Mark bought</button>
                 {!isOnList(item) && <button type="button" className="btn" onClick={async () => { const u = await putOnList(ctx, item); showToast(`Added ${item.name}`, u); onClose(); }}>Add to list</button>}
-                {isOnList(item) && <button type="button" className="btn grow" onClick={removeFromList}>Remove from list</button>}
               </div>
-              {isOnList(item) && <p className="tiny muted" style={{ marginTop: 6 }}>Changed your mind? Remove from list takes it off without logging a purchase.</p>}
             </div>
           </>
         ) : (
