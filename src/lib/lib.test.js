@@ -221,3 +221,31 @@ describe('saving searches', () => {
     expect(calls).toBe(1);
   });
 });
+
+import { planTrips, deptOf } from './tripPlan.js';
+describe('trip planner', () => {
+  const stores = [
+    { id: 'g', type: 'grocery', place: 'Monrovia', miles: 2 },
+    { id: 'w', type: 'walmart', place: 'Frederick', miles: 9 },
+    { id: 'a', type: 'autoparts', place: 'Frederick', miles: 8 },
+  ];
+  const items = [{ id: 1, name: 'Oranges' }, { id: 2, name: 'Bananas' }, { id: 3, name: 'Milk' }, { id: 4, name: 'Engine oil' }];
+  it('files engine oil under car items, not cooking oil', () => {
+    expect(deptOf({ name: 'Engine oil', category: 'Pantry' })).toBe('auto');
+    expect(deptOf({ name: 'Olive oil' })).toBe('grocery');
+  });
+  it('makes one run at the store that has everything', () => {
+    const { stops, unplaced } = planTrips(items, stores);
+    expect(stops.length).toBe(1);
+    expect(stops[0].store.id).toBe('w');
+    expect(unplaced.length).toBe(0);
+  });
+  it('picks the nearer store on a tie', () => {
+    const { stops } = planTrips(items.slice(0, 3), stores);
+    expect(stops[0].store.id).toBe('g');
+  });
+  it('keeps an item pinned with @store at that store', () => {
+    const { stops } = planTrips([...items, { id: 5, name: 'Wipers', store: 'Auto parts' }], stores);
+    expect(stops.map((s) => s.store.id).sort()).toEqual(['a', 'w']);
+  });
+});
