@@ -85,7 +85,7 @@ export function serverPriceProvider(getToken) {
       const r = await fetch(`/.netlify/functions/prices?q=${encodeURIComponent(q)}`, { headers: { authorization: `Bearer ${token}` } });
       const data = await r.json().catch(() => null);
       if (!data) throw new Error(`The price service didn't answer (${r.status}).`);
-      if (data.configured === false) throw new Error('Price lookups aren\'t set up yet: the SERPAPI_KEY setting in Netlify is missing or not available to Functions.');
+      if (data.configured === false) throw new Error('Price lookups aren\'t set up yet: the SERPAPI_KEY setting in Netlify is missing, not available to Functions, or has no value for this deploy context (Production, Deploy Previews or Branch deploys).');
       if (!r.ok || data.error) throw new Error(data.error || `Price search failed (${r.status}).`);
       return data.quotes || [];
     },
