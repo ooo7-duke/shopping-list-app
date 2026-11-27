@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useApp } from '../AppContext.jsx';
 import Sheet from './Sheet.jsx';
 import SwipeRow from './SwipeRow.jsx';
@@ -8,7 +8,7 @@ import { describePrediction } from '../lib/predict.js';
 import { fmtMoney, fmtDate, fmtQty, firstName } from '../lib/format.js';
 import { can } from '../lib/config.js';
 import { CartIcon, TruckIcon } from './Icons.jsx';
-import { planTrips, carries, STORE_TYPES } from '../lib/tripPlan.js';
+import { planTrips, carries, storeLabel, STORE_TYPES } from '../lib/tripPlan.js';
 
 export default function TripsView() {
   const { ctx, items, batches, predictions, account, role, showToast } = useApp();
@@ -31,11 +31,11 @@ export default function TripsView() {
     if (savedStores.length) {
       const { stops, unplaced } = planTrips(onList, savedStores);
       const out = stops.map((st) => ({
-        key: st.store.id, store: st.label, list: st.items, urgent: st.urgent, est: estimate(st.items),
+        key: st.store.id, store: st.label, drop: st.label, list: st.items, urgent: st.urgent, est: estimate(st.items),
         miles: st.miles, canWait: st.canWait, planned: true,
         pullForward: dueSoon((it) => carries(st.store, it)).slice(0, 8),
       }));
-      if (unplaced.length) out.push({ key: 'unplaced', store: '', list: unplaced, urgent: unplaced.filter((i) => i.urgent).length, est: estimate(unplaced), pullForward: [], unplaced: true });
+      if (unplaced.length) out.push({ key: 'unplaced', store: '', drop: '', list: unplaced, urgent: unplaced.filter((i) => i.urgent).length, est: estimate(unplaced), pullForward: [], unplaced: true });
       return out;
     }
 
@@ -47,12 +47,33 @@ export default function TripsView() {
     }
     return [...m.entries()]
       .map(([store, list]) => ({
-        key: store || 'any', store, list, urgent: list.filter((i) => i.urgent).length, est: estimate(list),
+        key: store || 'any', store, drop: store, list, urgent: list.filter((i) => i.urgent).length, est: estimate(list),
         pullForward: store ? dueSoon((it) => it.store === store) : [],
         canWait: !!store && !list.some((i) => i.urgent) && list.length < 3,
       }))
       .sort((a, b) => b.urgent - a.urgent || b.list.length - a.list.length);
   }, [items, predictions, lookahead, now, savedStores]);
+
+  // Stores you can move an item to that have no run right now: saved stores, or stores used on other items.
+  const otherStores = useMemo(() => {
+    const shown = new Set(groups.map((g) => g.drop));
+    const names = savedStores.length
+      ? savedStores.map(storeLabel)
+      : [...new Set(items.map((i) => (i.store || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+    return names.filter((n) => !shown.has(n));
+  }, [groups, items, savedStores]);
+  const allStores = [...groups.filter((g) => g.drop).map((g) => g.drop), ...otherStores];
+
+  const [moving, setMoving] = useState(null); // item whose Move to sheet is open
+  const drag = useDrag((it, store) => moveTo(it, store));
+
+  async function moveTo(it, store) {
+    const to = String(store || '').trim();
+    if ((it.store || '') === to) return;
+    const prev = it.store || '';
+    await ctx.backend.update(ctx.accountId, 'items', it.id, { store: to });
+    showToast(to ? `Moved ${it.name} to ${to}` : `${it.name} can come from any store`, () => ctx.backend.update(ctx.accountId, 'items', it.id, { store: prev }));
+  }
 
   const openOrders = batches.filter((b) => b.status === 'ordered').sort((a, b) => b.orderedAt - a.orderedAt);
   const done = batches.filter((b) => b.status === 'done').sort((a, b) => (b.arrivedAt || 0) - (a.arrivedAt || 0)).slice(0, 5);
@@ -112,7 +133,7 @@ export default function TripsView() {
 
       <div className="trip-grid">
         {groups.map((g) => (
-          <article key={g.key} className="card trip">
+          <article key={g.key} className={`card trip${drag.over === g.key ? ' drop-over' : ''}`} data-drop={g.key} data-store={g.drop}>
             <div className="head">
               <div className="grow">
                 <h2>{g.unplaced ? 'Not sure where to buy' : g.store || 'Any store'}</h2>
@@ -125,7 +146,11 @@ export default function TripsView() {
             {g.canWait && <p className="hint" style={{ marginTop: 10 }}>{g.planned ? 'Extra stop for one or two items, nothing urgent. This can wait for the next run.' : 'Small run, nothing urgent. This can wait for more items.'}</p>}
             <ul>
               {g.list.map((it) => (
-                <li key={it.id}><span className="ellipsis">{it.name}{fmtQty(it.qty, it.unit) ? <span className="muted"> · {fmtQty(it.qty, it.unit)}</span> : null}</span><span>{it.lastPrice != null ? fmtMoney(it.lastPrice * (Number(it.qty) || 1)) : ''}</span></li>
+                <li key={it.id} className={drag.item?.id === it.id ? 'dragging' : ''}>
+                  <button type="button" className="grip" aria-label={`Drag ${it.name} to another store`} title="Drag to another store" onPointerDown={(e) => drag.start(e, it, g.key)}><GripIcon /></button>
+                  <button type="button" className="trip-name grow ellipsis" onClick={() => setMoving(it)} title="Move to another store">{it.name}{fmtQty(it.qty, it.unit) ? <span className="muted"> · {fmtQty(it.qty, it.unit)}</span> : null}</button>
+                  <span>{it.lastPrice != null ? fmtMoney(it.lastPrice * (Number(it.qty) || 1)) : ''}</span>
+                </li>
               ))}
             </ul>
             {g.pullForward.length > 0 && (
@@ -147,6 +172,24 @@ export default function TripsView() {
           </article>
         ))}
       </div>
+
+      {groups.length > 0 && (
+        <p className="tiny muted" style={{ marginTop: 10 }}>Drag an item by its handle to another store, or tap its name to pick one.</p>
+      )}
+
+      {drag.item && (
+        <>
+          <div className="drag-ghost" style={{ left: drag.x, top: drag.y }} aria-hidden="true">{drag.item.name}</div>
+          {otherStores.length > 0 && (
+            <div className="drop-strip" aria-hidden="true">
+              <span className="tiny">Drop on a store:</span>
+              {otherStores.map((n) => (
+                <span key={n} className={`chip${drag.over === `other:${n}` ? ' drop-over' : ''}`} data-drop={`other:${n}`} data-store={n}>{n}</span>
+              ))}
+            </div>
+          )}
+        </>
+      )}
 
       {openOrders.length > 0 && (
         <section>
@@ -184,7 +227,93 @@ export default function TripsView() {
 
       {shopStore !== null && <ShopMode store={shopStore.store} ids={shopStore.ids} onClose={() => setShopStore(null)} />}
       {editStores && <StoresSheet onClose={() => setEditStores(false)} />}
+      {moving && <MoveSheet item={moving} stores={allStores} saved={savedStores.length > 0} onPick={(st) => { setMoving(null); moveTo(moving, st); }} onAddStore={() => { setMoving(null); setEditStores(true); }} onClose={() => setMoving(null)} />}
     </>
+  );
+}
+
+// Drag with a finger or a mouse. Native drag and drop doesn't work on phones, so this follows the pointer
+// and asks the page which store card is under it when you let go.
+function useDrag(onDrop) {
+  const [state, setState] = useState(null); // { item, from, x, y, over, store }
+  const ref = useRef(null);
+  ref.current = state;
+  useEffect(() => {
+    if (!state?.item) return undefined;
+    const at = (x, y) => {
+      const el = document.elementFromPoint(x, y)?.closest('[data-drop]');
+      return el ? { over: el.dataset.drop, store: el.dataset.store ?? '' } : { over: null, store: null };
+    };
+    const move = (e) => {
+      e.preventDefault();
+      const edge = 70;
+      if (e.clientY < edge) window.scrollBy(0, -12);
+      else if (e.clientY > window.innerHeight - edge) window.scrollBy(0, 12);
+      setState((s) => s && { ...s, x: e.clientX, y: e.clientY, ...at(e.clientX, e.clientY) });
+    };
+    const up = (e) => {
+      const s = ref.current;
+      const hit = at(e.clientX, e.clientY);
+      setState(null);
+      if (s && hit.over && hit.over !== s.from) onDrop(s.item, hit.store);
+    };
+    const cancel = () => setState(null);
+    const key = (e) => { if (e.key === 'Escape') cancel(); };
+    window.addEventListener('pointermove', move, { passive: false });
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', cancel);
+    window.addEventListener('keydown', key);
+    return () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', cancel);
+      window.removeEventListener('keydown', key);
+    };
+  }, [!!state?.item]); // eslint-disable-line react-hooks/exhaustive-deps
+  return {
+    item: state?.item || null, x: state?.x, y: state?.y, over: state?.over,
+    start(e, item, from) {
+      if (e.button != null && e.button !== 0) return;
+      e.preventDefault();
+      setState({ item, from, x: e.clientX, y: e.clientY, over: from, store: null });
+    },
+  };
+}
+
+function GripIcon() {
+  return (
+    <svg width="14" height="20" viewBox="0 0 14 20" aria-hidden="true" fill="currentColor">
+      {[3, 10, 17].map((y) => [4, 10].map((x) => <circle key={`${x}${y}`} cx={x} cy={y} r="1.8" />))}
+    </svg>
+  );
+}
+
+// Tap an item's name to pick where to buy it, or type a store that isn't on the list yet.
+function MoveSheet({ item, stores, saved, onPick, onAddStore, onClose }) {
+  const [typed, setTyped] = useState('');
+  const current = item.store || '';
+  return (
+    <Sheet title={`Where to buy ${item.name}`} onClose={onClose}>
+      <div className="stack">
+        {stores.map((st) => (
+          <button key={st} type="button" className={`btn block${st === current ? ' primary' : ''}`} onClick={() => onPick(st)} aria-pressed={st === current}>
+            {st}{st === current ? ' (now)' : ''}
+          </button>
+        ))}
+        <button type="button" className={`btn block${!current ? ' primary' : ''}`} onClick={() => onPick('')}>Any store{saved ? ', let the app pick' : ''}</button>
+        {saved ? (
+          <>
+            <p className="small muted">A store that isn't here? Add it to your stores first, then move {item.name} to it.</p>
+            <button type="button" className="btn block" onClick={onAddStore}>+ Add a store</button>
+          </>
+        ) : (
+          <form className="row" onSubmit={(e) => { e.preventDefault(); if (typed.trim()) onPick(typed.trim()); }}>
+            <input className="input grow" value={typed} onChange={(e) => setTyped(e.target.value)} placeholder="Another store, like H-Mart" aria-label="Another store" />
+            <button type="submit" className="btn" disabled={!typed.trim()}>Move</button>
+          </form>
+        )}
+      </div>
+    </Sheet>
   );
 }
 
@@ -222,16 +351,18 @@ function StoresSheet({ onClose }) {
   const { backend, account, showToast } = useApp();
   const [rows, setRows] = useState(() => (account?.settings?.stores || []).map((r) => ({ ...r })));
   const set = (i, patch) => setRows((r) => r.map((x, j) => (j === i ? { ...x, ...patch } : x)));
-  const addRow = () => setRows((r) => [...r, { id: `s${Date.now().toString(36)}${r.length}`, type: 'walmart', place: '', miles: '' }]);
+  const addRow = () => setRows((r) => [...r, { id: `s${Date.now().toString(36)}${r.length}`, type: 'walmart', name: '', place: '', miles: '' }]);
   async function save() {
-    const clean = rows.map((r) => ({ id: r.id, type: r.type, place: String(r.place || '').trim().slice(0, 40), miles: r.miles === '' || r.miles == null ? null : Math.max(0, Math.round(Number(r.miles) * 10) / 10) }));
+    const missing = rows.find((r) => r.type === 'other' && !String(r.name || '').trim());
+    if (missing) { showToast('Type a name for each store you added as Other store.'); return; }
+    const clean = rows.map((r) => ({ id: r.id, type: r.type, name: String(r.name || '').trim().slice(0, 30), place: String(r.place || '').trim().slice(0, 40), miles: r.miles === '' || r.miles == null ? null : Math.max(0, Math.round(Number(r.miles) * 10) / 10) }));
     await backend.updateAccount(account.id, { 'settings.stores': clean });
     showToast(clean.length ? `Saved ${clean.length} store${clean.length === 1 ? '' : 's'}` : 'Stores cleared');
     onClose();
   }
   return (
     <Sheet title="Your nearby stores" onClose={onClose}>
-      <p className="small muted" style={{ marginBottom: 10 }}>Add each store you'd shop at, the town or street so you can tell two apart, and roughly how many miles it is from home. Pick Walmart Neighborhood Market for the smaller Walmarts: they have no car aisle.</p>
+      <p className="small muted" style={{ marginBottom: 10 }}>Add each store you shop at, with its name, the town or street, and roughly how many miles it is from home. The kind of store tells the app what it sells. For a store like H-Mart, pick Grocery store and name it H-Mart so groceries can go there, or pick Other store to get only what you move there yourself.</p>
       <div className="stack">
         {rows.map((r, i) => (
           <div key={r.id} className="card" style={{ background: '#fff' }}>
@@ -239,6 +370,9 @@ function StoresSheet({ onClose }) {
               <select className="input" value={r.type} onChange={(e) => set(i, { type: e.target.value })}>
                 {STORE_TYPES.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
               </select>
+            </label>
+            <label className="field"><span>Store name{r.type === 'other' ? '' : ' (optional)'}</span>
+              <input className="input" value={r.name || ''} maxLength={30} placeholder={r.type === 'other' ? 'H-Mart' : r.type === 'grocery' ? 'Giant' : storeLabel({ type: r.type })} onChange={(e) => set(i, { name: e.target.value })} />
             </label>
             <div className="grid2">
               <label className="field"><span>Where</span><input className="input" value={r.place || ''} placeholder="Town or street" onChange={(e) => set(i, { place: e.target.value })} /></label>

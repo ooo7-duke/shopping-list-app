@@ -222,7 +222,7 @@ describe('saving searches', () => {
   });
 });
 
-import { planTrips, deptOf } from './tripPlan.js';
+import { planTrips, deptOf, storeLabel } from './tripPlan.js';
 describe('trip planner', () => {
   const stores = [
     { id: 'g', type: 'grocery', place: 'Monrovia', miles: 2 },
@@ -247,6 +247,19 @@ describe('trip planner', () => {
   it('keeps an item pinned with @store at that store', () => {
     const { stops } = planTrips([...items, { id: 5, name: 'Wipers', store: 'Auto parts' }], stores);
     expect(stops.map((s) => s.store.id).sort()).toEqual(['a', 'w']);
+  });
+  it('lets you name your own store and move items to it', () => {
+    const mine = [...stores, { id: 'h', type: 'other', name: 'H-Mart', place: 'Frederick', miles: 12 }];
+    expect(storeLabel(mine[3])).toBe('H-Mart · Frederick');
+    const { stops } = planTrips([...items, { id: 6, name: 'Tilapia', store: 'H-Mart · Frederick' }], mine);
+    expect(stops.find((s) => s.store.id === 'h').items.map((i) => i.name)).toEqual(['Tilapia']);
+    // A store with no kind gets nothing on its own.
+    expect(planTrips(items, [mine[3]]).stops.length).toBe(0);
+  });
+  it('keeps a named grocery store apart from another grocery store', () => {
+    const two = [{ id: 'g', type: 'grocery', name: 'Giant', miles: 2 }, { id: 'h', type: 'grocery', name: 'H-Mart', miles: 12 }];
+    const { stops } = planTrips([{ id: 1, name: 'Milk', store: 'Giant' }, { id: 2, name: 'Tilapia', store: 'H-Mart' }], two);
+    expect(stops.map((s) => [s.store.id, s.items.length]).sort()).toEqual([['g', 1], ['h', 1]]);
   });
 });
 
