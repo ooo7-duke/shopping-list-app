@@ -118,7 +118,7 @@ export function planTrips(items, stores = []) {
     const pinned = pinnedStore(saved, it.store);
     if (pinned) add(pinned.id, it); else remaining.push(it);
   }
-  const miles = (s) => (Number.isFinite(Number(s.miles)) && s.miles !== '' ? Number(s.miles) : 999);
+  const miles = (s) => (s.miles != null && s.miles !== '' && Number.isFinite(Number(s.miles)) ? Number(s.miles) : 999);
   const order = [];
   for (const id of byStore.keys()) order.push(id);
   while (remaining.length) {
