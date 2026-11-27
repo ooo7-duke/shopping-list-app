@@ -2,7 +2,7 @@
 import { HOUSEHOLD_CATEGORIES } from '../lib/categories.js';
 import { DAY } from '../lib/predict.js';
 
-const KEY = 'sla-demo-v1';
+const KEY = 'sla-demo-v2';
 const listeners = new Set();
 let state = load();
 
