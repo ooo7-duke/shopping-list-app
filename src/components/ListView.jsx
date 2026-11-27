@@ -14,6 +14,7 @@ import { guessCategory, HOUSEHOLD_CATEGORIES } from '../lib/categories.js';
 
 const GROUP_KEY = 'sla-group-by';
 const FILTER_KEY = 'sla-type-filter';
+const FOLD_KEY = 'sla-folded-groups';
 const LOW_LIMIT = 6; // chips shown before "Show all"
 
 export default function ListView() {
@@ -72,6 +73,20 @@ export default function ListView() {
     const next = new Set(activeFilter);
     if (next.has(t)) next.delete(t); else next.add(t);
     saveFilter(next);
+  };
+  const [folded, setFolded] = useState(() => {
+    try { return new Set(JSON.parse(localStorage.getItem(FOLD_KEY) || '[]')); } catch { return new Set(); }
+  });
+  const foldId = (name) => `${groupBy}:${name}`;
+  const saveFolded = (next) => {
+    setFolded(next);
+    try { localStorage.setItem(FOLD_KEY, JSON.stringify([...next])); } catch { /* private mode */ }
+  };
+  const toggleFold = (name) => {
+    const next = new Set(folded);
+    const id = foldId(name);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    saveFolded(next);
   };
   const shown = activeFilter.size ? onList.filter((it) => activeFilter.has(typeInfo.map.get(it.id))) : onList;
 
@@ -166,10 +181,23 @@ export default function ListView() {
         </div>
       )}
 
-      {groups.map(([name, list]) => (
+      {groups.length > 2 && (
+        <div className="fold-all">
+          {groups.every(([n]) => folded.has(foldId(n)))
+            ? <button type="button" className="linkish" onClick={() => saveFolded(new Set([...folded].filter((f) => !groups.some(([n]) => f === foldId(n)))))}>Open all groups</button>
+            : <button type="button" className="linkish" onClick={() => saveFolded(new Set([...folded, ...groups.map(([n]) => foldId(n))]))}>Fold all groups</button>}
+        </div>
+      )}
+
+      {groups.map(([name, list]) => {
+        const isFolded = folded.has(foldId(name));
+        return (
         <section key={name} aria-label={name}>
-          <div className="section-h"><h3>{name}</h3><span className="small muted">{list.length}</span></div>
-          <div className="list">
+          <button type="button" className="section-h fold-h" aria-expanded={!isFolded} onClick={() => toggleFold(name)}>
+            <h3><span className={`chev${isFolded ? '' : ' open'}`} aria-hidden="true">›</span>{name}</h3>
+            <span className="small muted">{list.length}</span>
+          </button>
+          {!isFolded && <div className="list">
             {list.map((it) => (
               <SwipeRow key={it.id} disabled={!editor} onRight={() => bought(it)} onLeft={() => doSnooze(it)} onFarLeft={() => doRemove(it)}>
                 <ItemRow item={it} pred={predictions[it.id]} showStore={groupBy !== 'store'} showCategory={groupBy === 'store'} readOnly={!editor}
@@ -177,9 +205,10 @@ export default function ListView() {
                   onToggle={() => bought(it)} onOpen={() => open(it.id)} onSnooze={editor ? () => doSnooze(it) : null} onRemove={editor ? () => doRemove(it) : null} />
               </SwipeRow>
             ))}
-          </div>
+          </div>}
         </section>
-      ))}
+        );
+      })}
 
       {ordered.length > 0 && (
         <section aria-labelledby="ord-h">
