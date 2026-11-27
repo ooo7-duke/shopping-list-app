@@ -98,6 +98,23 @@ export default function TripsView() {
     return <div className="card empty"><h2>Trips are planned by your editors</h2><p>Add or request items on the List tab. An editor will fold them into the next trip or order.</p></div>;
   }
 
+  // With stores saved, this sits below the store runs; until then it leads the page so the first step is easy to find.
+  const storesCard = (
+    <div className="card" style={{ background: '#fff', marginBottom: 14, marginTop: savedStores.length ? 14 : 0 }}>
+      {savedStores.length ? (
+        <div className="row wrap">
+          <p className="small grow">Planned as the fewest runs from your {savedStores.length} saved store{savedStores.length === 1 ? '' : 's'}. The store with the most of your list goes first, and the nearer one wins a tie.</p>
+          <button type="button" className="btn" onClick={() => setEditStores(true)}>Edit stores</button>
+        </div>
+      ) : (
+        <div className="row wrap">
+          <p className="small grow">Save the stores near you once, with how far each is from home, and the app plans one run at the closest store that has most of your list.</p>
+          <button type="button" className="btn primary" onClick={() => setEditStores(true)}>Add your stores</button>
+        </div>
+      )}
+          </div>
+  );
+
   return (
     <>
       <div className="section-h" style={{ marginTop: 4 }}>
@@ -107,19 +124,7 @@ export default function TripsView() {
         </div>
       </div>
 
-      <div className="card" style={{ background: '#fff', marginBottom: 14 }}>
-        {savedStores.length ? (
-          <div className="row wrap">
-            <p className="small grow">Planned as the fewest runs from your {savedStores.length} saved store{savedStores.length === 1 ? '' : 's'}. The store with the most of your list goes first, and the nearer one wins a tie.</p>
-            <button type="button" className="btn" onClick={() => setEditStores(true)}>Edit stores</button>
-          </div>
-        ) : (
-          <div className="row wrap">
-            <p className="small grow">Save the stores near you once, with how far each is from home, and the app plans one run at the closest store that has most of your list.</p>
-            <button type="button" className="btn primary" onClick={() => setEditStores(true)}>Add your stores</button>
-          </div>
-        )}
-      </div>
+      {!savedStores.length && storesCard}
 
       {smallRuns.length >= 2 && (
         <p className="hint" style={{ marginBottom: 14 }}>
@@ -176,6 +181,8 @@ export default function TripsView() {
       {groups.length > 0 && (
         <p className="tiny muted" style={{ marginTop: 10 }}>On a phone, press and hold an item, then drag it to another store. Or tap its name to pick one.</p>
       )}
+
+      {savedStores.length > 0 && storesCard}
 
       {drag.item && (
         <>
