@@ -40,3 +40,26 @@ export function pickCategories(parsed, asked, cats) {
   }
   return out;
 }
+
+// Names the product in a photo, keeping the brand and the variety that makes it the right one
+// ("Trader Joe's gluten-free bread"), so a photo can start a new list item.
+export async function nameProduct(dataUrl, cats, app) {
+  if (DEMO_MODE || !app) {
+    return new Promise((res) => setTimeout(() => res({ name: "Trader Joe's gluten-free bread", category: cats.includes('Pantry') ? 'Pantry' : '' }), 700));
+  }
+  const { getAI, getGenerativeModel, GoogleAIBackend, Schema } = await import('firebase/ai');
+  const ai = getAI(app, { backend: new GoogleAIBackend() });
+  const schema = Schema.object({ properties: { name: Schema.string(), category: Schema.string() } });
+  const model = getGenerativeModel(ai, {
+    model: GEMINI_MODEL,
+    generationConfig: { responseMimeType: 'application/json', responseSchema: schema, temperature: 0 },
+  });
+  const prompt = `This photo shows a product someone wants on their household shopping list.
+Give name: the product as a shopper would write it on a list, short, keeping the brand and the variety that tells it apart (for example "Trader Joe's gluten-free bread", "Tide Free & Clear detergent"). No sizes or prices. If no product is visible, give an empty name.
+Give category: the one store section it belongs in, from: ${cats.join(' | ')}`;
+  const result = await model.generateContent([prompt, { inlineData: { mimeType: 'image/jpeg', data: dataUrl.split(',')[1] } }]);
+  const parsed = JSON.parse(result.response.text());
+  const name = String(parsed?.name || '').trim().slice(0, 80);
+  const category = cats.find((c) => c.toLowerCase() === String(parsed?.category || '').trim().toLowerCase()) || '';
+  return { name, category };
+}

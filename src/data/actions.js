@@ -28,7 +28,7 @@ export async function addEntries(ctx, entries) {
   const added = [];
   for (const e of entries) {
     const existing = findItem(items, e.name);
-    if (existing) undoOps.push({ type: 'update', coll: 'items', id: existing.id, data: clean({ status: existing.status, qty: existing.qty ?? 1, store: existing.store ?? '', urgent: !!existing.urgent, needBy: existing.needBy ?? null }) });
+    if (existing) undoOps.push({ type: 'update', coll: 'items', id: existing.id, data: clean({ status: existing.status, qty: existing.qty ?? 1, store: existing.store ?? '', urgent: !!existing.urgent, needBy: existing.needBy ?? null, ...(e.photo ? { photo: existing.photo ?? null } : {}) }) });
     const category = e.category ? matchCategory(e.category, cats) : undefined;
     if (existing) {
       ops.push({
@@ -38,6 +38,7 @@ export async function addEntries(ctx, entries) {
           store: e.store || existing.store || '', category: category || existing.category,
           urgent: !!e.urgent, needBy: e.urgent ? Date.now() : null, addedAt: Date.now(), addedBy: user.uid, addedByName: user.name,
           ...(e.price != null ? { lastPrice: e.price } : {}),
+          ...(e.photo ? { photo: e.photo, photoAt: Date.now() } : {}),
         }),
       });
       added.push({ ...existing, status });
@@ -48,6 +49,7 @@ export async function addEntries(ctx, entries) {
         category: category || guessCategory(e.name, cats), status, urgent: !!e.urgent,
         needBy: e.urgent ? Date.now() : null, lastPrice: e.price ?? null, cadence: { mode: 'auto' },
         addedAt: Date.now(), addedBy: user.uid, addedByName: user.name,
+        ...(e.photo ? { photo: e.photo, photoAt: Date.now() } : {}),
       };
       ops.push({ type: 'set', coll: 'items', id, data });
       undoOps.push({ type: 'remove', coll: 'items', id });

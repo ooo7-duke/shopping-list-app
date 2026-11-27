@@ -373,3 +373,5 @@ table.data td.num, table.data th.num { text-align: right; }
 .inv-group summary { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 10px 14px; min-height: var(--tap); cursor: pointer; }
 .inv-group ul { list-style: none; margin: 0; padding: 0 14px 10px; display: grid; gap: 6px; }
 .inv-group li { display: flex; justify-content: space-between; gap: 8px; border-top: 1px solid var(--line-soft); padding-top: 6px; }
+.qa-photo { display: flex; align-items: center; gap: 10px; margin-top: 8px; padding: 6px 8px; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); }
+.qa-photo img { width: 48px; height: 48px; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); }
