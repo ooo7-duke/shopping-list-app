@@ -306,3 +306,29 @@ describe('receipt QR codes', () => {
     expect(parseQr('')).toBe(null);
   });
 });
+
+import { themeOf, sharedThemes } from './themes.js';
+describe('theme groups', () => {
+  it('groups two Christmas items but not a lone one', () => {
+    const list = [
+      { id: 1, name: 'Christmas lights for the house' },
+      { id: 2, name: 'Christmas tree ornaments' },
+      { id: 3, name: 'Cheerios' },
+      { id: 4, name: 'Balloons' },
+    ];
+    const t = sharedThemes(list);
+    expect(t.get(1)).toBe('Christmas');
+    expect(t.get(2)).toBe('Christmas');
+    expect(t.has(3)).toBe(false);
+    expect(t.has(4)).toBe(false);
+    expect(themeOf({ name: 'Balloons' })).toBe('Birthday party');
+  });
+  it('does not match part of a word', () => {
+    expect(themeOf({ name: 'Tentacles' })).toBe(null);
+    expect(themeOf({ name: 'Garden hose' })).toBe('Garden');
+  });
+  it('places cereal and deli meat', () => {
+    expect(guessCategory('Cheerios')).toBe('Pantry');
+    expect(guessCategory('Deli sandwich meat')).toBe('Meat & seafood');
+  });
+});

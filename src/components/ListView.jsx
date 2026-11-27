@@ -9,6 +9,8 @@ import { lastPurchaseMap, lastBuy } from '../lib/history.js';
 import { describePrediction, DAY } from '../lib/predict.js';
 import { can } from '../lib/config.js';
 import { fmtMoney } from '../lib/format.js';
+import { sharedThemes } from '../lib/themes.js';
+import { guessCategory, HOUSEHOLD_CATEGORIES } from '../lib/categories.js';
 
 const GROUP_KEY = 'sla-group-by';
 const LOW_LIMIT = 6; // chips shown before "Show all"
@@ -39,15 +41,22 @@ export default function ListView() {
 
   const groups = useMemo(() => {
     const m = new Map();
-    const key = (it) => (groupBy === 'store' ? it.store || 'Anywhere' : it.category || 'Other');
+    // By type, items that share an occasion (two Christmas items, say) get a group of their
+    // own, listed first. Items still marked Other get a fresh guess from their name.
+    const themed = groupBy === 'store' ? new Map() : sharedThemes(onList);
+    const cats = account?.categories || HOUSEHOLD_CATEGORIES;
+    const typeOf = (it) => (it.category && it.category !== 'Other' ? it.category : guessCategory(it.name, cats) || 'Other');
+    const key = (it) => (groupBy === 'store' ? it.store || 'Anywhere' : themed.get(it.id) || typeOf(it));
+    const themes = new Set(themed.values());
     for (const it of onList) {
       const k = key(it);
       if (!m.has(k)) m.set(k, []);
       m.get(k).push(it);
     }
     for (const list of m.values()) list.sort((a, b) => (b.urgent ? 1 : 0) - (a.urgent ? 1 : 0) || a.name.localeCompare(b.name));
-    return [...m.entries()].sort((a, b) => (a[0] === 'Anywhere' ? 1 : b[0] === 'Anywhere' ? -1 : a[0].localeCompare(b[0])));
-  }, [onList, groupBy]);
+    const rank = (k) => (themes.has(k) ? 0 : k === 'Anywhere' || k === 'Other' ? 2 : 1);
+    return [...m.entries()].sort((a, b) => rank(a[0]) - rank(b[0]) || a[0].localeCompare(b[0]));
+  }, [onList, groupBy, account]);
 
   const setGroup = (g) => { setGroupBy(g); localStorage.setItem(GROUP_KEY, g); };
 

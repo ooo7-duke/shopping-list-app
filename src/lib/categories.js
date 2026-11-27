@@ -17,9 +17,9 @@ export const ORG_CATEGORIES = [
 const KEYWORDS = {
   'Produce': ['apple', 'banana', 'orange', 'lemon', 'lime', 'lettuce', 'spinach', 'kale', 'tomato', 'onion', 'garlic', 'potato', 'carrot', 'pepper', 'cucumber', 'avocado', 'berries', 'strawberr', 'blueberr', 'grape', 'broccoli', 'celery', 'mushroom', 'plantain', 'yam', 'ginger', 'cilantro', 'parsley', 'fruit', 'veg'],
   'Dairy & eggs': ['milk', 'egg', 'cheese', 'yogurt', 'yoghurt', 'butter', 'cream', 'creamer'],
-  'Meat & seafood': ['chicken', 'beef', 'pork', 'turkey', 'fish', 'salmon', 'shrimp', 'tilapia', 'sausage', 'bacon', 'ham', 'goat', 'lamb', 'steak', 'ground'],
+  'Meat & seafood': ['deli', 'lunch meat', 'sandwich meat', 'salami', 'bologna', 'pepperoni', 'hot dog', 'chicken', 'beef', 'pork', 'turkey', 'fish', 'salmon', 'shrimp', 'tilapia', 'sausage', 'bacon', 'ham', 'goat', 'lamb', 'steak', 'ground'],
   'Bakery': ['bread', 'bagel', 'bun', 'roll', 'tortilla', 'muffin', 'croissant', 'cake'],
-  'Pantry': ['rice', 'pasta', 'flour', 'sugar', 'salt', 'oil', 'beans', 'cereal', 'oat', 'spice', 'sauce', 'ketchup', 'mayo', 'honey', 'peanut butter', 'jam', 'canned', 'soup', 'broth', 'seasoning', 'vinegar'],
+  'Pantry': ['cheerios', 'oatmeal', 'pancake', 'syrup', 'rice', 'pasta', 'flour', 'sugar', 'salt', 'oil', 'beans', 'cereal', 'oat', 'spice', 'sauce', 'ketchup', 'mayo', 'honey', 'peanut butter', 'jam', 'canned', 'soup', 'broth', 'seasoning', 'vinegar'],
   'Frozen': ['frozen', 'ice cream', 'pizza'],
   'Beverages': ['water', 'juice', 'soda', 'coffee', 'tea', 'pop', 'sparkling', 'gatorade', 'k-cup', 'kcup'],
   'Snacks': ['chips', 'cookie', 'cracker', 'snack', 'popcorn', 'nuts', 'granola', 'candy', 'chocolate'],
