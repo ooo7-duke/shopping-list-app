@@ -100,7 +100,7 @@ export default function TripsView() {
 
   // With stores saved, this sits below the store runs; until then it leads the page so the first step is easy to find.
   const storesCard = (
-    <div className="card" style={{ background: '#fff', marginBottom: 14, marginTop: savedStores.length ? 14 : 0 }}>
+    <div className="card" style={{ marginBottom: 14, marginTop: savedStores.length ? 14 : 0 }}>
       {savedStores.length ? (
         <div className="row wrap">
           <p className="small grow">Planned as the fewest runs from your {savedStores.length} saved store{savedStores.length === 1 ? '' : 's'}. The store with the most of your list goes first, and the nearer one wins a tie.</p>
