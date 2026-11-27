@@ -104,19 +104,26 @@ export default function QuickAdd() {
     } catch (e) {
       console.error('Add failed', e);
       showToast(saveErrorMessage(e, 'add that'));
-      return;
+      return false;
     }
     const { added, undo } = result;
     // Prices are looked up only when someone taps Look up prices on the item, to save searches.
     const names = added.map((a) => a.name);
     showToast(label || `Added ${names.length > 3 ? `${names.slice(0, 3).join(', ')} and ${names.length - 3} more` : names.join(', ')}`, undo);
+    return true;
   }
 
   // Holds the add when something looks like a duplicate, so the banner can ask first.
-  async function tryAdd(entries) {
+  // The box is cleared before saving: the list updates the moment the item is written, and
+  // text still in the box would then flash "already on your list" for the item just added.
+  // If the save fails, the typed text comes back.
+  async function tryAdd(entries, { clear = false } = {}) {
     const found = findDuplicates(entries, onList);
     if (found.length) { setPending({ entries, dupes: found }); return false; }
-    await submit(entries);
+    const typed = text;
+    if (clear) { setText(''); setSel(-1); }
+    const ok = await submit(entries);
+    if (!ok && clear) setText(typed);
     return true;
   }
 
@@ -145,7 +152,7 @@ export default function QuickAdd() {
     if (sel >= 0 && suggestions[sel]) return pickSuggestion(suggestions[sel]);
     const entries = parsed;
     setSel(-1);
-    if (await tryAdd(entries)) setText('');
+    await tryAdd(entries, { clear: true });
   }
 
   async function pickSuggestion(it) {
@@ -153,7 +160,7 @@ export default function QuickAdd() {
     const before = parseQuickAdd(head);
     const lastParsed = parseQuickAdd(text.split(/[,\n]/).pop())[0] || {};
     setSel(-1);
-    if (await tryAdd([...before, { ...lastParsed, name: it.name, store: lastParsed.store || '', qty: lastParsed.qty !== 1 ? lastParsed.qty : it.qty || 1 }])) setText('');
+    await tryAdd([...before, { ...lastParsed, name: it.name, store: lastParsed.store || '', qty: lastParsed.qty !== 1 ? lastParsed.qty : it.qty || 1 }], { clear: true });
     inputRef.current?.focus();
   }
 
