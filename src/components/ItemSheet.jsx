@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useApp } from '../AppContext.jsx';
 import Sheet from './Sheet.jsx';
-import { markBought, putOnList, isOnList, setSeenPrice, refreshPrices, canLookUpAgain, snoozeUntil } from '../data/actions.js';
+import { markBought, putOnList, takeOffList, isOnList, setSeenPrice, refreshPrices, canLookUpAgain, snoozeUntil } from '../data/actions.js';
 import SnoozePicker from './SnoozePicker.jsx';
 import { storeLinks, seenPrices, refurbPrice, hasPriceProvider, currentQuota, onQuota, refreshQuota } from '../lib/prices.js';
 import { deptOf } from '../lib/tripPlan.js';
@@ -98,8 +98,16 @@ export default function ItemSheet({ item, focus, onClose }) {
   }
   async function remove() {
     if (!confirmDelete) { setConfirmDelete(true); return; }
+    // Keep a copy so a delete tapped by mistake can be undone from the message.
+    const copy = Object.fromEntries(Object.entries(item).filter(([k, v]) => k !== 'id' && v !== undefined));
     await backend.remove(ctx.accountId, 'items', item.id);
-    showToast(`Deleted ${item.name}. Purchase history is kept for reports.`);
+    showToast(`Deleted ${item.name}. Past purchases stay in your history.`, () => backend.commit(ctx.accountId, [{ type: 'set', coll: 'items', id: item.id, data: copy }]));
+    onClose();
+  }
+  // Off the list with nothing logged: no purchase, no change to the history or the price.
+  async function removeFromList() {
+    const undo = await takeOffList(ctx, item);
+    showToast(`Removed ${item.name} from the list. Nothing was logged as bought.`, undo);
     onClose();
   }
 
@@ -290,7 +298,9 @@ export default function ItemSheet({ item, focus, onClose }) {
               <div className="row" style={{ marginTop: 10 }}>
                 <button type="button" className="btn primary grow" onClick={logPurchase}>Mark bought</button>
                 {!isOnList(item) && <button type="button" className="btn" onClick={async () => { const u = await putOnList(ctx, item); showToast(`Added ${item.name}`, u); onClose(); }}>Add to list</button>}
+                {isOnList(item) && <button type="button" className="btn grow" onClick={removeFromList}>Remove from list</button>}
               </div>
+              {isOnList(item) && <p className="tiny muted" style={{ marginTop: 6 }}>Changed your mind? Remove from list takes it off without logging a purchase.</p>}
             </div>
           </>
         ) : (

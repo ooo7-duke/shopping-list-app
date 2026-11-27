@@ -8,7 +8,7 @@ import { describePrediction } from '../lib/predict.js';
 import { fmtMoney, fmtDate, fmtQty, firstName } from '../lib/format.js';
 import { can } from '../lib/config.js';
 import { CartIcon, TruckIcon } from './Icons.jsx';
-import { planTrips, carries, storeLabel, STORE_TYPES, rememberStoreKinds } from '../lib/tripPlan.js';
+import { planTrips, carries, storeLabel, storeType, rememberStoreKinds, guessStoreType, COMMON_STORES } from '../lib/tripPlan.js';
 
 export default function TripsView() {
   const { ctx, items, batches, predictions, account, role, showToast } = useApp();
@@ -140,7 +140,7 @@ export default function TripsView() {
               </div>
               {g.urgent > 0 && <span className="chip warn">{g.urgent} needed now</span>}
             </div>
-            {g.unplaced && <p className="small muted" style={{ marginTop: 6 }}>None of your saved stores is a sure match for these. Add the right kind of store, or put @store on the item.</p>}
+            {g.unplaced && <p className="small muted" style={{ marginTop: 6 }}>None of your saved stores is a sure match for these. Add a store that sells them, or put @store on the item.</p>}
             {!g.store && !g.unplaced && <p className="small muted" style={{ marginTop: 6 }}>Add @store when you type an item, or set a store on the item, to fold these into a run.</p>}
             <ul>
               {g.list.map((it) => (
@@ -412,15 +412,18 @@ function ShopMode({ store, ids, onClose }) {
 }
 
 // The household's nearby stores, saved once on the account so everyone shares them.
-// New stores go on top. Stores named before are remembered and offered in the Kind of store list.
+// New stores go on top. Each store needs only its name: pick one from the list or type a
+// new one, and the app works out what it sells from the name.
+const NEW_STORE = '__new__';
+const typeName = (t) => storeType(t)?.name.replace(/\s*\(.*\)$/, '') || '';
 function StoresSheet({ forItem, onAdded, onClose }) {
   const { backend, account, showToast } = useApp();
-  // Opened from an item's Where to buy, it starts with an empty row on top for the new store.
-  const [rows, setRows] = useState(() => [
-    ...(forItem ? [{ id: `s${Date.now().toString(36)}n`, type: '', name: '', place: '', miles: '' }] : []),
-    ...(account?.settings?.stores || []).map((r) => ({ ...r })),
-  ]);
   const original = account?.settings?.stores || [];
+  // A store saved before with no name of its own shows its kind as the name, like "Grocery store".
+  const [rows, setRows] = useState(() => [
+    ...(forItem ? [{ id: `s${Date.now().toString(36)}n`, type: '', name: '', place: '', miles: '', typing: true }] : []),
+    ...original.map((r) => ({ ...r, name: String(r.name || '').trim() || typeName(r.type) })),
+  ]);
   // The saved names: the list kept on the account, or, before there is one, the names of the saved stores.
   const [kinds, setKinds] = useState(() => (Array.isArray(account?.settings?.storeKinds) ? rememberStoreKinds(account.settings.storeKinds, []) : rememberStoreKinds([], original)));
   async function forget(j) {
@@ -431,24 +434,31 @@ function StoresSheet({ forItem, onAdded, onClose }) {
     showToast(`Removed ${gone.name} from your saved stores`);
   }
   const set = (i, patch) => setRows((r) => r.map((x, j) => (j === i ? { ...x, ...patch } : x)));
-  const addRow = () => setRows((r) => [{ id: `s${Date.now().toString(36)}${r.length}`, type: '', name: '', place: '', miles: '' }, ...r]);
-  const others = STORE_TYPES.filter((t) => t.id !== 'other');
-  // What the Kind of store list shows for a row: a remembered store, a kind, or the prompt.
-  const pickOf = (r) => {
-    if (!r.type) return '';
-    const name = String(r.name || '').trim().toLowerCase();
-    const k = name ? kinds.findIndex((x) => x.type === r.type && x.name.toLowerCase() === name) : -1;
-    return k >= 0 ? `saved:${k}` : r.type;
-  };
+  const addRow = () => setRows((r) => [{ id: `s${Date.now().toString(36)}${r.length}`, type: '', name: '', place: '', miles: '', typing: false }, ...r]);
+  const lower = (x) => String(x || '').trim().toLowerCase();
+  const yours = kinds.map((k) => k.name);
+  const common = COMMON_STORES.filter((n) => !yours.some((y) => lower(y) === lower(n)));
+  const listed = (name) => [...yours, ...common].find((n) => lower(n) === lower(name)) || null;
+  // What the Store name list shows for a row: a listed store, the new-store box, or the prompt.
+  const pickOf = (r) => (r.typing ? NEW_STORE : listed(r.name) || (String(r.name || '').trim() ? NEW_STORE : ''));
   const pick = (i, value) => {
-    if (value.startsWith('saved:')) { const k = kinds[Number(value.slice(6))]; if (k) set(i, { type: k.type, name: k.name }); return; }
-    set(i, { type: value, ...(value === 'other' ? { name: '' } : {}) });
+    if (value === NEW_STORE) { set(i, { typing: true, name: listed(rows[i].name) ? '' : rows[i].name }); return; }
+    set(i, { typing: false, name: value });
+  };
+  // What a store sells: unchanged for a store kept under its old name, the remembered kind for a
+  // saved name, otherwise read from the name.
+  const typeFor = (r, name) => {
+    const o = original.find((x) => x.id === r.id);
+    if (o && lower(String(o.name || '').trim() || typeName(o.type)) === lower(name) && storeType(o.type)) return o.type;
+    const k = kinds.find((x) => lower(x.name) === lower(name));
+    return k ? k.type : guessStoreType(name);
   };
   async function save() {
-    if (rows.some((r) => !r.type)) { showToast('Pick a kind for each store, or remove the empty one.'); return; }
-    const missing = rows.find((r) => r.type === 'other' && !String(r.name || '').trim());
-    if (missing) { showToast('Type a name for each new store you added.'); return; }
-    const clean = rows.map((r) => ({ id: r.id, type: r.type, name: String(r.name || '').trim().slice(0, 30), place: String(r.place || '').trim().slice(0, 40), miles: r.miles === '' || r.miles == null ? null : Math.max(0, Math.round(Number(r.miles) * 10) / 10) }));
+    if (rows.some((r) => !String(r.name || '').trim())) { showToast('Pick or type a name for each store, or remove the empty one.'); return; }
+    const clean = rows.map((r) => {
+      const name = String(r.name || '').trim().slice(0, 30);
+      return { id: r.id, type: typeFor(r, name), name, place: String(r.place || '').trim().slice(0, 40), miles: r.miles === '' || r.miles == null ? null : Math.max(0, Math.round(Number(r.miles) * 10) / 10) };
+    });
     // Only stores added or renamed now join the saved names, so a name you removed stays removed.
     const changed = clean.filter((r) => { const o = original.find((x) => x.id === r.id); return !o || o.name !== r.name || o.type !== r.type; });
     await backend.updateAccount(account.id, { 'settings.stores': clean, 'settings.storeKinds': rememberStoreKinds(kinds, changed) });
@@ -466,7 +476,7 @@ function StoresSheet({ forItem, onAdded, onClose }) {
           <button type="button" className="btn primary grow" onClick={save}>Save stores</button>
         </div>
         {forItem && <p className="small"><strong>Add the store for {forItem.name}.</strong> When you save, {forItem.name} moves to it.</p>}
-        <p className="small muted">Pick the kind of store, then its name, the town or street, and roughly how many miles it is from home. The kind tells the app what it sells. For a store like H-Mart, pick Grocery store and name it H-Mart so groceries can go there, or pick + Add a new store to get only what you move there yourself. Stores you name are remembered for next time.</p>
+        <p className="small muted">Pick a store from the list, or pick + A new store and type its name. Add the town or street and roughly how many miles it is from home. The app knows what stores like Costco, Giant or Home Depot sell. A store it doesn't know gets only what you move there yourself. Stores you name are remembered for next time.</p>
         {kinds.length > 0 && (
           <div className="saved-stores">
             <p className="small"><strong>Saved store names.</strong> Tap ✕ to remove one you no longer want in the list.</p>
@@ -481,30 +491,28 @@ function StoresSheet({ forItem, onAdded, onClose }) {
         )}
         {rows.map((r, i) => (
           <div key={r.id} className="card" style={{ background: 'var(--card)' }}>
-            <label className="field"><span>Kind of store</span>
+            <label className="field"><span>Store name</span>
               <select className="input" value={pickOf(r)} onChange={(e) => pick(i, e.target.value)}>
-                <option value="" disabled>Select your store or add new ones</option>
-                <option value="other">+ Add a new store (type its name)</option>
-                {kinds.length > 0 && (
+                <option value="" disabled>Pick your store or add a new one</option>
+                <option value={NEW_STORE}>+ A new store (type its name)</option>
+                {yours.length > 0 && (
                   <optgroup label="Your stores">
-                    {kinds.map((k, j) => <option key={`${k.name}${j}`} value={`saved:${j}`}>{k.name}</option>)}
+                    {yours.map((n, j) => <option key={`${n}${j}`} value={n}>{n}</option>)}
                   </optgroup>
                 )}
-                <optgroup label="Kinds of store">
-                  {others.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                <optgroup label="Other stores">
+                  {common.map((n) => <option key={n} value={n}>{n}</option>)}
                 </optgroup>
               </select>
             </label>
-            {r.type && (
-              <>
-                <label className="field"><span>Store name{r.type === 'other' ? '' : ' (optional)'}</span>
-                  <input className="input" value={r.name || ''} maxLength={30} placeholder={r.type === 'other' ? 'H-Mart' : r.type === 'grocery' ? 'Giant' : storeLabel({ type: r.type })} onChange={(e) => set(i, { name: e.target.value })} />
-                </label>
-                <div className="grid2">
-                  <label className="field"><span>Where</span><input className="input" value={r.place || ''} placeholder="Town or street" onChange={(e) => set(i, { place: e.target.value })} /></label>
-                  <label className="field"><span>Miles from home</span><input className="input" inputMode="decimal" value={r.miles ?? ''} placeholder="5" onChange={(e) => set(i, { miles: e.target.value.replace(/[^0-9.]/g, '') })} /></label>
-                </div>
-              </>
+            {pickOf(r) === NEW_STORE && (
+              <input className="input" style={{ marginTop: 8 }} value={r.name || ''} maxLength={30} placeholder="Type the store's name, like H-Mart" aria-label="New store name" autoFocus={!r.name} onChange={(e) => set(i, { name: e.target.value })} />
+            )}
+            {pickOf(r) && (
+              <div className="grid2" style={{ marginTop: 8 }}>
+                <label className="field"><span>Where</span><input className="input" value={r.place || ''} placeholder="Town or street" onChange={(e) => set(i, { place: e.target.value })} /></label>
+                <label className="field"><span>Miles from home</span><input className="input" inputMode="decimal" value={r.miles ?? ''} placeholder="5" onChange={(e) => set(i, { miles: e.target.value.replace(/[^0-9.]/g, '') })} /></label>
+              </div>
             )}
             <button type="button" className="chip" style={{ marginTop: 8 }} onClick={() => setRows((x) => x.filter((_, j) => j !== i))}>Remove</button>
           </div>
