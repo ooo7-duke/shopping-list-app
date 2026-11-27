@@ -122,7 +122,7 @@ describe('price checks', () => {
   });
 });
 
-import { pickQuotes, storeIdFor, fitsQuery, directUrl, linkHost } from './storeMatch.js';
+import { pickQuotes, storeIdFor, fitsQuery, directUrl, linkHost, isBlockedSeller } from './storeMatch.js';
 import { mergeQuotes } from './prices.js';
 import { describePrediction as describe2 } from './predict.js';
 
@@ -166,6 +166,18 @@ describe('automatic price lookup', () => {
     expect(directUrl({ link: 'https://www.google.com/aclk?x', product_link: 'https://www.google.com/shopping/product/9' })).toBe('https://www.google.com/shopping/product/9');
     expect(directUrl({ link: 'javascript:alert(1)' })).toBe(null);
     expect(linkHost('https://www.walmart.com/ip/123')).toBe('walmart.com');
+  });
+  it('never shows eBay prices', () => {
+    const q = pickQuotes([
+      { source: 'eBay - go-ink', extracted_price: 14.45, title: 'Canon PG-240XL' },
+      { source: 'Some shop', extracted_price: 13, title: 'Canon PG-240XL', link: 'https://www.ebay.com/itm/1' },
+      { source: 'Walmart', extracted_price: 32.99, title: 'Canon PG-240XL' },
+    ], 'Canon PG-240XL');
+    expect(q.map((x) => x.storeId)).toEqual(['walmart']);
+    expect(isBlockedSeller('eBay - go-ink')).toBe(true);
+    const { best, rows } = seenPrices({ seenPrices: { any: { price: 14.45, at: Date.now(), by: 'auto', storeName: 'eBay - go-ink' }, walmart: { price: 32.99, at: Date.now(), by: 'auto' } } });
+    expect(rows.length).toBe(1);
+    expect(best.price).toBe(32.99);
   });
   it('ignores prices the old demo made up', () => {
     const { rows } = seenPrices({ seenPrices: { amazon: { price: 9, at: Date.now(), by: 'sample' } } });

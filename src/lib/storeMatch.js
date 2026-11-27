@@ -22,6 +22,13 @@ function priceOf(r) {
 
 const safeUrl = (u) => (typeof u === 'string' && /^https:\/\//.test(u) ? u : null);
 
+// Sellers whose prices are never shown (Sola's rule: no eBay).
+const BLOCKED_SELLER = /\bebay\b/i;
+export function isBlockedSeller(name = '', url = '') {
+  if (BLOCKED_SELLER.test(String(name || ''))) return true;
+  try { return /(^|\.)ebay\./i.test(new URL(url).hostname); } catch { return false; }
+}
+
 const isGoogle = (u) => { try { return /(^|\.)google\./i.test(new URL(u).hostname); } catch { return true; } };
 
 // The store's own product page when Google Shopping gives one, otherwise Google's page
@@ -62,6 +69,7 @@ export function pickQuotes(results = [], query = '') {
     const price = priceOf(r);
     if (price == null || !(price > 0)) continue;
     const storeName = String(r.source || '').slice(0, 60);
+    if (isBlockedSeller(storeName, r.link)) continue;
     const storeId = storeIdFor(storeName) || 'any';
     const q = { storeId, storeName, price: Math.round(price * 100) / 100, title: String(r.title || '').slice(0, 140), url: directUrl(r) };
     if (!best[storeId] || q.price < best[storeId].price) best[storeId] = q;

@@ -7,6 +7,8 @@
 //    The demo has no provider: it never makes up a price.
 // 2. By hand: a search link per store, and the person types the price they see.
 
+import { isBlockedSeller } from './storeMatch.js';
+
 // Preferred order. Stores after the first three are extras, not a limit.
 export const PRICE_STORES = [
   { id: 'samsclub', name: "Sam's Club", url: (q) => `https://www.samsclub.com/search?q=${q}` },
@@ -32,7 +34,7 @@ export function storeLinks(item) {
 export function seenPrices(item, now = Date.now(), maxAgeDays = 30) {
   const seen = item.seenPrices || {};
   // Prices the old demo made up (by 'sample') are ignored.
-  const rows = PRICE_STORES.filter((s) => seen[s.id]?.price != null && seen[s.id].by !== 'sample').map((s) => ({
+  const rows = PRICE_STORES.filter((s) => seen[s.id]?.price != null && seen[s.id].by !== 'sample' && !isBlockedSeller(seen[s.id].storeName, seen[s.id].url)).map((s) => ({
     store: seen[s.id].storeName || s.name, storeId: s.id, price: Number(seen[s.id].price), at: seen[s.id].at,
     by: seen[s.id].by || '', url: seen[s.id].url || null,
     stale: now - (seen[s.id].at || 0) > maxAgeDays * 86400e3,
@@ -66,6 +68,7 @@ export function mergeQuotes(seen = {}, quotes = [], now = Date.now()) {
   const out = { ...seen };
   for (const q of quotes) {
     if (!PRICE_STORES.some((s) => s.id === q.storeId)) continue;
+    if (isBlockedSeller(q.storeName, q.url)) continue;
     const cur = out[q.storeId];
     const typedRecently = cur && cur.by && cur.by !== 'auto' && now - (cur.at || 0) < 86400e3;
     if (typedRecently) continue;
