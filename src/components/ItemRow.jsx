@@ -65,7 +65,7 @@ export default function ItemRow({ item, pred, done, last, showHistory = false, o
       </div>
       {!readOnly && (onSnooze || onRemove) && (
         <div className="hover-actions">
-          {onSnooze && <button type="button" className="icon-btn" title="Snooze 1 week (S)" aria-label={`Snooze ${item.name} for a week`} onClick={(e) => { e.stopPropagation(); onSnooze(); }}><ClockIcon /></button>}
+          {onSnooze && <button type="button" className="icon-btn" title="Snooze (S)" aria-label={`Snooze ${item.name}`} onClick={(e) => { e.stopPropagation(); onSnooze(); }}><ClockIcon /></button>}
           {onRemove && <button type="button" className="icon-btn" title="Take off list" aria-label={`Take ${item.name} off the list`} onClick={(e) => { e.stopPropagation(); onRemove(); }}><TrashIcon /></button>}
         </div>
       )}

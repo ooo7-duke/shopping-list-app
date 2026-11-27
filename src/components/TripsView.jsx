@@ -448,7 +448,10 @@ function StoresSheet({ onClose }) {
   return (
     <Sheet title="Your nearby stores" onClose={onClose}>
       <div className="stack">
-        <button type="button" className="btn block" onClick={addRow}>+ Add a store</button>
+        <div className="row" style={{ gap: 8 }}>
+          <button type="button" className="btn grow" onClick={addRow}>+ Add a store</button>
+          <button type="button" className="btn primary grow" onClick={save}>Save stores</button>
+        </div>
         <p className="small muted">Pick the kind of store, then its name, the town or street, and roughly how many miles it is from home. The kind tells the app what it sells. For a store like H-Mart, pick Grocery store and name it H-Mart so groceries can go there, or pick + Add a new store to get only what you move there yourself. Stores you name are remembered for next time.</p>
         {kinds.length > 0 && (
           <div className="saved-stores">
@@ -492,7 +495,8 @@ function StoresSheet({ onClose }) {
             <button type="button" className="chip" style={{ marginTop: 8 }} onClick={() => setRows((x) => x.filter((_, j) => j !== i))}>Remove</button>
           </div>
         ))}
-        <button type="button" className="btn primary block" onClick={save}>Save stores</button>
+        {/* A long list keeps a second Save at the bottom, so it isn't a scroll back up. */}
+        {rows.length > 2 && <button type="button" className="btn primary block" onClick={save}>Save stores</button>}
       </div>
     </Sheet>
   );

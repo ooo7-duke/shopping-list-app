@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 
 // Swipe right = primary action (bought). Swipe left = snooze; a long swipe left = take off list.
 // Vertical scrolling is never hijacked: the swipe only starts once the drag is clearly sideways.
-export default function SwipeRow({ children, onRight, onLeft, onFarLeft, rightLabel = 'Got it', leftLabel = 'Snooze 1 week', farLeftLabel = 'Take off list', disabled }) {
+export default function SwipeRow({ children, onRight, onLeft, onFarLeft, rightLabel = 'Got it', leftLabel = 'Snooze…', farLeftLabel = 'Take off list', disabled }) {
   const [dx, setDx] = useState(0);
   const [mode, setMode] = useState('idle'); // idle | maybe | drag | settle
   const start = useRef(null);

@@ -4,10 +4,14 @@ import Sheet from './Sheet.jsx';
 import { compressImage, extractReceipt } from '../lib/receipts.js';
 import { decodeQr, parseQr, qrHost } from '../lib/qr.js';
 import { bestMatch } from '../lib/match.js';
-import { saveReceipt, deleteReceipt } from '../data/actions.js';
+import { saveReceipt, deleteReceipt, isOnList } from '../data/actions.js';
 import { fmtMoney, fmtDate, toInputDate, fromInputDate } from '../lib/format.js';
 import { DEMO_MODE } from '../lib/config.js';
 import { CameraIcon } from './Icons.jsx';
+import { extractReceiptText } from '../lib/receipts.js';
+import { fetchInbox, ackInbox, cachedRead, cacheRead, dropRead } from '../lib/emailReceipts.js';
+import { planLines, alreadySaved, INBOX_ADDRESS } from '../lib/inbox.js';
+import { HOUSEHOLD_CATEGORIES, householdCategories, isHouseholdList, foldCategory } from '../lib/categories.js';
 
 export default function ReceiptsView() {
   const { ctx, items, receipts, purchases, backend, showToast } = useApp();
@@ -91,6 +95,8 @@ export default function ReceiptsView() {
       </label>
       {DEMO_MODE && <p className="tiny muted" style={{ marginTop: 6 }}>Demo mode returns a sample Giant receipt so you can try the review step.</p>}
 
+      <EmailedReceipts />
+
       <div className="section-h"><h2>Past receipts</h2><span className="small muted">{receipts.length}</span></div>
       {receipts.length === 0 ? (
         <div className="card empty"><p>No receipts yet. Older receipts work too: the purchase date comes from the receipt.</p></div>
@@ -100,13 +106,15 @@ export default function ReceiptsView() {
             <div key={r.id} className="item" onClick={() => setViewing(r)} tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && setViewing(r)}>
               <div className="grow">
                 <div className="name">{r.store || 'Receipt'}</div>
-                <div className="meta">{fmtDate(r.date, { withYear: true })} · {r.lineCount} items · {r.matched} matched to your list · {r.uploadedByName}</div>
+                <div className="meta">{fmtDate(r.date, { withYear: true })} · {r.lineCount} items · {r.matched} matched to your list · {r.source === 'email' ? 'emailed' : r.uploadedByName}</div>
               </div>
               <div className="price">{fmtMoney(r.total)}</div>
             </div>
           ))}
         </div>
       )}
+
+      <Inventory purchases={purchases} />
 
       {review && <ReceiptReview data={review} onClose={() => setReview(null)} onSaved={(n) => { setReview(null); showToast(`Saved ${n} purchase${n === 1 ? '' : 's'} from the receipt`); }} />}
       {viewing && <ReceiptDetail receipt={viewing} onClose={() => setViewing(null)} onDelete={async () => { await deleteReceipt(ctx, viewing, purchases); setViewing(null); showToast('Receipt and its purchases deleted'); }} />}
@@ -127,7 +135,7 @@ function ReceiptReview({ data, onClose, onSaved }) {
   async function save() {
     setSaving(true);
     try {
-      await saveReceipt(ctx, { ...head, image: data.image, qrText: data.qr?.raw || '', qrUrl: data.qr?.url || '' }, lines);
+      await saveReceipt(ctx, { ...head, tax: data.tax ?? null, image: data.image, qrText: data.qr?.raw || '', qrUrl: data.qr?.url || '', source: data.source, emailId: data.emailId, orderId: data.orderId }, lines);
       onSaved(kept.length);
     } finally {
       setSaving(false);
@@ -136,7 +144,9 @@ function ReceiptReview({ data, onClose, onSaved }) {
 
   return (
     <Sheet title="Check the receipt" onClose={onClose} wide>
-      <p className="small muted" style={{ marginBottom: 12 }}>Each line is matched to an item on your list. Fix any wrong matches, skip lines you don't want tracked, then save.</p>
+      <p className="small muted" style={{ marginBottom: 12 }}>{data.source === 'email'
+        ? 'From an emailed receipt. Lines marked "Best guess" need your OK before they count as bought. Fix any wrong matches, skip lines you don\'t want tracked, then save.'
+        : "Each line is matched to an item on your list. Fix any wrong matches, skip lines you don't want tracked, then save."}</p>
       <div className="grid2">
         <label className="field"><span>Store</span><input className="input" value={head.store} onChange={(e) => setHead({ ...head, store: e.target.value })} /></label>
         <label className="field"><span>Date on receipt</span><input type="date" className="input" value={toInputDate(head.date)} max={toInputDate()} onChange={(e) => setHead({ ...head, date: fromInputDate(e.target.value) })} /></label>
@@ -152,6 +162,7 @@ function ReceiptReview({ data, onClose, onSaved }) {
             <div className="grow">
               <div className="raw">{ln.rawText}</div>
               <div style={{ fontWeight: 600 }}>{ln.itemId ? items.find((x) => x.id === ln.itemId)?.name : ln.newName}</div>
+              {ln.weak && <div className="guess-note">Best guess. Is this {items.find((x) => x.id === ln.itemId)?.name || 'the right item'}?</div>}
             </div>
             <label className="row small" style={{ gap: 6 }}>
               <input type="checkbox" checked={!ln.skip} onChange={(e) => set(i, { skip: !e.target.checked })} style={{ width: 22, height: 22 }} />
@@ -217,5 +228,177 @@ function QrNote({ qr }) {
         <div className="tiny muted ellipsis" style={{ marginTop: 4 }}>{qr.raw}</div>
       )}
     </div>
+  );
+}
+
+// Receipts forwarded to the app's Gmail inbox. Strong matches are saved and checked off on
+// their own; an email with a weaker guess waits here for a person to confirm it.
+function EmailedReceipts() {
+  const { ctx, items, receipts, backend, showToast } = useApp();
+  const latest = useRef({});
+  latest.current = { ctx, items, receipts };
+  const [inbox, setInbox] = useState({ loading: true, items: [] });
+  const [state, setState] = useState({});
+  const [done, setDone] = useState(null);
+  const [review, setReview] = useState(null);
+  const ran = useRef(false);
+  const account = ctx?.account;
+  const cats = isHouseholdList(account) ? householdCategories(account?.categories) : account?.categories || HOUSEHOLD_CATEGORIES;
+  const setOne = (id, v) => setState((s) => ({ ...s, [id]: v }));
+
+  useEffect(() => {
+    if (ran.current || !ctx?.accountId) return;
+    ran.current = true;
+    run();
+  }, [ctx?.accountId]);
+
+  async function run() {
+    let data;
+    try { data = await fetchInbox(); } catch (e) { setInbox({ loading: false, error: e.message, items: [] }); return; }
+    setInbox({ loading: false, ...data });
+    const out = { receipts: 0, checked: [], skipped: 0, waiting: 0 };
+    for (const m of data.items || []) {
+      setOne(m.id, { status: 'reading', m });
+      try {
+        let res = cachedRead(m.id);
+        if (!res) {
+          res = await extractReceiptText(m, latest.current.items.map((i) => i.name), backend.getApp(), cats);
+          cacheRead(m.id, res);
+        }
+        if (!res.isReceipt || alreadySaved(latest.current.receipts, { emailId: m.id, orderId: res.orderId, store: res.store })) {
+          await ackInbox(m.id);
+          dropRead(m.id);
+          out.skipped++;
+          setOne(m.id, { status: 'skipped', m });
+          continue;
+        }
+        const plan = planLines(res, latest.current.items, cats);
+        if (plan.weak) {
+          out.waiting++;
+          setOne(m.id, { status: 'review', m, res, plan });
+          continue;
+        }
+        const onList = plan.lines.filter((l) => l.itemId).map((l) => latest.current.items.find((i) => i.id === l.itemId)).filter((it) => it && isOnList(it));
+        await saveReceipt(latest.current.ctx, receiptOf(res, m), plan.lines);
+        await ackInbox(m.id);
+        dropRead(m.id);
+        out.receipts++;
+        out.checked.push(...onList.map((it) => it.name));
+        setOne(m.id, { status: 'saved', m, res });
+      } catch (e) {
+        console.error(e);
+        setOne(m.id, { status: 'error', m, error: e?.message || 'Couldn\'t read it.' });
+      }
+    }
+    if (out.receipts || out.skipped || out.waiting) setDone(out);
+    if (out.receipts) showToast(`Added ${out.receipts} emailed receipt${out.receipts === 1 ? '' : 's'}`);
+  }
+
+  function openReview(id) {
+    const { m, res, plan } = state[id];
+    setReview({ id, data: { ...receiptOf(res, m), image: null, qr: null, lines: plan.lines } });
+  }
+  async function finish(id, saved) {
+    await ackInbox(id);
+    dropRead(id);
+    setOne(id, { status: saved ? 'saved' : 'dismissed', m: state[id]?.m });
+    setReview(null);
+  }
+
+  const waiting = Object.entries(state).filter(([, v]) => ['review', 'reading', 'error'].includes(v.status));
+  const nothingYet = !inbox.loading && !waiting.length && !done;
+
+  return (
+    <>
+      <div className="section-h"><h2>Emailed receipts</h2>{waiting.length > 0 && <span className="small muted">{waiting.length} waiting</span>}</div>
+      <div className="card email-card">
+        {inbox.loading && <p className="small">Checking for emailed receipts…</p>}
+        {inbox.error && <p className="small">{inbox.error}</p>}
+        {done && (
+          <p className="small" style={{ marginBottom: waiting.length ? 10 : 0 }}>
+            {[
+              done.receipts ? `Added ${done.receipts} receipt${done.receipts === 1 ? '' : 's'}${done.checked.length ? ` and checked off ${listNames(done.checked)}` : ''}.` : '',
+              done.waiting ? `${done.waiting} ${done.waiting === 1 ? 'needs' : 'need'} your OK below.` : '',
+              done.skipped ? `Skipped ${done.skipped} email${done.skipped === 1 ? '' : 's'} that ${done.skipped === 1 ? 'wasn\'t a receipt or was' : 'weren\'t receipts or were'} already saved.` : '',
+            ].filter(Boolean).join(' ')}
+          </p>
+        )}
+        {waiting.map(([id, v]) => (
+          <div key={id} className="email-row">
+            <div className="grow">
+              <div className="name">{v.res?.store || storeFromSubject(v.m?.subject) || 'Emailed receipt'}</div>
+              <div className="meta">
+                {v.status === 'reading' ? 'Reading…' : v.status === 'error' ? `Couldn't read it. ${v.error}` : `${v.plan.lines.length} items · ${v.plan.weak} best guess${v.plan.weak === 1 ? '' : 'es'} to check`}
+              </div>
+            </div>
+            {v.status === 'review' && <button type="button" className="btn primary" onClick={() => openReview(id)}>Check</button>}
+            {(v.status === 'review' || v.status === 'error') && <button type="button" className="btn" onClick={() => finish(id, false)}>Dismiss</button>}
+          </div>
+        ))}
+        {nothingYet && <p className="small">No emailed receipts waiting.</p>}
+        <details className="email-how">
+          <summary>How to send receipts here</summary>
+          <ol className="small">
+            <li>Forward a receipt or order email to <strong>{INBOX_ADDRESS}</strong>{inbox.email ? <> from <strong>{inbox.email}</strong>, the address you sign in with</> : ' from the address you sign in with'}.</li>
+            <li>To skip forwarding by hand, set up a Gmail filter that forwards order emails there.</li>
+            <li>Within about 15 minutes, open this tab. Items that clearly match your list are checked off for you. Anything the app isn't sure about waits here for your OK.</li>
+          </ol>
+          <p className="tiny muted">Paper receipts from the store don't come by email, so snap those above.</p>
+          {!inbox.loading && inbox.configured === false && <p className="tiny muted">The inbox isn't switched on yet.</p>}
+        </details>
+      </div>
+      {review && (
+        <ReceiptReview
+          data={review.data}
+          onClose={() => setReview(null)}
+          onSaved={(n) => { finish(review.id, true); showToast(`Saved ${n} purchase${n === 1 ? '' : 's'} from the email`); }}
+        />
+      )}
+    </>
+  );
+}
+
+function receiptOf(res, m) {
+  return { store: res.store || storeFromSubject(m.subject), date: res.date || m.date || Date.now(), total: res.total ?? null, tax: res.tax ?? null, source: 'email', emailId: m.id, orderId: res.orderId || '' };
+}
+function storeFromSubject(subject) {
+  const m = String(subject || '').match(/\b(amazon|target|walmart|costco|giant|instacart|kroger|safeway|aldi|best buy|home depot|lowe'?s|cvs|walgreens)\b/i);
+  return m ? m[1].replace(/\b\w/g, (c) => c.toUpperCase()) : '';
+}
+function listNames(names) {
+  const u = [...new Set(names)];
+  return u.length <= 2 ? u.join(' and ') : `${u.slice(0, -1).join(', ')} and ${u[u.length - 1]}`;
+}
+
+// What the household has bought in the last 90 days, by category, newest first in each.
+function Inventory({ purchases }) {
+  const since = Date.now() - 90 * 864e5;
+  const latest = new Map();
+  for (const p of purchases) {
+    if ((p.purchasedAt || 0) < since) continue;
+    const key = p.itemId || p.name;
+    const prev = latest.get(key);
+    if (!prev || p.purchasedAt > prev.purchasedAt) latest.set(key, p);
+  }
+  const groups = {};
+  for (const p of latest.values()) (groups[foldCategory(p.category || 'Other')] ||= []).push(p);
+  const order = [...HOUSEHOLD_CATEGORIES, ...Object.keys(groups).filter((c) => !HOUSEHOLD_CATEGORIES.includes(c))].filter((c) => groups[c]);
+  if (!order.length) return null;
+  return (
+    <>
+      <div className="section-h"><h2>What you've bought</h2><span className="small muted">last 90 days</span></div>
+      <div className="list">
+        {order.map((c) => (
+          <details key={c} className="inv-group">
+            <summary><span className="name">{c}</span><span className="small muted">{groups[c].length} item{groups[c].length === 1 ? '' : 's'}</span></summary>
+            <ul>
+              {groups[c].sort((a, b) => b.purchasedAt - a.purchasedAt).map((p) => (
+                <li key={p.id}><span>{p.name}</span><span className="small muted">{fmtDate(p.purchasedAt)}{p.store ? ` · ${p.store}` : ''}</span></li>
+              ))}
+            </ul>
+          </details>
+        ))}
+      </div>
+    </>
   );
 }

@@ -4,7 +4,7 @@
 // Household lists use a few broad groups, in the order you walk a typical store.
 export const HOUSEHOLD_CATEGORIES = [
   'Produce', 'Meat, dairy & eggs', 'Frozen', 'Pantry', 'Household',
-  'Health & personal care', 'Pets', 'Other',
+  'Health & personal care', 'Pets', 'Electronics', 'Other',
 ];
 
 // The finer groups older household lists used, and the broad group each now belongs to.
@@ -12,7 +12,7 @@ export const HOUSEHOLD_FOLD = {
   'Dairy & eggs': 'Meat, dairy & eggs', 'Meat & seafood': 'Meat, dairy & eggs',
   'Bakery': 'Pantry', 'Snacks': 'Pantry', 'Beverages': 'Pantry',
   'Cleaning': 'Household', 'Paper goods': 'Household', 'Kitchen & breakroom': 'Household',
-  'Office & stationery': 'Household', 'Tech & electronics': 'Household', 'Printing': 'Household',
+  'Office & stationery': 'Household', 'Tech & electronics': 'Electronics', 'Printing': 'Household',
   'Mailing & shipping': 'Household', 'Furniture': 'Household', 'Event supplies': 'Household',
   'Personal care': 'Health & personal care', 'Health': 'Health & personal care',
   'Baby': 'Health & personal care', 'Safety & first aid': 'Health & personal care',
@@ -35,14 +35,15 @@ const KEYWORDS = {
   'Snacks': ['chips', 'cookie', 'cracker', 'snack', 'popcorn', 'nuts', 'granola', 'candy', 'chocolate'],
   'Cleaning': ['detergent', 'bleach', 'cleaner', 'disinfect', 'lysol', 'clorox', 'sponge', 'dish soap', 'dishwasher', 'trash bag', 'garbage bag', 'mop', 'windex', 'wipes'],
   'Paper goods': ['paper goods', 'paper towel', 'toilet paper', 'tissue', 'napkin', 'paper plate', 'kleenex'],
-  'Personal care': ['shampoo', 'conditioner', 'soap', 'toothpaste', 'toothbrush', 'deodorant', 'lotion', 'razor', 'floss', 'body wash'],
+  'Household': ['christmas tree', 'xmas tree', 'christmas decor', 'christmas lights', 'holiday decor', 'decoration', 'ornament', 'wreath', 'garland', 'tinsel', 'string lights', 'fairy lights', 'lights', 'light bulb', 'bulb', 'lamp', 'candle', 'extension cord', 'power strip', 'towel', 'bath mat', 'bed sheet', 'sheet set', 'pillow', 'blanket', 'comforter', 'duvet', 'curtain', 'rug', 'hanger', 'storage bin', 'basket', 'shelf', 'hook', 'picture frame', 'vase', 'air filter', 'furnace filter', 'smoke detector', 'tool', 'screwdriver', 'hammer', 'drill', 'wrench', 'pliers', 'screws', 'nails', 'glue', 'duct tape', 'paint', 'skillet', 'frying pan', 'saucepan', 'pots and pans', 'cookware', 'knife', 'cutting board', 'mug', 'water filter', 'umbrella', 'doormat', 'flower pot', 'potting soil', 'fertilizer', 'hose', 'gift wrap', 'wrapping paper', 'gift bag', 'balloon'],
+  'Personal care': ['nail polish', 'nail clipper', 'shampoo', 'conditioner', 'soap', 'toothpaste', 'toothbrush', 'deodorant', 'lotion', 'razor', 'floss', 'body wash'],
   'Health': ['vitamin', 'tylenol', 'advil', 'ibuprofen', 'bandage', 'band-aid', 'medicine'],
   'Baby': ['diaper', 'formula', 'baby'],
   'Pets': ['dog food', 'cat food', 'litter', 'pet'],
   'Office & stationery': ['pen', 'pencil', 'stapler', 'staple', 'sticky note', 'post-it', 'folder', 'binder', 'notebook', 'envelope', 'tape', 'marker', 'highlighter', 'clip', 'label', 'scissors'],
   'Printing': ['toner', 'ink', 'printer paper', 'copy paper', 'ream', 'cartridge'],
   'Kitchen & breakroom': ['cups', 'plates', 'utensil', 'fork', 'spoon', 'foil', 'plastic wrap', 'ziploc', 'filter'],
-  'Tech & electronics': ['battery', 'batteries', 'cable', 'charger', 'usb', 'mouse', 'keyboard', 'hdmi', 'headphone', 'earbud', 'airpods', 'laptop', 'chromebook', 'macbook', 'tablet', 'ipad', 'iphone', 'smartphone', 'phone', 'monitor', 'tv', 'television', 'camera', 'webcam', 'speaker', 'soundbar', 'router', 'smartwatch', 'apple watch', 'kindle', 'console', 'playstation', 'xbox', 'nintendo', 'ssd', 'hard drive'],
+  'Tech & electronics': ['samsung', 'galaxy', 'pixel', 'android', 'motorola', 'oneplus', 'phone case', 'screen protector', 'earphone', 'bluetooth', 'wireless charger', 'power bank', 'alexa', 'echo dot', 'roku', 'fire stick', 'firestick', 'chromecast', 'apple tv', 'ring doorbell', 'smart plug', 'smart bulb', 'surge protector', 'sd card', 'memory card', 'flash drive', 'thumb drive', 'gaming', 'controller', 'projector', 'dvd', 'blu-ray', 'computer', 'desktop', 'battery', 'batteries', 'cable', 'charger', 'usb', 'mouse', 'keyboard', 'hdmi', 'headphone', 'earbud', 'airpods', 'laptop', 'chromebook', 'macbook', 'tablet', 'ipad', 'iphone', 'smartphone', 'phone', 'monitor', 'tv', 'television', 'camera', 'webcam', 'speaker', 'soundbar', 'router', 'smartwatch', 'apple watch', 'kindle', 'console', 'playstation', 'xbox', 'nintendo', 'ssd', 'hard drive'],
   'Safety & first aid': ['first aid', 'gloves', 'mask', 'sanitizer'],
   'Mailing & shipping': ['stamp', 'box', 'mailer', 'bubble wrap', 'shipping'],
 };

@@ -86,7 +86,7 @@ describe('category guess', () => {
     expect(guessCategory('Shampoo')).toBe('Health & personal care');
     expect(foldCategory('Snacks')).toBe('Pantry');
     expect(foldCategory('Snacks', ORG_CATEGORIES)).toBe('Snacks');
-    expect(householdCategories(['Produce', 'Dairy & eggs', 'Paper goods', 'Garden', 'Other'])).toEqual(['Produce', 'Meat, dairy & eggs', 'Frozen', 'Pantry', 'Household', 'Health & personal care', 'Pets', 'Garden', 'Other']);
+    expect(householdCategories(['Produce', 'Dairy & eggs', 'Paper goods', 'Garden', 'Other'])).toEqual(['Produce', 'Meat, dairy & eggs', 'Frozen', 'Pantry', 'Household', 'Health & personal care', 'Pets', 'Electronics', 'Garden', 'Other']);
     expect(guessCategory('Paper towels', ORG_CATEGORIES)).toBe('Paper goods');
     expect(guessCategory('HP toner', ORG_CATEGORIES)).toBe('Printing');
     expect(guessCategory('mystery thing')).toBe('Other');
@@ -483,5 +483,65 @@ describe('certified refurbished prices', () => {
     const item = { seenPrices: mergeQuotes({}, pickQuotes(results, 'AirPods Pro 2'), now) };
     expect(refurbPrice(item, now)).toMatchObject({ price: 169.99 });
     expect(seenPrices(item).best.price).toBe(199.99);
+  });
+});
+
+import { forwarderOf, planLines, alreadySaved, isForwardingConfirmation, keyPart } from './inbox.js';
+
+describe('emailed receipts', () => {
+  it('files a receipt under the person who forwarded it', () => {
+    expect(forwarderOf('Sola O <Sola@Example.com>', '')).toBe('sola@example.com');
+    // A Gmail filter keeps the store as From and names the forwarder in X-Forwarded-For.
+    expect(forwarderOf('Amazon <auto-confirm@amazon.com>', 'sola@example.com loye10shopping@gmail.com')).toBe('sola@example.com');
+    expect(isForwardingConfirmation('Gmail Team <forwarding-noreply@google.com>')).toBe(true);
+    expect(keyPart('A/B..c@x.com')).toBe('ab..c@x.com');
+  });
+  it('checks off strong matches and holds weak guesses', () => {
+    const items = [{ id: 'a', name: 'Paper towels' }, { id: 'b', name: 'Sticky notes' }];
+    const res = { items: [
+      { rawText: 'Bounty 12 rolls', name: 'Paper towels', matchName: 'Paper towels', category: 'Cleaning' },
+      { rawText: 'Post-it Super Sticky Notes, 3x3 in, 12 Pads', name: 'Post-it super sticky notes, 12 pads', matchName: '' },
+      { rawText: 'Birthday card', name: 'Birthday card', matchName: '' },
+    ] };
+    const plan = planLines(res, items);
+    expect(plan.lines[0]).toMatchObject({ itemId: 'a', weak: false, category: 'Household' });
+    expect(plan.lines[1]).toMatchObject({ itemId: 'b', weak: true });
+    expect(plan.lines[2]).toMatchObject({ itemId: '', weak: false });
+    expect(plan.weak).toBe(1);
+  });
+  it('spots an order that is already saved', () => {
+    const receipts = [{ store: 'Amazon', orderId: '113-55', emailId: 'x1' }];
+    expect(alreadySaved(receipts, { emailId: 'x1' })).toBe(true);
+    expect(alreadySaved(receipts, { emailId: 'x2', orderId: '113 55', store: 'amazon' })).toBe(true);
+    expect(alreadySaved(receipts, { emailId: 'x2', orderId: '113-56', store: 'Amazon' })).toBe(false);
+  });
+});
+
+describe('electronics and fewer items in Other', () => {
+  it('sorts phones into Electronics and holiday lights into Household', async () => {
+    const { guessCategory, foldCategory } = await import('./categories.js');
+    expect(guessCategory('Samsung Galaxy S26')).toBe('Electronics');
+    expect(guessCategory('Christmas lights for the house')).toBe('Household');
+    expect(guessCategory('Christmas cookies')).toBe('Pantry');
+    expect(guessCategory('potatoes')).toBe('Produce');
+    expect(guessCategory('extension cord')).toBe('Household');
+    expect(foldCategory('Tech & electronics')).toBe('Electronics');
+  });
+  it('sends Electronics items to an electronics store on a trip', async () => {
+    const { deptOf } = await import('./tripPlan.js');
+    expect(deptOf({ name: 'Mystery gadget', category: 'Electronics' })).toBe('electronics');
+    expect(deptOf({ name: 'Samsung Galaxy S26', category: 'Other' })).toBe('electronics');
+  });
+});
+
+describe('snooze lengths', () => {
+  it('offers a day to a month, a month being a calendar month', async () => {
+    const { SNOOZE_CHOICES, snoozeEnd } = await import('../data/actions.js');
+    expect(SNOOZE_CHOICES.map((c) => c.label)).toEqual(['1 day', '3 days', '1 week', '2 weeks', '1 month']);
+    const nov27 = new Date(2026, 10, 27, 9).getTime();
+    expect(new Date(snoozeEnd({ days: 14 }, nov27)).getDate()).toBe(11);
+    expect(new Date(snoozeEnd({ months: 1 }, nov27)).toDateString()).toBe(new Date(2026, 11, 27, 9).toDateString());
+    const jan31 = new Date(2027, 0, 31, 9).getTime();
+    expect(new Date(snoozeEnd({ months: 1 }, jan31)).toDateString()).toBe(new Date(2027, 1, 28).toDateString());
   });
 });

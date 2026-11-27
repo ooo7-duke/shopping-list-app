@@ -52,7 +52,7 @@ const CATEGORY_DEPT = {
   'Baby': 'baby', 'Pets': 'pets',
   'Meat, dairy & eggs': 'grocery', 'Health & personal care': 'personal',
   'Office & stationery': 'office', 'Printing': 'office', 'Mailing & shipping': 'office', 'Event supplies': 'office',
-  'Tech & electronics': 'electronics', 'Automotive': 'auto',
+  'Tech & electronics': 'electronics', 'Electronics': 'electronics', 'Automotive': 'auto',
 };
 
 const AUTO = /\b(motor|engine)\s*oil\b|\boil filter\b|\bwiper|antifreeze|coolant|windshield|washer fluid|brake fluid|transmission fluid|car wash|car battery|tire|spark plug|air freshener for car/i;

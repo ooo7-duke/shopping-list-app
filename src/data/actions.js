@@ -28,7 +28,7 @@ export async function addEntries(ctx, entries) {
   const added = [];
   for (const e of entries) {
     const existing = findItem(items, e.name);
-    if (existing) undoOps.push({ type: 'update', coll: 'items', id: existing.id, data: clean({ status: existing.status, qty: existing.qty ?? 1, store: existing.store ?? '', urgent: !!existing.urgent, needBy: existing.needBy ?? null }) });
+    if (existing) undoOps.push({ type: 'update', coll: 'items', id: existing.id, data: clean({ status: existing.status, qty: existing.qty ?? 1, store: existing.store ?? '', urgent: !!existing.urgent, needBy: existing.needBy ?? null, ...(e.photo ? { photo: existing.photo ?? null } : {}) }) });
     const category = e.category ? matchCategory(e.category, cats) : undefined;
     if (existing) {
       ops.push({
@@ -38,6 +38,7 @@ export async function addEntries(ctx, entries) {
           store: e.store || existing.store || '', category: category || existing.category,
           urgent: !!e.urgent, needBy: e.urgent ? Date.now() : null, addedAt: Date.now(), addedBy: user.uid, addedByName: user.name,
           ...(e.price != null ? { lastPrice: e.price } : {}),
+          ...(e.photo ? { photo: e.photo, photoAt: Date.now() } : {}),
         }),
       });
       added.push({ ...existing, status });
@@ -48,6 +49,7 @@ export async function addEntries(ctx, entries) {
         category: category || guessCategory(e.name, cats), status, urgent: !!e.urgent,
         needBy: e.urgent ? Date.now() : null, lastPrice: e.price ?? null, cadence: { mode: 'auto' },
         addedAt: Date.now(), addedBy: user.uid, addedByName: user.name,
+        ...(e.photo ? { photo: e.photo, photoAt: Date.now() } : {}),
       };
       ops.push({ type: 'set', coll: 'items', id, data });
       undoOps.push({ type: 'remove', coll: 'items', id });
@@ -96,6 +98,20 @@ export async function setStatus(ctx, item, status, extra = {}) {
 }
 
 export const snooze = (ctx, item, days = 7) => setStatus(ctx, item, 'snoozed', { snoozeUntil: Date.now() + days * DAY });
+// How long an item can be snoozed for. A month is a calendar month, so Nov 27 comes back Dec 27.
+export const SNOOZE_CHOICES = [
+  { label: '1 day', days: 1 }, { label: '3 days', days: 3 }, { label: '1 week', days: 7 },
+  { label: '2 weeks', days: 14 }, { label: '1 month', months: 1 },
+];
+export function snoozeEnd(choice, now = Date.now()) {
+  if (!choice.months) return now + choice.days * DAY;
+  const d = new Date(now);
+  const want = d.getMonth() + choice.months;
+  d.setMonth(want);
+  if (d.getMonth() !== ((want % 12) + 12) % 12) d.setDate(0); // Jan 31 + 1 month is Feb 28, not Mar 3
+  return d.getTime();
+}
+export const snoozeUntil = (ctx, item, until) => setStatus(ctx, item, 'snoozed', { snoozeUntil: until });
 export const takeOffList = (ctx, item) => setStatus(ctx, item, 'stocked');
 export const putOnList = (ctx, item) => setStatus(ctx, item, 'needed', { addedAt: Date.now(), addedBy: ctx.user.uid, addedByName: ctx.user.name });
 
@@ -203,7 +219,7 @@ export async function saveReceipt(ctx, receipt, lines) {
   }
   ops.push({
     type: 'set', coll: 'receipts', id: rid,
-    data: clean({ store: receipt.store || '', date, total: receipt.total != null ? Number(receipt.total) : null, tax: receipt.tax ?? null, lineCount: lines.filter((l) => !l.skip).length, matched, uploadedBy: user.uid, uploadedByName: user.name, createdAt: Date.now(), hasImage: !!receipt.image, qrText: receipt.qrText || null, qrUrl: receipt.qrUrl || null }),
+    data: clean({ store: receipt.store || '', date, total: receipt.total != null ? Number(receipt.total) : null, tax: receipt.tax ?? null, lineCount: lines.filter((l) => !l.skip).length, matched, uploadedBy: user.uid, uploadedByName: user.name, createdAt: Date.now(), hasImage: !!receipt.image, qrText: receipt.qrText || null, qrUrl: receipt.qrUrl || null, source: receipt.source || null, emailId: receipt.emailId || null, orderId: receipt.orderId || null }),
   });
   if (receipt.image) ops.push({ type: 'set', coll: 'receiptImages', id: rid, data: { dataUrl: receipt.image } });
   // Strip undefined ids from item docs.

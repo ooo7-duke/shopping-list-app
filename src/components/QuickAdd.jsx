@@ -3,11 +3,12 @@ import { useApp } from '../AppContext.jsx';
 import { parseQuickAdd, normalizeName } from '../lib/parse.js';
 import { addEntries, isOnList } from '../data/actions.js';
 import { fmtMoney, fmtQty } from '../lib/format.js';
-import { MicIcon, PlusIcon } from './Icons.jsx';
+import { MicIcon, PlusIcon, CameraIcon, CloseIcon } from './Icons.jsx';
+import { compressImage } from '../lib/receipts.js';
 import { saveErrorMessage } from '../lib/errors.js';
 import { findDuplicates, listMatches } from '../lib/dupes.js';
 import { guessCategory, HOUSEHOLD_CATEGORIES } from '../lib/categories.js';
-import { classifyNames } from '../lib/classify.js';
+import { classifyNames, nameProduct } from '../lib/classify.js';
 import { DEMO_MODE } from '../lib/config.js';
 
 const SpeechRec = typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition);
@@ -20,6 +21,9 @@ export default function QuickAdd({ onJump }) {
   const [pending, setPending] = useState(null); // entries held back because some look like duplicates
   const inputRef = useRef();
   const recRef = useRef();
+  const photoRef = useRef();
+  const [photo, setPhoto] = useState(null); // a product photo waiting to go on the next item added
+  const [photoBusy, setPhotoBusy] = useState(false);
 
   const parsed = useMemo(() => parseQuickAdd(text), [text]);
   const first = parsed[0];
@@ -116,6 +120,7 @@ export default function QuickAdd({ onJump }) {
       return false;
     }
     const { added, undo } = result;
+    if (entries.some((e) => e.photo)) setPhoto(null);
     justAdded.current = { ids: new Set(added.map((a) => a.id)), names: new Set(entries.map((e) => normalizeName(e.name))), at: Date.now() };
     setTimeout(() => refresh((x) => x + 1), 4100);
     // Prices are looked up only when someone taps Look up prices on the item, to save searches.
@@ -163,7 +168,7 @@ export default function QuickAdd({ onJump }) {
   async function onSubmit(e) {
     e?.preventDefault();
     if (sel >= 0 && suggestions[sel]) return pickSuggestion(suggestions[sel]);
-    const entries = parsed;
+    const entries = withPhoto(parsed);
     setSel(-1);
     await tryAdd(entries, { clear: true });
   }
@@ -184,7 +189,7 @@ export default function QuickAdd({ onJump }) {
     const before = parseQuickAdd(head);
     const lastParsed = parseQuickAdd(text.split(/[,\n]/).pop())[0] || {};
     setSel(-1);
-    await tryAdd([...before, { ...lastParsed, name: it.name, store: lastParsed.store || '', qty: lastParsed.qty !== 1 ? lastParsed.qty : it.qty || 1 }], { clear: true });
+    await tryAdd(withPhoto([...before, { ...lastParsed, name: it.name, store: lastParsed.store || '', qty: lastParsed.qty !== 1 ? lastParsed.qty : it.qty || 1 }]), { clear: true });
     inputRef.current?.focus();
   }
 
@@ -199,6 +204,38 @@ export default function QuickAdd({ onJump }) {
     if (/\n/.test(t.trim())) {
       e.preventDefault();
       tryAdd(parseQuickAdd(t));
+    }
+  }
+
+  // The photo goes on the first item in the box (or the only one).
+  const withPhoto = (entries) => (photo && entries.length ? [{ ...entries[0], photo }, ...entries.slice(1)] : entries);
+
+  // Add from a photo: the photo is shrunk to fit on the item, the AI names the product and its
+  // section, and the name lands in the box to check before pressing Add.
+  async function addPhoto(file) {
+    if (!file) return;
+    if (!/^image\//.test(file.type) && !/\.(heic|heif)$/i.test(file.name)) { showToast('Pick a photo (JPG, PNG or HEIC).'); return; }
+    setPhotoBusy(true);
+    try {
+      const img = await compressImage(file, { maxSide: 900, maxChars: 150_000 });
+      setPhoto(img);
+      try {
+        const { name, category } = await nameProduct(img, cats, ctx.backend.getApp?.());
+        if (name) {
+          if (category) aiTypes.current.set(name.toLowerCase(), category);
+          setText((t) => (t.trim() ? t : name));
+          setPending(null);
+        } else showToast("Couldn't tell what the product is. Type its name; the photo goes with it.");
+      } catch (err) {
+        console.warn('Naming the photo failed', err);
+        showToast('Type the product name; the photo goes with it.');
+      }
+      inputRef.current?.focus();
+    } catch {
+      showToast("Couldn't use that photo. Try another one.");
+    } finally {
+      setPhotoBusy(false);
+      if (photoRef.current) photoRef.current.value = '';
     }
   }
 
@@ -250,6 +287,10 @@ export default function QuickAdd({ onJump }) {
           onKeyDown={onKeyDown} onPaste={onPaste}
           aria-autocomplete="list" aria-controls="qa-suggest"
         />
+        <button type="button" className={`icon-btn${photoBusy ? ' listening' : ''}`} onClick={() => photoRef.current?.click()} disabled={photoBusy} aria-label="Add from a photo of the product" title="Add from a photo">
+          <CameraIcon />
+        </button>
+        <input ref={photoRef} type="file" accept="image/*" hidden onChange={(e) => addPhoto(e.target.files?.[0])} />
         <button type="button" className={`icon-btn${listening ? ' listening' : ''}`} onClick={toggleVoice} aria-label={listening ? 'Stop listening' : 'Add by voice'} title="Add by voice">
           <MicIcon />
         </button>
@@ -259,6 +300,15 @@ export default function QuickAdd({ onJump }) {
           </button>
         )}
       </form>
+      {(photo || photoBusy) && (
+        <div className="qa-photo" aria-live="polite">
+          {photo && <img src={photo} alt="Product photo to add" />}
+          <span className="small grow">{photoBusy ? 'Reading the photo…' : text.trim() ? `The photo goes on ${parsed[0]?.name || 'this item'} when you add it.` : 'Type the name, then add. The photo goes with it.'}</span>
+          {photo && !photoBusy && (
+            <button type="button" className="icon-btn" onClick={() => setPhoto(null)} aria-label="Remove the photo"><CloseIcon /></button>
+          )}
+        </div>
+      )}
       {!pending && (liveDupes.length > 0 || typedMatches.length > 0) && (
         <div className="onlist-note" role="status" aria-live="polite">
           {liveDupes.map((d, i) => <p key={`d${i}`}>{dupeLine(d, jumpBtn)}</p>)}

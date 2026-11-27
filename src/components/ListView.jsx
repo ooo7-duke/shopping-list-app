@@ -4,7 +4,9 @@ import QuickAdd from './QuickAdd.jsx';
 import SwipeRow from './SwipeRow.jsx';
 import ItemRow from './ItemRow.jsx';
 import ItemSheet from './ItemSheet.jsx';
-import { isOnList, markBought, snooze, takeOffList, putOnList, estimate } from '../data/actions.js';
+import { isOnList, markBought, snoozeUntil, takeOffList, putOnList, estimate } from '../data/actions.js';
+import Sheet from './Sheet.jsx';
+import SnoozePicker from './SnoozePicker.jsx';
 import { lastPurchaseMap, lastBuy } from '../lib/history.js';
 import { describePrediction, DAY } from '../lib/predict.js';
 import { can, DEMO_MODE } from '../lib/config.js';
@@ -17,6 +19,7 @@ const GROUP_KEY = 'sla-group-by';
 const FILTER_KEY = 'sla-type-filter';
 const FOLD_KEY = 'sla-folded-groups'; // sessionStorage: groups open again when the app is reopened
 const LOW_LIMIT = 6; // chips shown before "Show all"
+const SORT_PASS = 2; // 2: Electronics became its own type, and Other became a last resort
 
 export default function ListView() {
   const { ctx, items, purchases, predictions, role, account, showToast, backend } = useApp();
@@ -26,27 +29,30 @@ export default function ListView() {
   const latest = useMemo(() => lastPurchaseMap(purchases), [purchases]);
   const open = (id, focus = null) => { setOpenId(id); setOpenFocus(focus); };
   const [showSnoozed, setShowSnoozed] = useState(false);
-  // Items stuck in "Other" get sorted once: keywords first, then the AI for the rest.
-  // A type picked by hand is never changed.
+  // Items stuck in "Other" get sorted: keywords first, then the AI for the rest. SORT_PASS goes up
+  // when the types or the sorting get better, so items sorted before get one more try. Household
+  // items that are really electronics move to Electronics. A type picked by hand is never changed.
   const sortedRef = useRef(new Set());
   useEffect(() => {
-    if (!can(role, 'edit') || DEMO_MODE || !backend?.getApp) return undefined;
-    const todo = items.filter((it) => (!it.category || it.category === 'Other') && !it.categoryByHand && !it.aiSortedAt && !sortedRef.current.has(it.id)).slice(0, 60);
+    if (!can(role, 'edit') || !backend?.commit) return undefined;
+    const cats = account?.categories || HOUSEHOLD_CATEGORIES;
+    const stale = (it) => !it.categoryByHand && (it.sortPass || 0) < SORT_PASS && !sortedRef.current.has(it.id);
+    const misplaced = (it) => cats.includes('Electronics') && it.category === 'Household' && guessCategory(`${it.name} ${it.note || ''}`, cats) === 'Electronics';
+    const todo = items.filter((it) => stale(it) && (!it.category || it.category === 'Other' || misplaced(it))).slice(0, 60);
     if (!todo.length) return undefined;
     const t = setTimeout(async () => {
       todo.forEach((it) => sortedRef.current.add(it.id));
-      const cats = account?.categories || HOUSEHOLD_CATEGORIES;
       const ops = [];
       const ask = [];
       for (const it of todo) {
         const g = guessCategory(`${it.name} ${it.note || ''}`, cats);
-        if (g !== 'Other') ops.push({ type: 'update', coll: 'items', id: it.id, data: { category: g } });
+        if (g !== 'Other') ops.push({ type: 'update', coll: 'items', id: it.id, data: { category: g, sortPass: SORT_PASS } });
         else ask.push(it);
       }
-      if (ask.length) {
+      if (ask.length && !DEMO_MODE && backend.getApp) {
         try {
           const found = await classifyNames(ask.map((it) => it.name), cats, backend.getApp());
-          for (const it of ask) ops.push({ type: 'update', coll: 'items', id: it.id, data: { category: found.get(it.name) || 'Other', aiSortedAt: Date.now() } });
+          for (const it of ask) ops.push({ type: 'update', coll: 'items', id: it.id, data: { category: found.get(it.name) || 'Other', aiSortedAt: Date.now(), sortPass: SORT_PASS } });
         } catch (e) {
           console.warn('Sorting by AI failed; will try again next time', e);
         }
@@ -181,7 +187,16 @@ export default function ListView() {
     showToast(`${it.name} is back on the list`);
   }
   const act = (fn, msg) => async (it) => { const undo = await fn(ctx, it); showToast(msg(it), undo); };
-  const doSnooze = act(snooze, (it) => `Snoozed ${it.name} for a week`);
+  // Snoozing asks how long: the clock button, a swipe left and the S key all open the choices.
+  const [snoozeFor, setSnoozeFor] = useState(null);
+  const doSnooze = (it) => setSnoozeFor(it);
+  async function pickSnooze(until, label) {
+    const it = snoozeFor;
+    setSnoozeFor(null);
+    const undo = await snoozeUntil(ctx, it, until);
+    const back = new Date(until).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    showToast(`Snoozed ${it.name} ${label.startsWith('until') ? '' : `for ${label} `}until ${back}`, undo);
+  }
   const doRemove = act(takeOffList, (it) => `Took ${it.name} off the list`);
   const doAdd = act(putOnList, (it) => `Added ${it.name}`);
 
@@ -326,10 +341,16 @@ export default function ListView() {
 
       {editor && onList.length > 0 && (
         <p className="tiny muted" style={{ textAlign: 'center', marginTop: 18 }}>
-          Swipe right when you've got it · swipe left to snooze · long swipe left to take it off
+          Swipe right when you've got it · swipe left to snooze (you pick how long) · long swipe left to take it off
         </p>
       )}
 
+      {snoozeFor && (
+        <Sheet title={`Snooze ${snoozeFor.name}`} onClose={() => setSnoozeFor(null)}>
+          <p className="small muted" style={{ marginBottom: 10 }}>It leaves the list and comes back on the day you pick.</p>
+          <SnoozePicker onPick={pickSnooze} />
+        </Sheet>
+      )}
       {openItem && <ItemSheet item={openItem} focus={openFocus} onClose={() => setOpenId(null)} />}
     </>
   );

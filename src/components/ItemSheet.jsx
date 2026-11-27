@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useApp } from '../AppContext.jsx';
 import Sheet from './Sheet.jsx';
-import { markBought, putOnList, isOnList, setSeenPrice, refreshPrices, canLookUpAgain } from '../data/actions.js';
+import { markBought, putOnList, isOnList, setSeenPrice, refreshPrices, canLookUpAgain, snoozeUntil } from '../data/actions.js';
+import SnoozePicker from './SnoozePicker.jsx';
 import { storeLinks, seenPrices, refurbPrice, hasPriceProvider, currentQuota, onQuota, refreshQuota } from '../lib/prices.js';
 import { deptOf } from '../lib/tripPlan.js';
 import { linkHost, isBlockedSeller, isKnownRetailer } from '../lib/storeMatch.js';
@@ -169,6 +170,20 @@ export default function ItemSheet({ item, focus, onClose }) {
               <input type="checkbox" checked={!!item.urgent} onChange={(e) => save({ urgent: e.target.checked, needBy: e.target.checked ? Date.now() : null })} style={{ width: 22, height: 22 }} />
               Needed now (can't wait for the next combined trip)
             </label>
+
+            {(['needed', 'requested', 'snoozed'].includes(item.status)) && (
+              <details className="card snooze-card" style={{ background: '#fff' }} open={item.status === 'snoozed' && (item.snoozeUntil || 0) > Date.now()}>
+                <summary><h3 style={{ display: 'inline' }}>Snooze</h3> <span className="small muted">take it off the list for a while</span></summary>
+                <div style={{ marginTop: 10 }}>
+                  <SnoozePicker current={item.status === 'snoozed' && (item.snoozeUntil || 0) > Date.now() ? item.snoozeUntil : null}
+                    onPick={async (until) => {
+                      const undo = await snoozeUntil(ctx, item, until);
+                      showToast(`Snoozed ${item.name} until ${new Date(until).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}`, undo);
+                      onClose();
+                    }} />
+                </div>
+              </details>
+            )}
 
             <div className="card" style={{ background: '#fff' }}>
               <h3 style={{ marginBottom: 6 }}>Last time</h3>
