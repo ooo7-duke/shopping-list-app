@@ -400,3 +400,24 @@ describe('sorting items into types', () => {
     expect([...m]).toEqual([['French fries', 'Frozen']]);
   });
 });
+
+import { checkSubmission } from './feedbackCheck.js';
+describe('feedback spam checks', () => {
+  const now = 1_800_000_000_000;
+  const base = { kind: 'feedback', message: 'Love the app, please add H-Mart', email: 'a@b.com', startedAt: now - 20000 };
+  it('keeps a real message', () => {
+    expect(checkSubmission(base, { now }).ok).toBe(true);
+  });
+  it('drops the honeypot, a form filled too fast, and link spam', () => {
+    expect(checkSubmission({ ...base, website: 'http://spam' }, { now }).drop).toBe(true);
+    expect(checkSubmission({ ...base, startedAt: now - 1000 }, { now }).drop).toBe(true);
+    expect(checkSubmission({ ...base, message: 'buy http://a http://b http://c' }, { now }).drop).toBe(true);
+  });
+  it('asks for an email from people who are not signed in', () => {
+    expect(checkSubmission({ ...base, email: '' }, { now }).error).toBeTruthy();
+    expect(checkSubmission({ ...base, email: '', startedAt: now }, { now, signedIn: true }).ok).toBe(true);
+  });
+  it('lets a deletion request have no message', () => {
+    expect(checkSubmission({ ...base, kind: 'delete', message: '' }, { now }).ok).toBe(true);
+  });
+});

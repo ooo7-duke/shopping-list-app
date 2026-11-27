@@ -11,3 +11,15 @@ ul { padding-left: 22px; }
 a { color: var(--bb); font-weight: 600; }
 .muted { color: var(--muted); font-size: 0.92rem; }
 .back { display: inline-block; margin-bottom: 14px; }
+form.contact { margin: 8px 0 4px; }
+form.contact label { display: block; margin-bottom: 10px; font-weight: 600; }
+form.contact input, form.contact textarea { display: block; width: 100%; margin-top: 4px; padding: 10px 12px; font: inherit; color: var(--ink); background: #fff; border: 1px solid #c9b46a; border-radius: 10px; }
+form.contact textarea { min-height: 120px; resize: vertical; }
+form.contact .opt { font-weight: 400; color: var(--muted); }
+form.contact button { min-height: 44px; padding: 10px 20px; font: inherit; font-weight: 700; color: var(--cream); background: var(--bb); border: 0; border-radius: 10px; cursor: pointer; }
+form.contact button:disabled { opacity: 0.6; cursor: default; }
+/* The honeypot: off screen for people, still in the page for bots. */
+.hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+.form-status { margin-top: 10px; min-height: 1.6em; }
+.form-status.ok { color: #1d5c3a; font-weight: 600; }
+.form-status.err { color: #a3261b; font-weight: 600; }

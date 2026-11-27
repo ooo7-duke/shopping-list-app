@@ -15,7 +15,14 @@
 <p class="muted">Shopping List, by Loye 10 Ventures, LLC</p>
 
 <h2>Ask us to delete it</h2>
-<p>Email [contact email] from the Google account you sign in with, with the subject "Delete my account". We'll delete your account and data within 30 days and reply to confirm. We may ask you to confirm the request from that address.</p>
+<p>Fill in this form with the email of the Google account you sign in with. We'll email that address to confirm it's you, then delete your account and data within 30 days.</p>
+<form class="contact" data-kind="delete" data-done="Got it. Watch for our email asking you to confirm.">
+<label>Email of your Google account <input name="email" type="email" autocomplete="email" required maxlength="120" /></label>
+<label>Anything we should know <span class="opt">(optional)</span> <textarea name="message" maxlength="2000"></textarea></label>
+<div class="hp" aria-hidden="true"><label>Website <input name="website" tabindex="-1" autocomplete="off" /></label></div>
+<button type="submit">Request deletion</button>
+<p class="form-status" role="status" aria-live="polite"></p>
+</form>
 
 <h2>Or delete it yourself in the app</h2>
 <p>Sign in, tap your list's name at the top, then tap <strong>Delete my account</strong>. It happens right away.</p>
@@ -36,5 +43,6 @@
 <p>Read the full <a href="/privacy/">privacy policy</a>.</p>
 </div>
 </main>
+<script src="/contact-form.js" defer></script>
 </body>
 </html>

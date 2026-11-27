@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Contact us · Shopping List</title>
+<meta name="theme-color" content="#fdf1c9" />
+<link rel="stylesheet" href="/legal.css" />
+</head>
+<body>
+<main>
+<a class="back" href="/">Back to the app</a>
+<div class="card">
+<h1>Contact us</h1>
+<p class="muted">Shopping List, by Loye 10 Ventures, LLC</p>
+<p>Questions, ideas or problems with the app? Send us a note and we'll reply by email. If you use the app, Send feedback in the app works too.</p>
+<form class="contact" data-kind="feedback" data-done="Thanks. We got your message and will reply by email.">
+<label>Your name <span class="opt">(optional)</span> <input name="name" autocomplete="name" maxlength="80" /></label>
+<label>Your email <input name="email" type="email" autocomplete="email" required maxlength="120" /></label>
+<label>Message <textarea name="message" required minlength="5" maxlength="2000"></textarea></label>
+<div class="hp" aria-hidden="true"><label>Website <input name="website" tabindex="-1" autocomplete="off" /></label></div>
+<button type="submit">Send</button>
+<p class="form-status" role="status" aria-live="polite"></p>
+</form>
+<p>To delete your account, use the <a href="/delete-account/">deletion page</a>. Read our <a href="/privacy/">privacy policy</a>.</p>
+</div>
+</main>
+<script src="/contact-form.js" defer></script>
+</body>
+</html>

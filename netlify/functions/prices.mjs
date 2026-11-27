@@ -16,6 +16,7 @@
 // Those accounts also skip the household limit. With that setting empty, nobody uses the reserve.
 import { getStore } from '@netlify/blobs';
 import { pickQuotes } from '../../src/lib/storeMatch.js';
+import { signedIn } from '../lib/auth.mjs';
 
 const HOUSEHOLD_LIMIT = Number(process.env.LOOKUP_HOUSEHOLD_LIMIT) || 150;
 const RESERVE = Number(process.env.LOOKUP_RESERVE) || 100;
@@ -23,19 +24,6 @@ const reserveEmails = () => (process.env.LOOKUP_RESERVE_EMAILS || '').split(',')
 
 const json = (body, status = 200, extra = {}) =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json', ...extra } });
-
-// Returns { uid, email } for a valid Firebase sign-in, or null.
-async function signedIn(req) {
-  const token = (req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '');
-  const apiKey = process.env.VITE_FIREBASE_API_KEY;
-  if (!token || !apiKey) return null;
-  const r = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${encodeURIComponent(apiKey)}`, {
-    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ idToken: token }),
-  });
-  if (!r.ok) return null;
-  const u = (await r.json().catch(() => ({})))?.users?.[0];
-  return u ? { uid: u.localId, email: (u.email || '').toLowerCase() } : null;
-}
 
 // One counter per household per plan month. The plan's renewal date names the month, so
 // household counts reset when the SerpApi searches do.
