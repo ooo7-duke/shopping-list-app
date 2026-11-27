@@ -6,6 +6,9 @@ import { fmtMoney, fmtQty } from '../lib/format.js';
 import { MicIcon, PlusIcon } from './Icons.jsx';
 import { saveErrorMessage } from '../lib/errors.js';
 import { findDuplicates } from '../lib/dupes.js';
+import { guessCategory, HOUSEHOLD_CATEGORIES } from '../lib/categories.js';
+import { classifyNames } from '../lib/classify.js';
+import { DEMO_MODE } from '../lib/config.js';
 
 const SpeechRec = typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition);
 
@@ -24,6 +27,44 @@ export default function QuickAdd() {
   // Shown live while typing, and again (with buttons) if Add is pressed anyway.
   const liveDupes = useMemo(() => findDuplicates(parsed, onList), [parsed, onList]);
   const dupes = pending ? pending.dupes : liveDupes;
+
+  // Sort each item into a type as it's typed: the word list answers at once, and for names it doesn't
+  // know the AI is asked once typing pauses, so the item lands in the right group when it's added.
+  const cats = ctx.account?.categories || HOUSEHOLD_CATEGORIES;
+  const aiTypes = useRef(new Map()); // lowercased name -> type, or null while asking
+  const [, bump] = useState(0);
+  const typeFor = (e) => {
+    if (e.category) return e.category;
+    const word = guessCategory(e.name, cats);
+    if (word && word !== 'Other') return word;
+    return aiTypes.current.get(e.name.trim().toLowerCase()) || word || 'Other';
+  };
+  const unknown = parsed.filter((e) => !e.category && (guessCategory(e.name, cats) || 'Other') === 'Other' && !aiTypes.current.has(e.name.trim().toLowerCase()));
+  const unknownKey = unknown.map((e) => e.name.trim().toLowerCase()).join('|');
+  useEffect(() => {
+    if (!unknownKey || DEMO_MODE) return undefined;
+    const t = setTimeout(async () => {
+      const names = unknownKey.split('|').filter((n) => n.length >= 3);
+      if (!names.length) return;
+      names.forEach((n) => aiTypes.current.set(n, null));
+      bump((x) => x + 1);
+      try {
+        const found = await classifyNames(names, cats, ctx.backend.getApp?.());
+        for (const [n, c] of found) aiTypes.current.set(n.toLowerCase(), c);
+      } catch (err) {
+        console.warn('Sorting while typing failed', err);
+      }
+      names.forEach((n) => { if (aiTypes.current.get(n) === null) aiTypes.current.set(n, 'Other'); });
+      bump((x) => x + 1);
+    }, 600);
+    return () => clearTimeout(t);
+  }, [unknownKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  const withTypes = (entries) => entries.map((e) => {
+    const c = typeFor(e);
+    return c && c !== 'Other' && !e.category ? { ...e, category: c } : e;
+  });
+  const firstSorting = first && !first.category && aiTypes.current.get(first.name.trim().toLowerCase()) === null;
+  const firstType = first && typeFor(first);
 
   // Catalog matches for the text after the last comma: re-adding a known item keeps its store, price and history.
   const suggestions = useMemo(() => {
@@ -51,7 +92,7 @@ export default function QuickAdd() {
     if (!entries.length) return;
     let result;
     try {
-      result = await addEntries(ctx, entries);
+      result = await addEntries(ctx, withTypes(entries));
     } catch (e) {
       console.error('Add failed', e);
       showToast(saveErrorMessage(e, 'add that'));
@@ -195,7 +236,7 @@ export default function QuickAdd() {
           <span className="chip blue">{first.name}</span>
           {(first.qty !== 1 || first.unit) && <span className="chip">Qty {fmtQty(first.qty, first.unit) || first.qty}</span>}
           {first.store && <span className="chip">@ {first.store}</span>}
-          {first.category && <span className="chip"># {first.category}</span>}
+          {firstSorting ? <span className="chip">Sorting…</span> : firstType && <span className="chip"># {firstType}</span>}
           {first.price != null && <span className="chip">{fmtMoney(first.price)}</span>}
           {first.urgent && <span className="chip warn">Needed now</span>}
           {parsed.length > 1 && <span className="chip gold">+{parsed.length - 1} more</span>}
