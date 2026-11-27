@@ -48,7 +48,9 @@ export default function ItemSheet({ item, focus, onClose }) {
     setLooking(true);
     try {
       const { found, recent } = await refreshPrices(ctx, item);
-      showToast(recent ? 'Already checked today. Change the name or note to check again.' : found ? 'Prices updated' : 'No prices found. Try a more specific name, like "Bounty paper towels 12 rolls".');
+      const q = currentQuota();
+      const left = q ? ` ${q.left}${q.total ? ` of ${q.total}` : ''} free lookups left this month.` : '';
+      showToast(recent ? 'Already checked today. Change the name or note to check again.' : (found ? 'Prices updated.' : 'No prices found. Try a more specific name, like "Bounty paper towels 12 rolls".') + left);
     } catch (e) {
       showToast(e?.message || 'Price lookup failed. Please try again.');
     } finally { setLooking(false); }
