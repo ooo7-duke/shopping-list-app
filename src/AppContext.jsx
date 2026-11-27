@@ -3,6 +3,7 @@ import backend from './data/backend.js';
 import { predictAll } from './lib/predict.js';
 import { can } from './lib/config.js';
 import { saveErrorMessage } from './lib/errors.js';
+import { setPriceAccount } from './lib/prices.js';
 
 const Ctx = createContext(null);
 export const useApp = () => useContext(Ctx);
@@ -44,6 +45,8 @@ export function AppProvider({ children }) {
     if (!accounts?.length) return null;
     return accounts.find((a) => a.id === activeId) || accounts[0];
   }, [accounts, activeId]);
+
+  useEffect(() => { setPriceAccount(account?.id); }, [account?.id]);
 
   const role = account && user ? account.members?.[user.uid]?.role || 'editor' : null;
 

@@ -9,6 +9,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@netlify/blobs": "^8.2.0",
     "chart.js": "^4.6.2",
     "firebase": "^13.4.0",
     "jsqr": "^1.4.0",

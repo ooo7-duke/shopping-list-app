@@ -52,7 +52,10 @@ The preview branch then lives at `preview--your-site.netlify.app`.
 1. Create a free account at [serpapi.com](https://serpapi.com). The free plan covers 250 lookups a month. Each tap of Look up prices uses one.
 2. Copy your private API key from the SerpApi dashboard.
 3. In Netlify, add an environment variable named `SERPAPI_KEY` with that key, with the Functions scope and a value for Production, Deploy Previews and Branch deploys. Keep it out of the code and out of any `VITE_` name, so it never reaches the browser.
-4. Redeploy. Tap Look up prices on an item to check stores.
+4. Optional: add `LOOKUP_RESERVE_EMAILS` with your Google sign-in address (several can be separated by commas). Those accounts may use the reserve described below.
+5. Redeploy. Tap Look up prices on an item to check stores.
+
+Limits: each household gets 150 lookups per plan month, counted on the server. The last 100 searches of the plan are held in reserve: once the plan is down to them, lookups stop for everyone except the accounts in `LOOKUP_RESERVE_EMAILS`, which also skip the household limit. `LOOKUP_HOUSEHOLD_LIMIT` and `LOOKUP_RESERVE` change the two numbers. The household's count shows in small text at the bottom of each page.
 
 ## How changes reach production
 
