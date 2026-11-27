@@ -56,6 +56,7 @@ export default function ListView() {
     return () => clearTimeout(t);
   }, [items, role, backend, account, ctx.accountId]);
   const [showAllLow, setShowAllLow] = useState(false);
+  const [filterOpen, setFilterOpen] = useState(false);
   const editor = can(role, 'edit');
   const now = Date.now();
   const lookahead = account?.settings?.lookaheadDays ?? 10;
@@ -191,13 +192,29 @@ export default function ListView() {
       )}
 
       {typeCounts.length > 1 && (
-        <div className="filter-row" role="group" aria-label="Show only these types">
-          <button type="button" className={`chip${activeFilter.size ? '' : ' gold'}`} aria-pressed={!activeFilter.size} onClick={() => saveFilter(new Set())}>All</button>
-          {typeCounts.map(([t, n]) => (
-            <button key={t} type="button" className={`chip${activeFilter.has(t) ? ' gold' : ''}`} aria-pressed={activeFilter.has(t)} onClick={() => toggleType(t)}>
-              {t} <span className="muted">{n}</span>
-            </button>
-          ))}
+        <div className="type-pick">
+          <button type="button" className="type-pick-btn" aria-expanded={filterOpen} aria-controls="type-pick-list" onClick={() => setFilterOpen((o) => !o)}>
+            <span className="muted">Show:</span>
+            <span className="ellipsis">{activeFilter.size ? [...activeFilter].join(', ') : 'All types'}</span>
+            <span className={`chev${filterOpen ? ' open' : ''}`} aria-hidden="true">›</span>
+          </button>
+          {filterOpen && (
+            <div id="type-pick-list" className="type-pick-list" role="group" aria-label="Show only these types">
+              <label className="type-opt">
+                <input type="checkbox" checked={!activeFilter.size} onChange={() => saveFilter(new Set())} />
+                <span className="grow">All types</span>
+                <span className="muted">{onList.length}</span>
+              </label>
+              {typeCounts.map(([t, n]) => (
+                <label key={t} className="type-opt">
+                  <input type="checkbox" checked={activeFilter.has(t)} onChange={() => toggleType(t)} />
+                  <span className="grow">{t}</span>
+                  <span className="muted">{n}</span>
+                </label>
+              ))}
+              <button type="button" className="btn primary type-done" onClick={() => setFilterOpen(false)}>Done</button>
+            </div>
+          )}
         </div>
       )}
 

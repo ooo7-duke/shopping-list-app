@@ -258,15 +258,23 @@ table.data td.num, table.data th.num { text-align: right; }
 .price-input { width: 104px; text-align: right; }
 
 /* Type filter above the list: tap several to combine. */
-.filter-row {
-  display: flex; flex-wrap: nowrap; gap: 6px; margin: 4px -16px 6px; padding: 2px 16px 4px;
-  overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; scroll-snap-type: x proximity;
-  mask-image: linear-gradient(to right, #000 85%, transparent);
+.type-pick { margin: 4px 0 6px; }
+.type-pick-btn {
+  width: 100%; display: flex; align-items: center; gap: 8px; min-height: var(--tap); padding: 0 14px;
+  background: var(--card); border: 1px solid var(--line); border-radius: 12px; cursor: pointer;
+  color: var(--bb-ink); font-size: 0.95rem; text-align: left;
 }
-.filter-row::-webkit-scrollbar { display: none; }
-.filter-row .chip { flex: none; scroll-snap-align: start; }
-.filter-row .chip .muted { margin-left: 4px; font-weight: 400; }
-.filter-row .chip.gold .muted { color: inherit; opacity: 0.75; }
+.type-pick-btn .ellipsis { flex: 1; min-width: 0; font-weight: 600; }
+.type-pick-btn .chev { transform: rotate(90deg); transition: transform 0.15s; color: var(--bb); }
+.type-pick-btn .chev.open { transform: rotate(-90deg); }
+.type-pick-list {
+  margin-top: 6px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 6px;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 2px;
+}
+.type-opt { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 10px; border-radius: 8px; cursor: pointer; }
+.type-opt:hover { background: var(--bb-soft); }
+.type-opt input { width: 20px; height: 20px; accent-color: var(--bb); flex: none; }
+.type-done { grid-column: 1 / -1; margin: 6px 4px 4px; }
 
 /* Foldable list groups */
 .fold-h { width: 100%; background: none; border: 0; padding: 6px 2px; margin: 12px 0 4px; cursor: pointer; font: inherit; color: inherit; text-align: left; }
