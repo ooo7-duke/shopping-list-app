@@ -40,6 +40,8 @@ export default function ItemSheet({ item, focus, onClose }) {
     try {
       const { found } = await refreshPrices(ctx, item, { force: true });
       showToast(found ? 'Prices updated' : 'No prices found. Try a more specific name, like "Bounty paper towels 12 rolls".');
+    } catch (e) {
+      showToast(e?.message || 'Price lookup failed. Please try again.');
     } finally { setLooking(false); }
   }
 

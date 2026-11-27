@@ -54,7 +54,8 @@ export default function QuickAdd() {
     }
     const { added, undo } = result;
     // Look up today's prices in the background; the list updates when they arrive.
-    for (const a of added) refreshPrices(ctx, a).catch(() => {});
+    let told = false;
+    for (const a of added) refreshPrices(ctx, a).catch((e) => { if (!told) { told = true; showToast(e?.message || 'Price lookup failed.'); } });
     const names = added.map((a) => a.name);
     const pricing = hasPriceProvider() ? '. Looking up prices.' : '';
     showToast(label || `Added ${names.length > 3 ? `${names.slice(0, 3).join(', ')} and ${names.length - 3} more` : names.join(', ')}${pricing}`, undo);

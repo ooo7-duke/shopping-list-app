@@ -31,8 +31,11 @@ export default async (req) => {
   const url = `https://serpapi.com/search.json?engine=google_shopping&gl=us&hl=en&q=${encodeURIComponent(q)}&api_key=${encodeURIComponent(key)}`;
   try {
     const r = await fetch(url);
-    if (!r.ok) return json({ configured: true, quotes: [], error: `Price search failed (${r.status})` }, 502);
-    const data = await r.json();
+    const data = await r.json().catch(() => ({}));
+    // SerpApi explains problems such as a wrong key or a used-up plan in data.error.
+    if (!r.ok || (data.error && !/hasn't returned any results/i.test(data.error))) {
+      return json({ configured: true, quotes: [], error: `Price search failed: ${String(data.error || r.status).slice(0, 160)}` }, 502);
+    }
     const results = [...(data.shopping_results || []), ...(data.inline_shopping_results || [])];
     return json({ configured: true, quotes: pickQuotes(results, q) });
   } catch {

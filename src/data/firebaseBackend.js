@@ -87,13 +87,25 @@ export async function removeMember(account, uid) {
 const LIMITS = { purchases: 5000, receipts: 300 };
 const ORDER = { purchases: 'purchasedAt', receipts: 'date' };
 
+// A listener that errors stops for good. Right after a list is created, the server can refuse
+// the first read before it sees the new list, which left the screen empty until a reload.
+// So retry a few times, waiting longer each time, before reporting the error.
 export function subscribe(accountId, coll, cb, onError) {
   let q = collection(db, 'accounts', accountId, coll);
   if (ORDER[coll]) q = query(q, orderBy(ORDER[coll], 'desc'), limit(LIMITS[coll]));
-  return onSnapshot(q, (s) => cb(snapList(s)), (e) => {
-    cb([]);
-    onError?.(e);
-  });
+  let unsub = () => {};
+  let timer;
+  let stopped = false;
+  const start = (attempt) => {
+    unsub = onSnapshot(q, (s) => cb(snapList(s)), (e) => {
+      if (stopped) return;
+      if (attempt < 5) { timer = setTimeout(() => start(attempt + 1), 500 * 2 ** attempt); return; }
+      cb([]);
+      onError?.(e);
+    });
+  };
+  start(0);
+  return () => { stopped = true; clearTimeout(timer); unsub(); };
 }
 
 export async function add(accountId, coll, data) {

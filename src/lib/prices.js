@@ -47,13 +47,16 @@ export function seenPrices(item, now = Date.now(), maxAgeDays = 30) {
 const providers = [];
 export function registerPriceProvider(p) { providers.push(p); }
 export const hasPriceProvider = () => providers.length > 0;
+// Throws only when every provider failed, so the caller can say why instead of failing silently.
 export async function fetchQuotes(item) {
   const out = [];
+  let lastError = null;
   for (const p of providers) {
     try {
       for (const q of (await p.quote(item)) || []) out.push({ ...q, by: p.by || 'auto' });
-    } catch { /* a provider failing never breaks the list */ }
+    } catch (e) { lastError = e; }
   }
+  if (!out.length && lastError) throw lastError;
   return out;
 }
 
@@ -77,12 +80,14 @@ export function serverPriceProvider(getToken) {
     id: 'server', by: 'auto',
     async quote(item) {
       const token = await getToken();
-      if (!token) return [];
+      if (!token) throw new Error('Sign in again to look up prices.');
       const q = [item.name, item.note].filter(Boolean).join(' ').trim();
       const r = await fetch(`/.netlify/functions/prices?q=${encodeURIComponent(q)}`, { headers: { authorization: `Bearer ${token}` } });
-      if (!r.ok) return [];
-      const data = await r.json();
-      return data.configured ? data.quotes || [] : [];
+      const data = await r.json().catch(() => null);
+      if (!data) throw new Error(`The price service didn't answer (${r.status}).`);
+      if (data.configured === false) throw new Error('Price lookups aren\'t set up yet: the SERPAPI_KEY setting in Netlify is missing or not available to Functions.');
+      if (!r.ok || data.error) throw new Error(data.error || `Price search failed (${r.status}).`);
+      return data.quotes || [];
     },
   };
 }
