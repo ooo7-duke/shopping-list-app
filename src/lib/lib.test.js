@@ -485,3 +485,16 @@ describe('certified refurbished prices', () => {
     expect(seenPrices(item).best.price).toBe(199.99);
   });
 });
+
+import { shopLink, ONLINE_STORES } from './shopOnline.js';
+describe('shop online links', () => {
+  it('leaves Google out of the stores', () => {
+    expect(ONLINE_STORES.some((s) => s.id === 'any')).toBe(false);
+  });
+  it('searches the store site, or opens the product page a lookup found there', () => {
+    const it = { name: 'Paper towels', seenPrices: { walmart: { price: 19.97, url: 'https://www.walmart.com/ip/123', by: 'auto' }, target: { price: 21, url: 'https://www.google.com/shopping/x', by: 'auto' } } };
+    expect(shopLink(it, 'walmart')).toMatchObject({ href: 'https://www.walmart.com/ip/123', exact: true, price: 19.97 });
+    expect(shopLink(it, 'target').href).toBe('https://www.target.com/s?searchTerm=Paper+towels');
+    expect(shopLink(it, 'amazon')).toMatchObject({ href: 'https://www.amazon.com/s?k=Paper+towels', exact: false, price: null });
+  });
+});

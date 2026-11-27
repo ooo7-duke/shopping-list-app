@@ -5,6 +5,7 @@ import TripsView from './components/TripsView.jsx';
 import ReceiptsView from './components/ReceiptsView.jsx';
 import InsightsView from './components/InsightsView.jsx';
 import AccountSheet from './components/AccountSheet.jsx';
+import ShopOnline from './components/ShopOnline.jsx';
 import { SignIn, Onboarding, InviteBanner } from './components/Welcome.jsx';
 import { LookupMeter, BackToTop, LookPicker } from './components/PageExtras.jsx';
 import { ListIcon, CartIcon, ReceiptIcon, ChartIcon, ChevronDown, LogoMark, MenuIcon } from './components/Icons.jsx';
@@ -35,6 +36,7 @@ function Shell() {
   const [tab, go] = useHashTab();
   const [sheet, setSheet] = useState(false);
   const [menu, setMenu] = useState(false);
+  const [shop, setShop] = useState(false);
   const headRef = useRef();
 
   useEffect(() => {
@@ -74,6 +76,9 @@ function Shell() {
             <span className="page-name">· {tabs.find((t) => t.id === current)?.label}</span>
             <ChevronDown width="20" height="20" style={{ color: 'var(--bb)', flex: 'none' }} />
           </button>
+          <button type="button" className="icon-btn shop-btn" onClick={() => setShop(true)} aria-label="Shop online" title="Shop online">
+            <CartIcon />
+          </button>
           <button type="button" className="avatar" onClick={() => setSheet(true)} aria-label="Account menu" style={{ cursor: 'pointer' }}>
             {user.photo ? <img src={user.photo} alt="" referrerPolicy="no-referrer" /> : initials(user.name)}
           </button>
@@ -102,6 +107,7 @@ function Shell() {
       <BackToTop />
 
       {sheet && <AccountSheet onClose={() => setSheet(false)} />}
+      {shop && <ShopOnline onClose={() => setShop(false)} />}
       {toast && (
         <div className="toast" role="status" key={toast.key}>
           <span>{toast.message}</span>
