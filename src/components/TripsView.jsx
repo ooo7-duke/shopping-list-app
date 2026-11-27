@@ -147,7 +147,7 @@ export default function TripsView() {
             <ul>
               {g.list.map((it) => (
                 <li key={it.id} className={drag.item?.id === it.id ? 'dragging' : ''}>
-                  <button type="button" className="grip" aria-label={`Drag ${it.name} to another store`} title="Drag to another store" onPointerDown={(e) => drag.start(e, it, g.key)}><GripIcon /></button>
+                  <button type="button" className="grip" aria-label={`Drag ${it.name} to another store`} title="Drag to another store" onPointerDown={(e) => drag.start(e, it, g.key)} onContextMenu={(e) => e.preventDefault()}><GripIcon /></button>
                   <button type="button" className="trip-name grow ellipsis" onClick={() => setMoving(it)} title="Move to another store">{it.name}{fmtQty(it.qty, it.unit) ? <span className="muted"> · {fmtQty(it.qty, it.unit)}</span> : null}</button>
                   <span>{it.lastPrice != null ? fmtMoney(it.lastPrice * (Number(it.qty) || 1)) : ''}</span>
                 </li>
@@ -174,7 +174,7 @@ export default function TripsView() {
       </div>
 
       {groups.length > 0 && (
-        <p className="tiny muted" style={{ marginTop: 10 }}>Drag an item by its handle to another store, or tap its name to pick one.</p>
+        <p className="tiny muted" style={{ marginTop: 10 }}>Press and hold an item's handle, then drag it to another store, or tap its name to pick one.</p>
       )}
 
       {drag.item && (
@@ -232,12 +232,30 @@ export default function TripsView() {
   );
 }
 
+const HOLD_MS = 350; // how long a finger holds the handle before a drag starts
+const HOLD_SLOP = 10; // pixels a finger may wander during the hold; more than that is a scroll
+
 // Drag with a finger or a mouse. Native drag and drop doesn't work on phones, so this follows the pointer
 // and asks the page which store card is under it when you let go.
 function useDrag(onDrop) {
   const [state, setState] = useState(null); // { item, from, x, y, over, store }
   const ref = useRef(null);
   ref.current = state;
+  const held = useRef(false); // a finger has held a handle long enough to drag
+  // Once a finger drag has started, keep the page from scrolling under it. This listener is always
+  // there, so it is in place before the finger moves, even in the moment before the drag shows.
+  useEffect(() => {
+    const noScroll = (e) => { if ((held.current || ref.current?.item) && e.cancelable) e.preventDefault(); };
+    const release = () => { held.current = false; };
+    window.addEventListener('touchmove', noScroll, { passive: false });
+    window.addEventListener('touchend', release);
+    window.addEventListener('touchcancel', release);
+    return () => {
+      window.removeEventListener('touchmove', noScroll);
+      window.removeEventListener('touchend', release);
+      window.removeEventListener('touchcancel', release);
+    };
+  }, []);
   useEffect(() => {
     if (!state?.item) return undefined;
     const at = (x, y) => {
@@ -274,8 +292,38 @@ function useDrag(onDrop) {
     item: state?.item || null, x: state?.x, y: state?.y, over: state?.over,
     start(e, item, from) {
       if (e.button != null && e.button !== 0) return;
-      e.preventDefault();
-      setState({ item, from, x: e.clientX, y: e.clientY, over: from, store: null });
+      const begin = (x, y) => setState({ item, from, x, y, over: from, store: null });
+      if (e.pointerType !== 'touch') {
+        e.preventDefault();
+        begin(e.clientX, e.clientY);
+        return;
+      }
+      // On a phone a swipe that lands on the handle should still scroll the page, so a finger
+      // drag starts only after the handle is pressed and held without moving.
+      const x0 = e.clientX;
+      const y0 = e.clientY;
+      let x = x0;
+      let y = y0;
+      const stop = () => {
+        clearTimeout(timer);
+        window.removeEventListener('pointermove', track);
+        window.removeEventListener('pointerup', stop);
+        window.removeEventListener('pointercancel', stop);
+      };
+      const track = (ev) => {
+        x = ev.clientX;
+        y = ev.clientY;
+        if (Math.hypot(x - x0, y - y0) > HOLD_SLOP) stop();
+      };
+      const timer = setTimeout(() => {
+        stop();
+        held.current = true;
+        navigator.vibrate?.(15);
+        begin(x, y);
+      }, HOLD_MS);
+      window.addEventListener('pointermove', track);
+      window.addEventListener('pointerup', stop);
+      window.addEventListener('pointercancel', stop);
     },
   };
 }
