@@ -375,3 +375,10 @@ table.data td.num, table.data th.num { text-align: right; }
 .inv-group li { display: flex; justify-content: space-between; gap: 8px; border-top: 1px solid var(--line-soft); padding-top: 6px; }
 .qa-photo { display: flex; align-items: center; gap: 10px; margin-top: 8px; padding: 6px 8px; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); }
 .qa-photo img { width: 48px; height: 48px; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); }
+
+/* Snooze choices */
+.snooze-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; }
+.snooze-opt { flex-direction: column; align-items: flex-start; gap: 2px; min-height: 56px; padding: 8px 12px; text-align: left; }
+.snooze-date { margin-top: 12px; align-items: flex-end; gap: 8px; }
+.snooze-card summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; gap: 8px; list-style: none; }
+.snooze-card summary::-webkit-details-marker { display: none; }

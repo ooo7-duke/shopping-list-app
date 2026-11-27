@@ -3,8 +3,9 @@
 import { DEMO_MODE, GEMINI_MODEL } from './config.js';
 
 const PROMPT = (names, cats) => `You sort shopping list items into store sections for a household shopping app.
-For each item, pick the one section a shopper would find it in. Food is never "Other": frozen foods such as french fries go to Frozen, breakfast cereals such as Cheerios go to Pantry.
-Use "Other" only when no section fits at all.
+For each item, pick the one section a shopper would find it in. When no section is a perfect fit, pick the closest one.
+Food is never "Other": frozen foods such as french fries go to Frozen, breakfast cereals such as Cheerios go to Pantry.${cats.includes('Electronics') ? '\nPhones, tablets, laptops, TVs, chargers, cables, headphones, game consoles and smart home devices go to Electronics, brand names included (Samsung Galaxy, Pixel, iPhone).' : ''}${cats.includes('Household') ? '\nHoliday decorations and lights, light bulbs, tools, cookware, linens, towels, home and garden goods go to Household.' : ''}
+"Other" is a last resort: use it only for something that belongs in no store section at all, such as a gift card or a service.
 SECTIONS: ${cats.join(' | ')}
 ITEMS:
 ${names.map((n, i) => `${i + 1}. ${n}`).join('\n')}`;

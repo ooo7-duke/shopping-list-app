@@ -98,6 +98,20 @@ export async function setStatus(ctx, item, status, extra = {}) {
 }
 
 export const snooze = (ctx, item, days = 7) => setStatus(ctx, item, 'snoozed', { snoozeUntil: Date.now() + days * DAY });
+// How long an item can be snoozed for. A month is a calendar month, so Nov 27 comes back Dec 27.
+export const SNOOZE_CHOICES = [
+  { label: '1 day', days: 1 }, { label: '3 days', days: 3 }, { label: '1 week', days: 7 },
+  { label: '2 weeks', days: 14 }, { label: '1 month', months: 1 },
+];
+export function snoozeEnd(choice, now = Date.now()) {
+  if (!choice.months) return now + choice.days * DAY;
+  const d = new Date(now);
+  const want = d.getMonth() + choice.months;
+  d.setMonth(want);
+  if (d.getMonth() !== ((want % 12) + 12) % 12) d.setDate(0); // Jan 31 + 1 month is Feb 28, not Mar 3
+  return d.getTime();
+}
+export const snoozeUntil = (ctx, item, until) => setStatus(ctx, item, 'snoozed', { snoozeUntil: until });
 export const takeOffList = (ctx, item) => setStatus(ctx, item, 'stocked');
 export const putOnList = (ctx, item) => setStatus(ctx, item, 'needed', { addedAt: Date.now(), addedBy: ctx.user.uid, addedByName: ctx.user.name });
 
