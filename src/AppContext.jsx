@@ -5,6 +5,7 @@ import { can } from './lib/config.js';
 import { saveErrorMessage } from './lib/errors.js';
 import { setPriceAccount } from './lib/prices.js';
 import { applyLook, rememberLookLocal, savedLookLocal, lookById } from './lib/looks.js';
+import { foldCategory } from './lib/categories.js';
 
 const Ctx = createContext(null);
 export const useApp = () => useContext(Ctx);
@@ -15,7 +16,7 @@ export function AppProvider({ children }) {
   const [user, setUser] = useState(undefined); // undefined = still checking
   const [accounts, setAccounts] = useState(null);
   const [activeId, setActiveId] = useState(() => localStorage.getItem(ACTIVE_KEY));
-  const [items, setItems] = useState([]);
+  const [rawItems, setItems] = useState([]);
   const [purchases, setPurchases] = useState([]);
   const [receipts, setReceipts] = useState([]);
   const [batches, setBatches] = useState([]);
@@ -44,10 +45,24 @@ export function AppProvider({ children }) {
 
   const account = useMemo(() => {
     if (!accounts?.length) return null;
-    return accounts.find((a) => a.id === activeId) || accounts[0];
+    const a = accounts.find((x) => x.id === activeId) || accounts[0];
+    // Household lists no longer have a Paper goods category; those things live in Pantry.
+    if (a?.categories?.includes('Pantry') && a.categories.includes('Paper goods')) {
+      return { ...a, categories: a.categories.filter((c) => c !== 'Paper goods') };
+    }
+    return a;
   }, [accounts, activeId]);
 
   useEffect(() => { setPriceAccount(account?.id); }, [account?.id]);
+
+  // Items saved under a category the list no longer has (Paper goods) show in Pantry.
+  const items = useMemo(() => {
+    const cats = account?.categories;
+    if (!cats?.includes('Pantry') || cats.includes('Paper goods')) return rawItems;
+    return rawItems.some((it) => it.category === 'Paper goods')
+      ? rawItems.map((it) => (it.category === 'Paper goods' ? { ...it, category: foldCategory(it.category, cats) } : it))
+      : rawItems;
+  }, [rawItems, account?.categories]);
 
   const role = account && user ? account.members?.[user.uid]?.role || 'editor' : null;
 

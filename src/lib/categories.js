@@ -3,7 +3,7 @@
 
 export const HOUSEHOLD_CATEGORIES = [
   'Produce', 'Dairy & eggs', 'Meat & seafood', 'Bakery', 'Pantry', 'Frozen',
-  'Beverages', 'Snacks', 'Household', 'Cleaning', 'Paper goods', 'Personal care',
+  'Beverages', 'Snacks', 'Household', 'Cleaning', 'Personal care',
   'Health', 'Baby', 'Pets', 'Office & stationery', 'Kitchen & breakroom',
   'Tech & electronics', 'Other',
 ];
@@ -24,7 +24,7 @@ const KEYWORDS = {
   'Beverages': ['drink', 'lemonade', 'malt', 'water', 'juice', 'soda', 'coffee', 'tea', 'pop', 'sparkling', 'gatorade', 'k-cup', 'kcup'],
   'Snacks': ['chips', 'cookie', 'cracker', 'snack', 'popcorn', 'nuts', 'granola', 'candy', 'chocolate'],
   'Cleaning': ['detergent', 'bleach', 'cleaner', 'disinfect', 'lysol', 'clorox', 'sponge', 'dish soap', 'dishwasher', 'trash bag', 'garbage bag', 'mop', 'windex', 'wipes'],
-  'Paper goods': ['paper towel', 'toilet paper', 'tissue', 'napkin', 'paper plate', 'kleenex'],
+  'Paper goods': ['paper goods', 'paper towel', 'toilet paper', 'tissue', 'napkin', 'paper plate', 'kleenex'],
   'Personal care': ['shampoo', 'conditioner', 'soap', 'toothpaste', 'toothbrush', 'deodorant', 'lotion', 'razor', 'floss', 'body wash'],
   'Health': ['vitamin', 'tylenol', 'advil', 'ibuprofen', 'bandage', 'band-aid', 'medicine'],
   'Baby': ['diaper', 'formula', 'baby'],
@@ -37,11 +37,17 @@ const KEYWORDS = {
   'Mailing & shipping': ['stamp', 'box', 'mailer', 'bubble wrap', 'shipping'],
 };
 
+// Households keep paper towels, tissue and the like in Pantry; workplace lists still have Paper goods.
+export function foldCategory(cat, allowed = HOUSEHOLD_CATEGORIES) {
+  return cat === 'Paper goods' && !allowed.includes('Paper goods') && allowed.includes('Pantry') ? 'Pantry' : cat;
+}
+
 export function guessCategory(name, allowed = HOUSEHOLD_CATEGORIES) {
   const n = ` ${String(name || '').toLowerCase().replace(/[^a-z0-9&%' -]+/g, ' ')} `;
   let best = null;
   let bestLen = 0;
-  for (const [cat, words] of Object.entries(KEYWORDS)) {
+  for (const [key, words] of Object.entries(KEYWORDS)) {
+    const cat = foldCategory(key, allowed);
     if (!allowed.includes(cat)) continue;
     for (const w of words) {
       // Match at the start of a word, so "drink" isn't ink and "foil" isn't oil.

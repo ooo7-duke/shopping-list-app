@@ -80,7 +80,9 @@ describe('receipt matching', () => {
 describe('category guess', () => {
   it('guesses common categories', () => {
     expect(guessCategory('2% milk')).toBe('Dairy & eggs');
-    expect(guessCategory('Paper towels')).toBe('Paper goods');
+    expect(guessCategory('Paper towels')).toBe('Pantry');
+    expect(guessCategory('Tissue paper')).toBe('Pantry');
+    expect(guessCategory('Paper towels', ORG_CATEGORIES)).toBe('Paper goods');
     expect(guessCategory('HP toner', ORG_CATEGORIES)).toBe('Printing');
     expect(guessCategory('mystery thing')).toBe('Other');
   });
