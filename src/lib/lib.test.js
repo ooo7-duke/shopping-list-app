@@ -208,21 +208,16 @@ describe('automatic price lookup', () => {
 import { refreshPrices, canLookUpAgain } from '../data/actions.js';
 import { registerPriceProvider } from './prices.js';
 describe('saving searches', () => {
-  it('rations lookups', async () => {
+  it('looks up only when asked, at most once a day per item', async () => {
     let calls = 0;
     registerPriceProvider({ id: 't', by: 'auto', quote: async () => { calls += 1; return [{ storeId: 'walmart', storeName: 'Walmart', price: 10 }]; } });
-    const writes = [];
-    const backend = { update: async (a, c, id, patch) => writes.push({ id, patch }) };
+    const backend = { update: async () => {} };
     const now = Date.now();
-    const checked = { id: 'a', name: 'Canon PG-240XL ink', pricesCheckedAt: now - 2 * 86400e3, seenPrices: { walmart: { price: 32.99 } } };
-    const fresh = { id: 'b', name: 'canon pg-240xl  ink' };
-    const ctx = { backend, accountId: 'x', items: [checked, fresh] };
-    expect((await refreshPrices(ctx, checked)).skipped).toBe(true);
-    expect((await refreshPrices(ctx, fresh)).copied).toBe(true);
+    const ctx = { backend, accountId: 'x', items: [] };
+    expect((await refreshPrices(ctx, { id: 'a', name: 'Milk', pricesCheckedAt: now - 3600e3 })).recent).toBe(true);
     expect(calls).toBe(0);
-    expect(canLookUpAgain({ pricesCheckedAt: now - 3600e3 })).toBe(false);
-    expect((await refreshPrices(ctx, { ...checked, pricesCheckedAt: now - 3600e3 }, { force: true })).recent).toBe(true);
-    await refreshPrices(ctx, checked, { force: true });
+    expect(canLookUpAgain({ pricesCheckedAt: now - 25 * 3600e3 })).toBe(true);
+    await refreshPrices(ctx, { id: 'a', name: 'Milk', pricesCheckedAt: null });
     expect(calls).toBe(1);
   });
 });

@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useApp } from '../AppContext.jsx';
 import { parseQuickAdd, normalizeName } from '../lib/parse.js';
-import { addEntries, isOnList, refreshPrices } from '../data/actions.js';
-import { hasPriceProvider } from '../lib/prices.js';
+import { addEntries, isOnList } from '../data/actions.js';
 import { fmtMoney, fmtQty } from '../lib/format.js';
 import { MicIcon, PlusIcon } from './Icons.jsx';
 import { saveErrorMessage } from '../lib/errors.js';
@@ -53,12 +52,9 @@ export default function QuickAdd() {
       return;
     }
     const { added, undo } = result;
-    // Look up today's prices in the background; the list updates when they arrive.
-    let told = false;
-    for (const a of added) refreshPrices(ctx, a).catch((e) => { if (!told) { told = true; showToast(e?.message || 'Price lookup failed.'); } });
+    // Prices are looked up only when someone taps Look up prices on the item, to save searches.
     const names = added.map((a) => a.name);
-    const pricing = hasPriceProvider() ? '. Looking up prices.' : '';
-    showToast(label || `Added ${names.length > 3 ? `${names.slice(0, 3).join(', ')} and ${names.length - 3} more` : names.join(', ')}${pricing}`, undo);
+    showToast(label || `Added ${names.length > 3 ? `${names.slice(0, 3).join(', ')} and ${names.length - 3} more` : names.join(', ')}`, undo);
   }
 
   async function onSubmit(e) {

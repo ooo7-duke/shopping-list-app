@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useApp } from '../AppContext.jsx';
 import Sheet from './Sheet.jsx';
 import { markBought, putOnList, isOnList, setSeenPrice, refreshPrices, canLookUpAgain } from '../data/actions.js';
-import { storeLinks, seenPrices, hasPriceProvider } from '../lib/prices.js';
+import { storeLinks, seenPrices, hasPriceProvider, currentQuota, onQuota, refreshQuota } from '../lib/prices.js';
 import { linkHost, isBlockedSeller, isKnownRetailer } from '../lib/storeMatch.js';
 import { lastPurchaseMap, lastBuy } from '../lib/history.js';
 import { fmtMoney, fmtDate, toInputDate, fromInputDate, fmtQty } from '../lib/format.js';
@@ -24,6 +24,13 @@ export default function ItemSheet({ item, focus, onClose }) {
   const [days, setDays] = useState(cadence.days || Math.round(pred?.intervalDays || 14));
   const [qty, setQty] = useState(item.qty ?? 1);
   const pricesRef = useRef(null);
+  const [quota, setQuota] = useState(currentQuota());
+  useEffect(() => {
+    if (!hasPriceProvider()) return undefined;
+    const off = onQuota(setQuota);
+    refreshQuota();
+    return off;
+  }, []);
   useEffect(() => { if (focus === 'prices') pricesRef.current?.scrollIntoView({ block: 'start' }); }, [focus]);
   const last = lastBuy(item, lastPurchaseMap(history)[item.id]);
   const links = storeLinks(item);
@@ -40,8 +47,8 @@ export default function ItemSheet({ item, focus, onClose }) {
   async function lookUp() {
     setLooking(true);
     try {
-      const { found } = await refreshPrices(ctx, item, { force: true });
-      showToast(found ? 'Prices updated' : 'No prices found. Try a more specific name, like "Bounty paper towels 12 rolls".');
+      const { found, recent } = await refreshPrices(ctx, item);
+      showToast(recent ? 'Already checked today. Change the name or note to check again.' : found ? 'Prices updated' : 'No prices found. Try a more specific name, like "Bounty paper towels 12 rolls".');
     } catch (e) {
       showToast(e?.message || 'Price lookup failed. Please try again.');
     } finally { setLooking(false); }
@@ -74,7 +81,7 @@ export default function ItemSheet({ item, focus, onClose }) {
         {editor ? (
           <>
             <label className="field"><span>Name</span>
-              <input className="input" defaultValue={item.name} onBlur={(e) => e.target.value.trim() && e.target.value !== item.name && save({ name: e.target.value.trim() })} />
+              <input className="input" defaultValue={item.name} onBlur={(e) => e.target.value.trim() && e.target.value !== item.name && save({ name: e.target.value.trim(), pricesCheckedAt: null })} />
             </label>
             <div className="grid2">
               <div className="field">
@@ -105,7 +112,7 @@ export default function ItemSheet({ item, focus, onClose }) {
                 <input className="input" inputMode="decimal" defaultValue={item.lastPrice ?? ''} placeholder="0.00" onBlur={(e) => save({ lastPrice: num(e.target.value) })} />
               </label>
               <label className="field"><span>Note</span>
-                <input className="input" defaultValue={item.note || ''} placeholder="Brand, size, aisle" onBlur={(e) => save({ note: e.target.value.trim() })} />
+                <input className="input" defaultValue={item.note || ''} placeholder="Brand, size, aisle" onBlur={(e) => e.target.value.trim() !== (item.note || '') && save({ note: e.target.value.trim(), pricesCheckedAt: null })} />
               </label>
             </div>
             <label className="row small" style={{ minHeight: 44 }}>
@@ -128,7 +135,7 @@ export default function ItemSheet({ item, focus, onClose }) {
             <div className="card" style={{ background: '#fff', scrollMarginTop: 12 }} ref={pricesRef}>
               <h3 style={{ marginBottom: 4 }}>Today's prices</h3>
               <p className="small muted" style={{ marginBottom: 8 }}>
-                {hasPriceProvider() ? 'Prices fill in when you add an item. ' : ''}Tap a store to check it, or type a price you see.
+                {hasPriceProvider() ? 'Tap Look up prices to check stores. ' : ''}Tap a store to open it, or type a price you see.
                 {best ? ` Cheapest: ${best.store} at ${fmtMoney(best.price)}.` : ''}
               </p>
               {DEMO_MODE && <p className="small" style={{ marginBottom: 8 }}>This demo can't look up live prices. On your site they fill in from Google Shopping once the price key is set up.</p>}
@@ -161,7 +168,15 @@ export default function ItemSheet({ item, focus, onClose }) {
                 )}
               </div>
               {hasPriceProvider() && (
-                <button type="button" className="btn" style={{ marginTop: 10 }} onClick={lookUp} disabled={looking || !canLookUpAgain(item)}>{looking ? 'Looking…' : canLookUpAgain(item) ? 'Look up prices again' : 'Checked today'}</button>
+                <>
+                  <button type="button" className="btn" style={{ marginTop: 10 }} onClick={lookUp} disabled={looking || !canLookUpAgain(item) || quota?.left === 0}>
+                    {looking ? 'Looking…' : quota?.left === 0 ? 'No free checks left' : !canLookUpAgain(item) ? 'Checked today' : item.pricesCheckedAt ? 'Look up prices again' : 'Look up prices'}
+                  </button>
+                  <p className="tiny muted" role="status" style={{ marginTop: 6 }}>
+                    {quota ? `Free price checks left this month: ${quota.left}${quota.total ? ` of ${quota.total}` : ''}. Each lookup uses one.` : 'Each lookup uses one of your free monthly price checks.'}
+                    {quota?.left === 0 && quota.renews ? ` They reset ${fmtDate(Date.parse(quota.renews), { withYear: true })}.` : ''}
+                  </p>
+                </>
               )}
               <a className="small" href={links.find((l) => l.id === 'any').href} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block', marginTop: 8, minHeight: 44, lineHeight: '44px' }}>Compare more stores on Google Shopping ↗</a>
             </div>

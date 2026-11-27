@@ -50,6 +50,20 @@ const providers = [];
 export function registerPriceProvider(p) { providers.push(p); }
 export const hasPriceProvider = () => providers.length > 0;
 // Throws only when every provider failed, so the caller can say why instead of failing silently.
+// The latest known count of free price checks left: { left, total, renews } or null.
+let quotaNow = null;
+const quotaListeners = new Set();
+function setQuota(q) { if (q) { quotaNow = q; quotaListeners.forEach((f) => f(q)); } }
+export const currentQuota = () => quotaNow;
+export function onQuota(f) { quotaListeners.add(f); return () => quotaListeners.delete(f); }
+export async function refreshQuota() {
+  for (const p of providers) {
+    if (!p.quota) continue;
+    try { setQuota(await p.quota()); } catch { /* the counter just stays as it was */ }
+  }
+  return quotaNow;
+}
+
 export async function fetchQuotes(item) {
   const out = [];
   let lastError = null;
@@ -88,9 +102,17 @@ export function serverPriceProvider(getToken) {
       const r = await fetch(`/.netlify/functions/prices?q=${encodeURIComponent(q)}`, { headers: { authorization: `Bearer ${token}` } });
       const data = await r.json().catch(() => null);
       if (!data) throw new Error(`The price service didn't answer (${r.status}).`);
+      setQuota(data.quota);
       if (data.configured === false) throw new Error('Price lookups aren\'t set up yet: the SERPAPI_KEY setting in Netlify is missing, not available to Functions, or has no value for this deploy context (Production, Deploy Previews or Branch deploys).');
       if (!r.ok || data.error) throw new Error(data.error || `Price search failed (${r.status}).`);
       return data.quotes || [];
+    },
+    async quota() {
+      const token = await getToken();
+      if (!token) return null;
+      const r = await fetch('/.netlify/functions/prices?quota=1', { headers: { authorization: `Bearer ${token}` } });
+      const data = await r.json().catch(() => null);
+      return data?.quota || null;
     },
   };
 }
