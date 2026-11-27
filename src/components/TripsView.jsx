@@ -346,6 +346,12 @@ function MoveSheet({ item, stores, saved, onPick, onAddStore, onClose }) {
   return (
     <Sheet title={`Where to buy ${item.name}`} onClose={onClose}>
       <div className="stack">
+        {!saved && (
+          <form className="row" onSubmit={(e) => { e.preventDefault(); if (typed.trim()) onPick(typed.trim()); }}>
+            <input className="input grow" value={typed} onChange={(e) => setTyped(e.target.value)} placeholder="A new store, like H-Mart" aria-label="A new store" />
+            <button type="submit" className="btn primary" disabled={!typed.trim()}>Add and move</button>
+          </form>
+        )}
         {saved && (
           <>
             <button type="button" className="btn block" onClick={onAddStore}>+ Add a store</button>
@@ -358,12 +364,6 @@ function MoveSheet({ item, stores, saved, onPick, onAddStore, onClose }) {
           </button>
         ))}
         <button type="button" className={`btn block${!current ? ' primary' : ''}`} onClick={() => onPick('')}>Any store{saved ? ', let the app pick' : ''}</button>
-        {!saved && (
-          <form className="row" onSubmit={(e) => { e.preventDefault(); if (typed.trim()) onPick(typed.trim()); }}>
-            <input className="input grow" value={typed} onChange={(e) => setTyped(e.target.value)} placeholder="Another store, like H-Mart" aria-label="Another store" />
-            <button type="submit" className="btn" disabled={!typed.trim()}>Move</button>
-          </form>
-        )}
       </div>
     </Sheet>
   );
