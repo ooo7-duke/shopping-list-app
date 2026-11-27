@@ -65,7 +65,7 @@ export function AppProvider({ children }) {
   const showToast = useCallback((message, undo) => {
     clearTimeout(toastTimer.current);
     setToast({ message, undo, key: Date.now() });
-    toastTimer.current = setTimeout(() => setToast(null), undo ? 6000 : 3500);
+    toastTimer.current = setTimeout(() => setToast(null), undo || String(message).length > 60 ? 6000 : 3500);
   }, []);
   showToastRef.current = showToast;
 

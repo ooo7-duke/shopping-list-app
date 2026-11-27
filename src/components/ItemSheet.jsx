@@ -8,6 +8,7 @@ import { lastPurchaseMap, lastBuy } from '../lib/history.js';
 import { fmtMoney, fmtDate, toInputDate, fromInputDate, fmtQty } from '../lib/format.js';
 import { HOUSEHOLD_CATEGORIES } from '../lib/categories.js';
 import { can, DEMO_MODE } from '../lib/config.js';
+import { compressImage } from '../lib/receipts.js';
 
 // Every field saves as soon as it changes, so there is no Save button to forget.
 export default function ItemSheet({ item, focus, onClose }) {
@@ -48,13 +49,41 @@ export default function ItemSheet({ item, focus, onClose }) {
     setLooking(true);
     try {
       const { found, recent } = await refreshPrices(ctx, item);
-      showToast(recent ? 'Already checked today. Change the name or note to check again.' : found ? 'Prices updated' : 'No prices found. Try a more specific name, like "Bounty paper towels 12 rolls".');
+      const q = currentQuota();
+      const left = q ? ` ${q.left}${q.total ? ` of ${q.total}` : ''} free lookups left this month.` : '';
+      showToast(recent ? 'Already checked today. Change the name or note to check again.' : (found ? 'Prices updated.' : 'No prices found. Try a more specific name, like "Bounty paper towels 12 rolls".') + left);
     } catch (e) {
       showToast(e?.message || 'Price lookup failed. Please try again.');
     } finally { setLooking(false); }
   }
 
   const save = (patch) => backend.update(ctx.accountId, 'items', item.id, patch);
+  const photoInput = useRef();
+  const [photoBusy, setPhotoBusy] = useState(false);
+
+  // A photo of the exact product, kept small so it fits on the item itself (about 100 KB).
+  async function addPhoto(file) {
+    if (!file) return;
+    if (!/^image\//.test(file.type) && !/\.(heic|heif)$/i.test(file.name)) { showToast('Pick a photo (JPG, PNG or HEIC).'); return; }
+    setPhotoBusy(true);
+    try {
+      const photo = await compressImage(file, { maxSide: 900, maxChars: 150_000 });
+      const before = item.photo || null;
+      await save({ photo, photoAt: Date.now() });
+      showToast(before ? 'Photo replaced.' : 'Photo added. It shows on the list and in Trips.', before ? () => save({ photo: before }) : () => save({ photo: null }));
+    } catch (e) {
+      console.error('Photo failed', e);
+      showToast("Couldn't use that photo. Try another one.");
+    } finally {
+      setPhotoBusy(false);
+      if (photoInput.current) photoInput.current.value = '';
+    }
+  }
+  async function removePhoto() {
+    const before = item.photo;
+    await save({ photo: null });
+    showToast('Photo removed.', () => save({ photo: before }));
+  }
   const num = (v) => (v === '' || v == null ? null : Number(v));
 
   async function logPurchase() {
@@ -102,7 +131,7 @@ export default function ItemSheet({ item, focus, onClose }) {
                 <datalist id="stores">{stores.map((s) => <option key={s} value={s} />)}</datalist>
               </label>
               <label className="field"><span>Type</span>
-                <select className="input" value={item.category || 'Other'} onChange={(e) => save({ category: e.target.value })}>
+                <select className="input" value={item.category || 'Other'} onChange={(e) => save({ category: e.target.value, categoryByHand: true })}>
                   {[...new Set([...cats, item.category || 'Other'])].map((c) => <option key={c}>{c}</option>)}
                 </select>
               </label>
@@ -114,6 +143,23 @@ export default function ItemSheet({ item, focus, onClose }) {
               <label className="field"><span>Note</span>
                 <input className="input" defaultValue={item.note || ''} placeholder="Brand, size, aisle" onBlur={(e) => e.target.value.trim() !== (item.note || '') && save({ note: e.target.value.trim(), pricesCheckedAt: null })} />
               </label>
+            </div>
+            <div className="field photo-field">
+              <span className="small muted" style={{ display: 'block', marginBottom: 4 }}>Photo of the right item</span>
+              {item.photo ? (
+                <div className="photo-box">
+                  <img src={item.photo} alt={`The ${item.name} to buy`} />
+                  <div className="row">
+                    <button type="button" className="btn" disabled={photoBusy} onClick={() => photoInput.current?.click()}>{photoBusy ? 'Saving…' : 'Replace photo'}</button>
+                    <button type="button" className="btn ghost" onClick={removePhoto}>Remove photo</button>
+                  </div>
+                </div>
+              ) : (
+                <button type="button" className="btn block" disabled={photoBusy} onClick={() => photoInput.current?.click()}>
+                  {photoBusy ? 'Saving the photo…' : 'Add a photo so the wrong one isn\'t bought'}
+                </button>
+              )}
+              <input ref={photoInput} type="file" accept="image/*" hidden onChange={(e) => addPhoto(e.target.files?.[0])} />
             </div>
             <label className="row small" style={{ minHeight: 44 }}>
               <input type="checkbox" checked={!!item.urgent} onChange={(e) => save({ urgent: e.target.checked, needBy: e.target.checked ? Date.now() : null })} style={{ width: 22, height: 22 }} />

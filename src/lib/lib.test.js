@@ -306,3 +306,75 @@ describe('receipt QR codes', () => {
     expect(parseQr('')).toBe(null);
   });
 });
+
+import { themeOf, sharedThemes } from './themes.js';
+describe('theme groups', () => {
+  it('groups two Christmas items but not a lone one', () => {
+    const list = [
+      { id: 1, name: 'Christmas lights for the house' },
+      { id: 2, name: 'Christmas tree ornaments' },
+      { id: 3, name: 'Cheerios' },
+      { id: 4, name: 'Balloons' },
+    ];
+    const t = sharedThemes(list);
+    expect(t.get(1)).toBe('Christmas');
+    expect(t.get(2)).toBe('Christmas');
+    expect(t.has(3)).toBe(false);
+    expect(t.has(4)).toBe(false);
+    expect(themeOf({ name: 'Balloons' })).toBe('Birthday party');
+  });
+  it('does not match part of a word', () => {
+    expect(themeOf({ name: 'Tentacles' })).toBe(null);
+    expect(themeOf({ name: 'Garden hose' })).toBe('Garden');
+  });
+  it('places cereal and deli meat', () => {
+    expect(guessCategory('Cheerios')).toBe('Pantry');
+    expect(guessCategory('Deli sandwich meat')).toBe('Meat & seafood');
+  });
+});
+
+import { matchKind, findDuplicates } from './dupes.js';
+
+describe('duplicate check', () => {
+  it('sees the same item in another spelling or plural', () => {
+    expect(matchKind('Paper towels', 'paper towel')).toBe('same');
+    expect(matchKind('a bag of apples', 'Apples')).toBe('same');
+  });
+  it('flags near matches', () => {
+    expect(matchKind('milk', '2% milk')).toBe('close');
+    expect(matchKind('bananna', 'banana')).toBe('close');
+    expect(matchKind('Christmas lights', 'Christmas lights outdoor')).toBe('close');
+  });
+  it('leaves different items alone', () => {
+    expect(matchKind('milk', 'chocolate chips')).toBe(null);
+    expect(matchKind('eggs', 'eggplant')).toBe(null);
+    expect(matchKind('ink', 'pink')).toBe(null);
+    expect(matchKind('Canon PG-240XL ink', 'Canon CL-241XL ink')).toBe(null);
+  });
+  it('checks the list and the entries themselves', () => {
+    const list = [{ id: '1', name: 'Milk' }];
+    const d = findDuplicates([{ name: 'milk' }, { name: 'bread' }, { name: 'Bread' }], list);
+    expect(d.map((x) => [x.entry.name, x.kind, x.onList])).toEqual([['milk', 'same', true], ['Bread', 'same', false]]);
+  });
+});
+
+import { pickCategories } from './classify.js';
+
+describe('sorting items into types', () => {
+  it('knows common groceries by keyword', () => {
+    expect(guessCategory('French Fries')).toBe('Frozen');
+    expect(guessCategory('Cheerios')).toBe('Pantry');
+    expect(guessCategory('Eggplant')).toBe('Produce');
+    expect(guessCategory('Sports drink')).toBe('Beverages');
+    expect(guessCategory('Aluminum foil')).toBe('Kitchen & breakroom');
+    expect(guessCategory('Canon PG-240XL ink')).toBe('Office & stationery');
+  });
+  it('keeps only AI answers for items asked about and types on the list', () => {
+    const m = pickCategories({ items: [
+      { name: 'french fries', category: 'frozen' },
+      { name: 'Cheerios', category: 'Breakfast' },
+      { name: 'Something else', category: 'Pantry' },
+    ] }, ['French fries', 'Cheerios'], ['Frozen', 'Pantry', 'Other']);
+    expect([...m]).toEqual([['French fries', 'Frozen']]);
+  });
+});

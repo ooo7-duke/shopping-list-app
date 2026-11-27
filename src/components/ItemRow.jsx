@@ -1,9 +1,12 @@
+import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { describePrediction } from '../lib/predict.js';
 import { fmtMoney, fmtQty, fmtDate } from '../lib/format.js';
 import { seenPrices } from '../lib/prices.js';
 import { ClockIcon, TrashIcon } from './Icons.jsx';
 
 export default function ItemRow({ item, pred, done, last, showHistory = false, onPrices, showStore = true, showCategory = false, onToggle, onOpen, onSnooze, onRemove, readOnly, extra }) {
+  const [viewing, setViewing] = useState(false);
   const qty = fmtQty(item.qty, item.unit);
   const predText = pred && pred.basis !== 'off' && pred.basis !== 'learning' ? describePrediction(pred) : '';
   const overdue = pred?.daysLeft != null && pred.daysLeft < 1;
@@ -32,6 +35,11 @@ export default function ItemRow({ item, pred, done, last, showHistory = false, o
       >
         <span />
       </button>
+      {item.photo && (
+        <button type="button" className="thumb" onClick={(e) => { e.stopPropagation(); setViewing(true); }} aria-label={`See the photo of ${item.name}`}>
+          <img src={item.photo} alt="" />
+        </button>
+      )}
       <div className="grow">
         <div className="name ellipsis">{item.name}{qty && <span className="muted" style={{ fontWeight: 400 }}> · {qty}</span>}</div>
         <div className="meta">
@@ -57,6 +65,13 @@ export default function ItemRow({ item, pred, done, last, showHistory = false, o
           {onSnooze && <button type="button" className="icon-btn" title="Snooze 1 week (S)" aria-label={`Snooze ${item.name} for a week`} onClick={(e) => { e.stopPropagation(); onSnooze(); }}><ClockIcon /></button>}
           {onRemove && <button type="button" className="icon-btn" title="Take off list" aria-label={`Take ${item.name} off the list`} onClick={(e) => { e.stopPropagation(); onRemove(); }}><TrashIcon /></button>}
         </div>
+      )}
+      {viewing && createPortal(
+        <div className="photo-view" role="dialog" onPointerDown={(e) => e.stopPropagation()} onTouchStart={(e) => e.stopPropagation()} aria-label={`Photo of ${item.name}`} onClick={(e) => { e.stopPropagation(); setViewing(false); }}>
+          <img src={item.photo} alt={`The ${item.name} to buy`} />
+          <div className="photo-cap">{item.name}{item.note ? ` · ${item.note}` : ''}<br /><span className="small">Tap anywhere to close</span></div>
+        </div>,
+        document.body,
       )}
       {price != null && (
         <div className="price">

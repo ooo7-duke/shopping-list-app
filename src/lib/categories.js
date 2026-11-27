@@ -15,13 +15,13 @@ export const ORG_CATEGORIES = [
 ];
 
 const KEYWORDS = {
-  'Produce': ['apple', 'banana', 'orange', 'lemon', 'lime', 'lettuce', 'spinach', 'kale', 'tomato', 'onion', 'garlic', 'potato', 'carrot', 'pepper', 'cucumber', 'avocado', 'berries', 'strawberr', 'blueberr', 'grape', 'broccoli', 'celery', 'mushroom', 'plantain', 'yam', 'ginger', 'cilantro', 'parsley', 'fruit', 'veg'],
+  'Produce': ['eggplant', 'apple', 'banana', 'orange', 'lemon', 'lime', 'lettuce', 'spinach', 'kale', 'tomato', 'onion', 'garlic', 'potato', 'carrot', 'pepper', 'cucumber', 'avocado', 'berries', 'strawberr', 'blueberr', 'grape', 'broccoli', 'celery', 'mushroom', 'plantain', 'yam', 'ginger', 'cilantro', 'parsley', 'fruit', 'veg'],
   'Dairy & eggs': ['milk', 'egg', 'cheese', 'yogurt', 'yoghurt', 'butter', 'cream', 'creamer'],
-  'Meat & seafood': ['chicken', 'beef', 'pork', 'turkey', 'fish', 'salmon', 'shrimp', 'tilapia', 'sausage', 'bacon', 'ham', 'goat', 'lamb', 'steak', 'ground'],
+  'Meat & seafood': ['deli', 'lunch meat', 'sandwich meat', 'salami', 'bologna', 'pepperoni', 'hot dog', 'chicken', 'beef', 'pork', 'turkey', 'fish', 'salmon', 'shrimp', 'tilapia', 'sausage', 'bacon', 'ham', 'goat', 'lamb', 'steak', 'ground'],
   'Bakery': ['bread', 'bagel', 'bun', 'roll', 'tortilla', 'muffin', 'croissant', 'cake'],
-  'Pantry': ['rice', 'pasta', 'flour', 'sugar', 'salt', 'oil', 'beans', 'cereal', 'oat', 'spice', 'sauce', 'ketchup', 'mayo', 'honey', 'peanut butter', 'jam', 'canned', 'soup', 'broth', 'seasoning', 'vinegar'],
-  'Frozen': ['frozen', 'ice cream', 'pizza'],
-  'Beverages': ['water', 'juice', 'soda', 'coffee', 'tea', 'pop', 'sparkling', 'gatorade', 'k-cup', 'kcup'],
+  'Pantry': ['cheerios', 'frosted flakes', 'corn flakes', 'raisin bran', 'rice krispies', 'chex', 'lucky charms', 'froot loops', 'cinnamon toast crunch', 'grits', 'noodle', 'ramen', 'spaghetti', 'macaroni', 'garri', 'semolina', 'cornmeal', 'tomato paste', 'bouillon', 'maggi', 'mustard', 'salsa', 'olive', 'oatmeal', 'pancake', 'syrup', 'rice', 'pasta', 'flour', 'sugar', 'salt', 'oil', 'beans', 'cereal', 'oat', 'spice', 'sauce', 'ketchup', 'mayo', 'honey', 'peanut butter', 'jam', 'canned', 'soup', 'broth', 'seasoning', 'vinegar'],
+  'Frozen': ['frozen', 'ice cream', 'pizza', 'french fries', 'fries', 'tater tot', 'hash brown', 'nugget', 'popsicle', 'frozen waffle', 'eggo', 'fish stick'],
+  'Beverages': ['drink', 'lemonade', 'malt', 'water', 'juice', 'soda', 'coffee', 'tea', 'pop', 'sparkling', 'gatorade', 'k-cup', 'kcup'],
   'Snacks': ['chips', 'cookie', 'cracker', 'snack', 'popcorn', 'nuts', 'granola', 'candy', 'chocolate'],
   'Cleaning': ['detergent', 'bleach', 'cleaner', 'disinfect', 'lysol', 'clorox', 'sponge', 'dish soap', 'dishwasher', 'trash bag', 'garbage bag', 'mop', 'windex', 'wipes'],
   'Paper goods': ['paper towel', 'toilet paper', 'tissue', 'napkin', 'paper plate', 'kleenex'],
@@ -38,13 +38,14 @@ const KEYWORDS = {
 };
 
 export function guessCategory(name, allowed = HOUSEHOLD_CATEGORIES) {
-  const n = ` ${String(name || '').toLowerCase()} `;
+  const n = ` ${String(name || '').toLowerCase().replace(/[^a-z0-9&%' -]+/g, ' ')} `;
   let best = null;
   let bestLen = 0;
   for (const [cat, words] of Object.entries(KEYWORDS)) {
     if (!allowed.includes(cat)) continue;
     for (const w of words) {
-      if (n.includes(w) && w.length > bestLen) {
+      // Match at the start of a word, so "drink" isn't ink and "foil" isn't oil.
+      if (n.includes(` ${w}`) && w.length > bestLen) {
         best = cat;
         bestLen = w.length;
       }

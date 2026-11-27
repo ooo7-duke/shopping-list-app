@@ -264,3 +264,31 @@ table.data td.num, table.data th.num { text-align: right; }
 .price-line { display: flex; align-items: center; gap: 10px; }
 .price-line a.chip { min-height: 44px; display: inline-flex; align-items: center; padding: 4px 14px; text-decoration: none; font-weight: 600; white-space: nowrap; }
 .price-input { width: 104px; text-align: right; }
+
+/* Type filter above the list: tap several to combine. */
+.filter-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 10px; }
+.filter-row .chip .muted { margin-left: 4px; font-weight: 400; }
+.filter-row .chip.gold .muted { color: inherit; opacity: 0.75; }
+
+/* Foldable list groups */
+.fold-h { width: 100%; background: none; border: 0; padding: 6px 2px; margin: 12px 0 4px; cursor: pointer; font: inherit; color: inherit; text-align: left; }
+.fold-h h3 { display: flex; align-items: center; gap: 6px; margin: 0; }
+.chev { display: inline-block; width: 1em; text-align: center; font-size: 1.1em; transition: transform .15s; }
+.chev.open { transform: rotate(90deg); }
+.fold-all { display: flex; justify-content: flex-end; margin: 2px 2px -6px; }
+.linkish { background: none; border: 0; padding: 4px 0; font: inherit; font-size: 0.85rem; color: var(--muted); text-decoration: underline; cursor: pointer; }
+
+/* Duplicate warning under the add box */
+.dupe-banner { margin: 8px 0 4px; padding: 10px 12px; background: #fff1ec; border: 1px solid #f0c2b4; border-left: 4px solid var(--danger); border-radius: var(--radius); color: var(--bb-ink); font-size: 0.92rem; }
+.dupe-banner strong { color: var(--danger); }
+.dupe-banner ul { margin: 4px 0 0; padding-left: 18px; }
+.dupe-banner .row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+
+/* Item photos */
+.thumb { flex: none; width: 44px; height: 44px; padding: 0; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: #fff; cursor: zoom-in; }
+.thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.photo-box img { display: block; max-width: 100%; max-height: 260px; border-radius: 10px; border: 1px solid var(--line); background: #fff; margin-bottom: 8px; }
+.photo-box .row { display: flex; flex-wrap: wrap; gap: 8px; }
+.photo-view { position: fixed; inset: 0; z-index: 1000; background: rgba(12, 18, 40, 0.92); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 16px; cursor: zoom-out; }
+.photo-view img { max-width: 100%; max-height: 78vh; border-radius: 12px; background: #fff; }
+.photo-cap { color: #fffbee; text-align: center; font-weight: 600; }
