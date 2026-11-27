@@ -263,3 +263,24 @@ describe('ordered by mistake', () => {
     expect(ops[1].data).toEqual({ status: 'needed', batchId: null });
   });
 });
+
+import { carries, isSpecific } from './tripPlan.js';
+describe('specific products', () => {
+  const costco = { id: 'c', type: 'costco', miles: 10 };
+  const walmart = { id: 'w', type: 'walmart', miles: 12 };
+  const staples = { id: 's', type: 'office', miles: 14 };
+  const ink = { id: 1, name: 'Canon PG-240XL ink' };
+  it('needs proof before sending a model number to a store', () => {
+    expect(isSpecific(ink)).toBe(true);
+    expect(isSpecific({ name: 'Milk', note: '2 gal' })).toBe(false);
+    expect(isSpecific({ name: 'Bounty paper towels', note: '12 rolls' })).toBe(false);
+    expect(carries(costco, ink)).toBe(false);
+    expect(carries(staples, ink)).toBe(true);
+    expect(carries(walmart, { ...ink, seenPrices: { walmart: { price: 32.99 } } })).toBe(true);
+  });
+  it('lists it as not sure when no saved store has proof', () => {
+    const { stops, unplaced } = planTrips([ink], [costco, walmart]);
+    expect(stops.length).toBe(0);
+    expect(unplaced.length).toBe(1);
+  });
+});

@@ -45,12 +45,29 @@ export function deptOf(item) {
   return CATEGORY_DEPT[item.category] || null;
 }
 
+// Stores that reliably stock a whole department, model numbers included.
+const SPECIALISTS = { office: ['office'], auto: ['autoparts'], electronics: ['electronics', 'office'] };
+
+// A product with a model number, like "Canon PG-240XL ink", is a specific product. Sizes
+// such as "12oz" or "2 gal" don't count.
+const UNITS = /^\d+(\.\d+)?(oz|lb|lbs|ct|pk|pack|gal|ml|l|g|kg|in|ft|qt|pt|count|rolls?)$/;
+export function isSpecific(item) {
+  const words = [item.name, item.note].filter(Boolean).join(' ').toLowerCase().split(/[^a-z0-9-]+/);
+  return words.some((w) => /\d/.test(w) && /[a-z]/.test(w) && w.replace(/-/g, '').length >= 3 && !UNITS.test(w));
+}
+
 // Does this saved store carry the item?
+// - A price already found at that chain counts as proof.
+// - A specific product (with a model number) goes only to a store with that proof, or to a
+//   store that specializes in its department, like an office store for printer ink. A
+//   department guess is not enough: Costco sells office supplies but not every ink.
+// - Everyday items go by department.
 export function carries(store, item) {
   const type = storeType(store.type);
   if (!type) return false;
   if (type.priceStore && item.seenPrices?.[type.priceStore]?.price != null) return true;
   const d = deptOf(item);
+  if (isSpecific(item)) return !!d && (SPECIALISTS[d] || []).includes(type.id);
   return d ? type.depts.includes(d) : ['walmart', 'costco', 'samsclub', 'target'].includes(type.id);
 }
 
@@ -79,11 +96,9 @@ export function planTrips(items, stores = []) {
   while (remaining.length) {
     let best = null;
     for (const s of saved) {
-      // A store already on the route takes its items at no extra trip.
-      const bonus = byStore.has(s.id) ? 0.5 : 0;
       const got = remaining.filter((it) => carries(s, it));
       if (!got.length) continue;
-      const score = got.length + bonus;
+      const score = got.length + (byStore.has(s.id) ? 0.5 : 0);
       if (!best || score > best.score || (score === best.score && miles(s) < miles(best.s))) best = { s, got, score };
     }
     if (!best) break;
