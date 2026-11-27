@@ -13,6 +13,7 @@ import { sharedThemes } from '../lib/themes.js';
 import { guessCategory, HOUSEHOLD_CATEGORIES } from '../lib/categories.js';
 
 const GROUP_KEY = 'sla-group-by';
+const FILTER_KEY = 'sla-type-filter';
 const LOW_LIMIT = 6; // chips shown before "Show all"
 
 export default function ListView() {
@@ -39,24 +40,52 @@ export default function ListView() {
     .filter(({ p }) => p && (p.basis === 'history' || p.basis === 'manual') && p.daysLeft <= lookahead)
     .sort((a, b) => a.p.daysLeft - b.p.daysLeft), [items, predictions, lookahead, now]);
 
+  // Each item's type: a shared occasion (two Christmas items, say) first, then its type.
+  // Items still marked Other get a fresh guess from their name.
+  const typeInfo = useMemo(() => {
+    const themed = sharedThemes(onList);
+    const cats = account?.categories || HOUSEHOLD_CATEGORIES;
+    const map = new Map();
+    for (const it of onList) {
+      map.set(it.id, themed.get(it.id) || (it.category && it.category !== 'Other' ? it.category : guessCategory(it.name, cats) || 'Other'));
+    }
+    return { map, themes: new Set(themed.values()) };
+  }, [onList, account]);
+  const rank = (k) => (typeInfo.themes.has(k) ? 0 : k === 'Anywhere' || k === 'Other' ? 2 : 1);
+  const byRank = (a, b) => rank(a) - rank(b) || a.localeCompare(b);
+
+  // Type filter: tap one or more types to show only those. None picked shows everything.
+  const [typeFilter, setTypeFilter] = useState(() => {
+    try { return new Set(JSON.parse(localStorage.getItem(FILTER_KEY) || '[]')); } catch { return new Set(); }
+  });
+  const typeCounts = useMemo(() => {
+    const c = new Map();
+    for (const t of typeInfo.map.values()) c.set(t, (c.get(t) || 0) + 1);
+    return [...c.entries()].sort((a, b) => byRank(a[0], b[0]));
+  }, [typeInfo]);
+  const activeFilter = new Set([...typeFilter].filter((t) => typeInfo.map.size && typeCounts.some(([k]) => k === t)));
+  const saveFilter = (next) => {
+    setTypeFilter(next);
+    try { localStorage.setItem(FILTER_KEY, JSON.stringify([...next])); } catch { /* private mode */ }
+  };
+  const toggleType = (t) => {
+    const next = new Set(activeFilter);
+    if (next.has(t)) next.delete(t); else next.add(t);
+    saveFilter(next);
+  };
+  const shown = activeFilter.size ? onList.filter((it) => activeFilter.has(typeInfo.map.get(it.id))) : onList;
+
   const groups = useMemo(() => {
     const m = new Map();
-    // By type, items that share an occasion (two Christmas items, say) get a group of their
-    // own, listed first. Items still marked Other get a fresh guess from their name.
-    const themed = groupBy === 'store' ? new Map() : sharedThemes(onList);
-    const cats = account?.categories || HOUSEHOLD_CATEGORIES;
-    const typeOf = (it) => (it.category && it.category !== 'Other' ? it.category : guessCategory(it.name, cats) || 'Other');
-    const key = (it) => (groupBy === 'store' ? it.store || 'Anywhere' : themed.get(it.id) || typeOf(it));
-    const themes = new Set(themed.values());
-    for (const it of onList) {
+    const key = (it) => (groupBy === 'store' ? it.store || 'Anywhere' : typeInfo.map.get(it.id) || 'Other');
+    for (const it of shown) {
       const k = key(it);
       if (!m.has(k)) m.set(k, []);
       m.get(k).push(it);
     }
     for (const list of m.values()) list.sort((a, b) => (b.urgent ? 1 : 0) - (a.urgent ? 1 : 0) || a.name.localeCompare(b.name));
-    const rank = (k) => (themes.has(k) ? 0 : k === 'Anywhere' || k === 'Other' ? 2 : 1);
-    return [...m.entries()].sort((a, b) => rank(a[0]) - rank(b[0]) || a[0].localeCompare(b[0]));
-  }, [onList, groupBy, account]);
+    return [...m.entries()].sort((a, b) => byRank(a[0], b[0]));
+  }, [shown, groupBy, typeInfo]);
 
   const setGroup = (g) => { setGroupBy(g); localStorage.setItem(GROUP_KEY, g); };
 
@@ -106,7 +135,7 @@ export default function ListView() {
       {onList.length > 0 && (
         <div className="section-h" style={{ marginTop: 14 }}>
           <div>
-            <h2>{`${onList.length} item${onList.length === 1 ? '' : 's'} to get`}</h2>
+            <h2>{activeFilter.size ? `${shown.length} of ${onList.length} items` : `${onList.length} item${onList.length === 1 ? '' : 's'} to get`}</h2>
             {total > 0 && editor && <div className="small muted">About {fmtMoney(total)} at last prices</div>}
           </div>
           <div className="row" style={{ gap: 6 }}>
@@ -116,6 +145,17 @@ export default function ListView() {
               <button type="button" aria-pressed={groupBy === 'store'} onClick={() => setGroup('store')}>Where to buy</button>
             </div>
           </div>
+        </div>
+      )}
+
+      {typeCounts.length > 1 && (
+        <div className="filter-row" role="group" aria-label="Show only these types">
+          <button type="button" className={`chip${activeFilter.size ? '' : ' gold'}`} aria-pressed={!activeFilter.size} onClick={() => saveFilter(new Set())}>All</button>
+          {typeCounts.map(([t, n]) => (
+            <button key={t} type="button" className={`chip${activeFilter.has(t) ? ' gold' : ''}`} aria-pressed={activeFilter.has(t)} onClick={() => toggleType(t)}>
+              {t} <span className="muted">{n}</span>
+            </button>
+          ))}
         </div>
       )}
 
