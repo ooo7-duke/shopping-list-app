@@ -5,7 +5,7 @@ import TripsView from './components/TripsView.jsx';
 import ReceiptsView from './components/ReceiptsView.jsx';
 import InsightsView from './components/InsightsView.jsx';
 import AccountSheet from './components/AccountSheet.jsx';
-import { SignIn, Onboarding } from './components/Welcome.jsx';
+import { SignIn, Onboarding, InviteBanner } from './components/Welcome.jsx';
 import { ListIcon, CartIcon, ReceiptIcon, ChartIcon, ChevronDown, LogoMark, MenuIcon } from './components/Icons.jsx';
 import { isOnList } from './data/actions.js';
 import { can, DEMO_MODE, APP_NAME } from './lib/config.js';
@@ -95,6 +95,7 @@ function Shell() {
       )}
 
       <main className={current === 'insights' || current === 'trips' ? 'wide' : ''}>
+        <InviteBanner />
         <View />
       </main>
 

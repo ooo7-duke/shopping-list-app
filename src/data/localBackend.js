@@ -13,6 +13,25 @@ function load() {
   } catch { /* storage unavailable */ }
   return seed();
 }
+// Demo only: adding ?invite to the address puts a waiting invite to another list on this
+// device, so the join banner can be tried without a second Google account.
+function addSampleInvite() {
+  try {
+    if (!new URLSearchParams(location.search).has('invite')) return;
+  } catch { return; }
+  const id = 'demo-relatives';
+  if (state.accounts[id]?.memberUids.includes(DEMO_USER.uid) || state.invites['demo-invite']) return;
+  state.accounts[id] = {
+    id, name: "Grandma's house", type: 'household', categories: HOUSEHOLD_CATEGORIES,
+    members: { 'demo-grandma': { role: 'owner', name: 'Grandma', email: 'grandma@example.com' } },
+    memberUids: ['demo-grandma'], settings: { lookaheadDays: 10 }, createdAt: Date.now(),
+  };
+  state.data[id] = { items: {}, purchases: {}, receipts: {}, batches: {}, receiptImages: {} };
+  state.invites['demo-invite'] = {
+    id: 'demo-invite', email: DEMO_USER.email, role: 'editor', accountId: id,
+    accountName: "Grandma's house", invitedBy: 'Grandma', createdAt: Date.now(),
+  };
+}
 function save() {
   try { localStorage.setItem(KEY, JSON.stringify(state)); } catch { /* quota or private mode */ }
   for (const l of listeners) l();
@@ -20,6 +39,8 @@ function save() {
 function uid() { return Math.random().toString(36).slice(2, 11); }
 
 const DEMO_USER = { uid: 'demo-user', name: 'Demo user', email: 'demo@example.com', photo: '' };
+state.invites ||= {};
+addSampleInvite();
 
 function seed() {
   const now = Date.now();

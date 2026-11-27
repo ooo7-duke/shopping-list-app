@@ -28,6 +28,18 @@ export function AppProvider({ children }) {
     return backend.subscribeAccounts(user, setAccounts);
   }, [user]);
 
+  // Invites waiting for this Google account. Shown everywhere in the app, not only on the
+  // first screen, so someone who already started their own list can still join another.
+  const [myInvites, setMyInvites] = useState([]);
+  useEffect(() => {
+    if (!user) { setMyInvites([]); return undefined; }
+    return backend.subscribeMyInvites(user, setMyInvites);
+  }, [user?.uid]);
+  const invites = useMemo(
+    () => myInvites.filter((iv) => !(accounts || []).some((a) => a.id === iv.accountId)),
+    [myInvites, accounts],
+  );
+
   const account = useMemo(() => {
     if (!accounts?.length) return null;
     return accounts.find((a) => a.id === activeId) || accounts[0];
@@ -54,6 +66,16 @@ export function AppProvider({ children }) {
     setItems([]); setPurchases([]); setReceipts([]); setBatches([]);
   }, []);
 
+  const joinInvite = useCallback(async (iv) => {
+    try {
+      await backend.acceptInvite(iv, user);
+      switchAccount(iv.accountId);
+      showToastRef.current?.(`You joined ${iv.accountName}.`);
+    } catch (e) {
+      showToastRef.current?.(`Couldn't join: ${e?.message || e}`);
+    }
+  }, [user, switchAccount]);
+
   // Re-run predictions when data changes, and once an hour so "due in" stays fresh.
   const [tick, setTick] = useState(0);
   useEffect(() => {
@@ -73,7 +95,7 @@ export function AppProvider({ children }) {
 
   const value = {
     backend, user, accounts, account, role, items, purchases, receipts, batches, predictions,
-    switchAccount, ctx, toast, showToast, dismissToast: () => setToast(null),
+    switchAccount, invites, joinInvite, ctx, toast, showToast, dismissToast: () => setToast(null),
   };
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
