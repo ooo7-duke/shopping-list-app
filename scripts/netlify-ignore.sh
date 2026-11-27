@@ -6,7 +6,10 @@
 # (or a commit whose message starts with "release:").
 
 # Skip any build where only documentation changed.
-if [ -n "$CACHED_COMMIT_REF" ] && [ -n "$COMMIT_REF" ] && \
+# Netlify sets CACHED_COMMIT_REF equal to COMMIT_REF when there is no earlier build
+# (like the first production deploy). Comparing a commit with itself shows no changes,
+# so only compare when the two differ.
+if [ -n "$CACHED_COMMIT_REF" ] && [ -n "$COMMIT_REF" ] && [ "$CACHED_COMMIT_REF" != "$COMMIT_REF" ] && \
    git diff --quiet "$CACHED_COMMIT_REF" "$COMMIT_REF" -- . ':(exclude)*.md' ':(exclude)docs/' ':(exclude).github/' 2>/dev/null; then
   echo "Only docs changed. Skipping build."
   exit 0

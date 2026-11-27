@@ -284,3 +284,25 @@ describe('specific products', () => {
     expect(unplaced.length).toBe(1);
   });
 });
+
+import { parseQr } from './qr.js';
+describe('receipt QR codes', () => {
+  it('reads a store link and its date and total', () => {
+    const q = parseQr('https://www.walmart.com/receipt-lookup?date=2026-11-20&total=42.17&tc=1234');
+    expect(q.store).toBe('Walmart');
+    expect(q.url).toContain('walmart.com');
+    expect(q.total).toBe(42.17);
+    expect(new Date(q.date).getDate()).toBe(20);
+  });
+  it('reads plain text codes', () => {
+    const q = parseQr('STORE 1234|DATE:11/20/2026|TOTAL:19.99');
+    expect(q.url).toBe('');
+    expect(q.total).toBe(19.99);
+    expect(new Date(q.date).getMonth()).toBe(10);
+  });
+  it('ignores links that are not web links, and future dates', () => {
+    expect(parseQr('javascript:alert(1)').url).toBe('');
+    expect(parseQr('date=2099-01-01').date).toBe(null);
+    expect(parseQr('')).toBe(null);
+  });
+});

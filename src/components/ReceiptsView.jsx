@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useApp } from '../AppContext.jsx';
 import Sheet from './Sheet.jsx';
 import { compressImage, extractReceipt } from '../lib/receipts.js';
+import { decodeQr, parseQr, qrHost } from '../lib/qr.js';
 import { bestMatch } from '../lib/match.js';
 import { saveReceipt, deleteReceipt } from '../data/actions.js';
 import { fmtMoney, fmtDate, toInputDate, fromInputDate } from '../lib/format.js';
@@ -32,16 +33,32 @@ export default function ReceiptsView() {
       showToast('Use a photo or screenshot of the receipt (JPG, PNG or HEIC).');
       return;
     }
+    setBusy('Looking for a QR code…');
+    const qr = parseQr(await decodeQr(file));
     try {
       setBusy('Shrinking the photo…');
       const image = await compressImage(file);
       setBusy('Reading the receipt…');
-      const res = await extractReceipt(image, items.map((i) => i.name), backend.getApp());
-      const lines = res.items.map((ln) => {
+      let res = null;
+      let readError = null;
+      try {
+        res = await extractReceipt(image, items.map((i) => i.name), backend.getApp());
+      } catch (e) {
+        if (!qr) throw e;
+        readError = e; // the QR code still gives us something to save
+      }
+      const lines = (res?.items || []).map((ln) => {
         const m = bestMatch(ln, items);
         return { ...ln, itemId: m.item?.id || '', newName: ln.name, skip: false };
       });
-      setReview({ store: res.store, date: res.date || Date.now(), total: res.total, tax: res.tax, image, lines });
+      setReview({
+        store: res?.store || qr?.store || '',
+        date: res?.date || qr?.date || Date.now(),
+        total: res?.total ?? qr?.total ?? null,
+        tax: res?.tax ?? null,
+        image, lines, qr,
+      });
+      if (readError) showToast("Couldn't read the printed lines, but the QR code was read.");
     } catch (e) {
       console.error(e);
       showToast(e?.message?.includes('App Check') ? 'Receipt reading is blocked by App Check. See the setup guide.' : `Couldn't read that receipt. ${e?.message || 'Try a clearer photo.'}`);
@@ -69,7 +86,7 @@ export default function ReceiptsView() {
       >
         <CameraIcon />
         <strong style={{ color: 'var(--bb)', fontSize: '1.1rem' }}>{busy || 'Snap or upload a receipt'}</strong>
-        <span className="small muted">{busy ? 'This takes a few seconds.' : 'Take a photo, pick one from your library, drop a file here, or paste a screenshot.'}</span>
+        <span className="small muted">{busy ? 'This takes a few seconds.' : 'Take a photo, pick one from your library, drop a file here, or paste a screenshot. A QR code on the receipt is read too.'}</span>
         <input ref={fileRef} type="file" accept="image/*" capture="environment" className="sr-only" onChange={(e) => handle(e.target.files?.[0])} disabled={!!busy} />
       </label>
       {DEMO_MODE && <p className="tiny muted" style={{ marginTop: 6 }}>Demo mode returns a sample Giant receipt so you can try the review step.</p>}
@@ -110,7 +127,7 @@ function ReceiptReview({ data, onClose, onSaved }) {
   async function save() {
     setSaving(true);
     try {
-      await saveReceipt(ctx, { ...head, image: data.image }, lines);
+      await saveReceipt(ctx, { ...head, image: data.image, qrText: data.qr?.raw || '', qrUrl: data.qr?.url || '' }, lines);
       onSaved(kept.length);
     } finally {
       setSaving(false);
@@ -125,6 +142,8 @@ function ReceiptReview({ data, onClose, onSaved }) {
         <label className="field"><span>Date on receipt</span><input type="date" className="input" value={toInputDate(head.date)} max={toInputDate()} onChange={(e) => setHead({ ...head, date: fromInputDate(e.target.value) })} /></label>
         <label className="field"><span>Receipt total</span><input className="input" inputMode="decimal" value={head.total ?? ''} onChange={(e) => setHead({ ...head, total: e.target.value === '' ? null : Number(e.target.value) })} /></label>
       </div>
+
+      {data.qr && <QrNote qr={data.qr} />}
 
       <div className="rhead" aria-hidden="true"><span>Matches list item</span><span>Qty</span><span>Line total $</span></div>
       <div>
@@ -155,7 +174,7 @@ function ReceiptReview({ data, onClose, onSaved }) {
       <div className="row" style={{ marginTop: 12, justifyContent: 'space-between' }}>
         <span className="small">Tracked lines: <strong>{fmtMoney(sum)}</strong>{head.total != null && Math.abs(sum - head.total) > 0.05 ? <span className="muted"> (receipt says {fmtMoney(head.total)}, tax and skipped lines account for the gap)</span> : null}</span>
       </div>
-      <button type="button" className="btn primary block" style={{ marginTop: 12 }} onClick={save} disabled={saving || !kept.length}>{saving ? 'Saving…' : `Save ${kept.length} purchase${kept.length === 1 ? '' : 's'}`}</button>
+      <button type="button" className="btn primary block" style={{ marginTop: 12 }} onClick={save} disabled={saving || (!kept.length && !data.qr)}>{saving ? 'Saving…' : kept.length ? `Save ${kept.length} purchase${kept.length === 1 ? '' : 's'}` : 'Save receipt'}</button>
     </Sheet>
   );
 }
@@ -177,9 +196,26 @@ function ReceiptDetail({ receipt, onClose, onDelete }) {
             <tr><td><strong>Total</strong></td><td /><td className="num"><strong>{fmtMoney(receipt.total)}</strong></td></tr>
           </tbody>
         </table>
+        {receipt.qrUrl && <p className="small">QR code on the receipt: <a href={receipt.qrUrl} target="_blank" rel="noopener noreferrer">open on {qrHost(receipt.qrUrl)} ↗</a></p>}
         {img && <img src={img} alt={`Receipt from ${receipt.store}`} style={{ width: '100%', borderRadius: 10, border: '1px solid var(--line)' }} />}
       </div>
       <button type="button" className="btn danger block" style={{ marginTop: 14 }} onClick={() => (confirm ? onDelete() : setConfirm(true))}>{confirm ? 'Tap again to delete the receipt and its purchases' : 'Delete receipt'}</button>
     </Sheet>
+  );
+}
+
+function QrNote({ qr }) {
+  const found = [qr.store && 'store', qr.date && 'date', qr.total != null && 'total'].filter(Boolean);
+  return (
+    <div className="card" style={{ margin: '10px 0', padding: 10 }}>
+      <div className="small"><strong>QR code found.</strong>{' '}
+        {found.length ? `It gave the ${found.join(', ')} above.` : 'It holds no store, date or total, so those come from the printed receipt.'}
+      </div>
+      {qr.url ? (
+        <div className="small" style={{ marginTop: 4 }}>It links to <a href={qr.url} target="_blank" rel="noopener noreferrer">{qrHost(qr.url)} ↗</a>. The link is saved with the receipt.</div>
+      ) : (
+        <div className="tiny muted ellipsis" style={{ marginTop: 4 }}>{qr.raw}</div>
+      )}
+    </div>
   );
 }
