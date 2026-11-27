@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useApp } from '../AppContext.jsx';
 import QuickAdd from './QuickAdd.jsx';
 import SwipeRow from './SwipeRow.jsx';
@@ -7,7 +7,8 @@ import ItemSheet from './ItemSheet.jsx';
 import { isOnList, markBought, snooze, takeOffList, putOnList, estimate } from '../data/actions.js';
 import { lastPurchaseMap, lastBuy } from '../lib/history.js';
 import { describePrediction, DAY } from '../lib/predict.js';
-import { can } from '../lib/config.js';
+import { can, DEMO_MODE } from '../lib/config.js';
+import { classifyNames } from '../lib/classify.js';
 import { fmtMoney } from '../lib/format.js';
 import { sharedThemes } from '../lib/themes.js';
 import { guessCategory, HOUSEHOLD_CATEGORIES } from '../lib/categories.js';
@@ -25,6 +26,35 @@ export default function ListView() {
   const latest = useMemo(() => lastPurchaseMap(purchases), [purchases]);
   const open = (id, focus = null) => { setOpenId(id); setOpenFocus(focus); };
   const [showSnoozed, setShowSnoozed] = useState(false);
+  // Items stuck in "Other" get sorted once: keywords first, then the AI for the rest.
+  // A type picked by hand is never changed.
+  const sortedRef = useRef(new Set());
+  useEffect(() => {
+    if (!can(role, 'edit') || DEMO_MODE || !backend?.getApp) return undefined;
+    const todo = items.filter((it) => (!it.category || it.category === 'Other') && !it.categoryByHand && !it.aiSortedAt && !sortedRef.current.has(it.id)).slice(0, 60);
+    if (!todo.length) return undefined;
+    const t = setTimeout(async () => {
+      todo.forEach((it) => sortedRef.current.add(it.id));
+      const cats = account?.categories || HOUSEHOLD_CATEGORIES;
+      const ops = [];
+      const ask = [];
+      for (const it of todo) {
+        const g = guessCategory(`${it.name} ${it.note || ''}`, cats);
+        if (g !== 'Other') ops.push({ type: 'update', coll: 'items', id: it.id, data: { category: g } });
+        else ask.push(it);
+      }
+      if (ask.length) {
+        try {
+          const found = await classifyNames(ask.map((it) => it.name), cats, backend.getApp());
+          for (const it of ask) ops.push({ type: 'update', coll: 'items', id: it.id, data: { category: found.get(it.name) || 'Other', aiSortedAt: Date.now() } });
+        } catch (e) {
+          console.warn('Sorting by AI failed; will try again next time', e);
+        }
+      }
+      if (ops.length) await backend.commit(ctx.accountId, ops).catch((e) => console.warn('Saving sorted types failed', e));
+    }, 1200);
+    return () => clearTimeout(t);
+  }, [items, role, backend, account, ctx.accountId]);
   const [showAllLow, setShowAllLow] = useState(false);
   const editor = can(role, 'edit');
   const now = Date.now();

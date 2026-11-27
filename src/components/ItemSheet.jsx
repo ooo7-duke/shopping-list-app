@@ -131,7 +131,7 @@ export default function ItemSheet({ item, focus, onClose }) {
                 <datalist id="stores">{stores.map((s) => <option key={s} value={s} />)}</datalist>
               </label>
               <label className="field"><span>Type</span>
-                <select className="input" value={item.category || 'Other'} onChange={(e) => save({ category: e.target.value })}>
+                <select className="input" value={item.category || 'Other'} onChange={(e) => save({ category: e.target.value, categoryByHand: true })}>
                   {[...new Set([...cats, item.category || 'Other'])].map((c) => <option key={c}>{c}</option>)}
                 </select>
               </label>

@@ -357,3 +357,24 @@ describe('duplicate check', () => {
     expect(d.map((x) => [x.entry.name, x.kind, x.onList])).toEqual([['milk', 'same', true], ['Bread', 'same', false]]);
   });
 });
+
+import { pickCategories } from './classify.js';
+
+describe('sorting items into types', () => {
+  it('knows common groceries by keyword', () => {
+    expect(guessCategory('French Fries')).toBe('Frozen');
+    expect(guessCategory('Cheerios')).toBe('Pantry');
+    expect(guessCategory('Eggplant')).toBe('Produce');
+    expect(guessCategory('Sports drink')).toBe('Beverages');
+    expect(guessCategory('Aluminum foil')).toBe('Kitchen & breakroom');
+    expect(guessCategory('Canon PG-240XL ink')).toBe('Office & stationery');
+  });
+  it('keeps only AI answers for items asked about and types on the list', () => {
+    const m = pickCategories({ items: [
+      { name: 'french fries', category: 'frozen' },
+      { name: 'Cheerios', category: 'Breakfast' },
+      { name: 'Something else', category: 'Pantry' },
+    ] }, ['French fries', 'Cheerios'], ['Frozen', 'Pantry', 'Other']);
+    expect([...m]).toEqual([['French fries', 'Frozen']]);
+  });
+});
