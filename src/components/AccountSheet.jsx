@@ -176,7 +176,7 @@ function DeleteAccount({ onClose }) {
           {err && <p className="small" style={{ color: 'var(--danger)' }}>{err}</p>}
           <div className="grid2">
             <button type="button" className="btn" onClick={() => setOpen(false)} disabled={busy}>Keep my account</button>
-            <button type="button" className="btn danger" onClick={confirm} disabled={busy}>{busy ? 'Deleting…' : 'Delete everything'}</button>
+            <button type="button" className="btn danger" onClick={confirm} disabled={busy}>{busy ? 'Deleting…' : 'Delete my account'}</button>
           </div>
         </div>
       )}
