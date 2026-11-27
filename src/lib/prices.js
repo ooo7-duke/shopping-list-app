@@ -92,6 +92,15 @@ export function mergeQuotes(seen = {}, quotes = [], now = Date.now()) {
 }
 
 // The live provider: asks the app's own server function, which holds the search key.
+// The household that lookups are counted against. AppContext sets it when the list changes.
+let priceAccount = '';
+export function setPriceAccount(id) {
+  if (id === priceAccount) return;
+  priceAccount = id || '';
+  quotaNow = null;
+  if (priceAccount) refreshQuota();
+}
+
 export function serverPriceProvider(getToken) {
   return {
     id: 'server', by: 'auto',
@@ -99,7 +108,7 @@ export function serverPriceProvider(getToken) {
       const token = await getToken();
       if (!token) throw new Error('Sign in again to look up prices.');
       const q = [item.name, item.note].filter(Boolean).join(' ').trim();
-      const r = await fetch(`/.netlify/functions/prices?q=${encodeURIComponent(q)}`, { headers: { authorization: `Bearer ${token}` } });
+      const r = await fetch(`/.netlify/functions/prices?q=${encodeURIComponent(q)}&account=${encodeURIComponent(priceAccount)}`, { headers: { authorization: `Bearer ${token}` } });
       const data = await r.json().catch(() => null);
       if (!data) throw new Error(`The price service didn't answer (${r.status}).`);
       setQuota(data.quota);
@@ -109,8 +118,8 @@ export function serverPriceProvider(getToken) {
     },
     async quota() {
       const token = await getToken();
-      if (!token) return null;
-      const r = await fetch('/.netlify/functions/prices?quota=1', { headers: { authorization: `Bearer ${token}` } });
+      if (!token || !priceAccount) return null;
+      const r = await fetch(`/.netlify/functions/prices?quota=1&account=${encodeURIComponent(priceAccount)}`, { headers: { authorization: `Bearer ${token}` } });
       const data = await r.json().catch(() => null);
       return data?.quota || null;
     },

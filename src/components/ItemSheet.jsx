@@ -50,7 +50,7 @@ export default function ItemSheet({ item, focus, onClose }) {
     try {
       const { found, recent } = await refreshPrices(ctx, item);
       const q = currentQuota();
-      const left = q ? ` ${q.left}${q.total ? ` of ${q.total}` : ''} free lookups left this month.` : '';
+      const left = q ? ` ${q.left} lookups left for your household this month.` : '';
       showToast(recent ? 'Already checked today. Change the name or note to check again.' : (found ? 'Prices updated.' : 'No prices found. Try a more specific name, like "Bounty paper towels 12 rolls".') + left);
     } catch (e) {
       showToast(e?.message || 'Price lookup failed. Please try again.');
@@ -216,10 +216,10 @@ export default function ItemSheet({ item, focus, onClose }) {
               {hasPriceProvider() && (
                 <>
                   <button type="button" className="btn" style={{ marginTop: 10 }} onClick={lookUp} disabled={looking || !canLookUpAgain(item) || quota?.left === 0}>
-                    {looking ? 'Looking…' : quota?.left === 0 ? 'No free checks left' : !canLookUpAgain(item) ? 'Checked today' : item.pricesCheckedAt ? 'Look up prices again' : 'Look up prices'}
+                    {looking ? 'Looking…' : quota?.left === 0 ? (quota.paused ? 'Lookups paused' : 'No lookups left') : !canLookUpAgain(item) ? 'Checked today' : item.pricesCheckedAt ? 'Look up prices again' : 'Look up prices'}
                   </button>
                   <p className="tiny muted" role="status" style={{ marginTop: 6 }}>
-                    {quota ? `Free price checks left this month: ${quota.left}${quota.total ? ` of ${quota.total}` : ''}. Each lookup uses one.` : 'Each lookup uses one of your free monthly price checks.'}
+                    {quota?.paused ? 'Price lookups are paused for everyone this month.' : quota ? `Lookups left for your household this month: ${quota.left}. Each lookup uses one.` : 'Each lookup uses one of your household\'s monthly price lookups.'}
                     {quota?.left === 0 && quota.renews ? ` They reset ${fmtDate(Date.parse(quota.renews), { withYear: true })}.` : ''}
                   </p>
                 </>

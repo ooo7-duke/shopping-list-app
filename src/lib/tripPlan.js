@@ -20,6 +20,8 @@ export const STORE_TYPES = [
   { id: 'office', name: 'Office store (Staples, Office Depot)', depts: ['office', 'electronics'] },
   { id: 'hardware', name: 'Home improvement (Home Depot, Lowe’s)', depts: ['household'] },
   { id: 'electronics', name: 'Electronics (Best Buy)', depts: ['electronics'] },
+  // A store the list above doesn't cover, like H-Mart. It gets only what you move there yourself.
+  { id: 'other', name: 'Other store (type its name)', depts: [] },
 ];
 export const storeType = (id) => STORE_TYPES.find((t) => t.id === id) || null;
 
@@ -72,10 +74,17 @@ export function carries(store, item) {
 }
 
 const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
-export const storeLabel = (s) => [storeType(s.type)?.name.replace(/\s*\(.*\)$/, '') || 'Store', s.place].filter(Boolean).join(' · ');
+// A saved store's own name, like "Giant" or "H-Mart", wins over the kind of store.
+export const storeLabel = (s) => [String(s.name || '').trim() || storeType(s.type)?.name.replace(/\s*\(.*\)$/, '') || 'Store', s.place].filter(Boolean).join(' · ');
 const nameMatches = (s, want) => {
   const w = norm(want);
-  return w && (norm(storeLabel(s)).includes(w) || norm(storeType(s.type)?.name).includes(w) || norm(s.place) === w);
+  return w && (norm(storeLabel(s)).includes(w) || norm(s.name) === w || norm(storeType(s.type)?.name).includes(w) || norm(s.place) === w);
+};
+// The saved store an item was put at: the exact store first, then the closest name.
+export const pinnedStore = (saved, want) => {
+  if (!want) return null;
+  const w = norm(want);
+  return saved.find((s) => norm(storeLabel(s)) === w) || saved.find((s) => s.name && norm(s.name) === w) || saved.find((s) => nameMatches(s, want)) || null;
 };
 
 // Returns { stops: [{ store, items, covered, miles, canWait }], unplaced: [items] }.
@@ -87,7 +96,7 @@ export function planTrips(items, stores = []) {
   const add = (id, it) => { if (!byStore.has(id)) byStore.set(id, []); byStore.get(id).push(it); };
   let remaining = [];
   for (const it of items) {
-    const pinned = it.store ? saved.find((s) => nameMatches(s, it.store)) : null;
+    const pinned = pinnedStore(saved, it.store);
     if (pinned) add(pinned.id, it); else remaining.push(it);
   }
   const miles = (s) => (Number.isFinite(Number(s.miles)) && s.miles !== '' ? Number(s.miles) : 999);

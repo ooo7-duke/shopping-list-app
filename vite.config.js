@@ -22,12 +22,12 @@ export default defineConfig({
           { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
         ],
       },
-      workbox: { navigateFallback: '/index.html', navigateFallbackDenylist: [/^\/\.netlify\//], maximumFileSizeToCacheInBytes: 4 * 1024 * 1024 },
+      workbox: { navigateFallback: '/index.html', navigateFallbackDenylist: [/^\/\.netlify\//, /^\/\.well-known\//, /^\/privacy/, /^\/delete-account/, /^\/contact/], maximumFileSizeToCacheInBytes: 4 * 1024 * 1024 },
     }),
   ],
   build: {
     chunkSizeWarningLimit: 1200,
     rollupOptions: { output: { manualChunks: (id) => (id.includes('node_modules/firebase') || id.includes('node_modules/@firebase') ? 'firebase' : id.includes('chart.js') ? 'charts' : undefined) } },
   },
-  test: { include: ['src/**/*.test.js'] },
+  test: { include: ['src/**/*.test.js', 'netlify/**/*.test.js'] },
 });

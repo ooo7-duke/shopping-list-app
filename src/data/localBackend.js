@@ -126,6 +126,23 @@ export function onAuth(cb) {
 }
 export async function signIn() { state.signedIn = true; save(); }
 export async function signOut() { state.signedIn = false; save(); }
+// Demo version of account deletion: lists the demo user owns alone are deleted, others are
+// left, and the demo user is signed out. "Try the demo" then starts over with fresh sample data.
+export async function deleteMyAccount(user, accounts) {
+  for (const a of accounts) {
+    const acc = state.accounts[a.id];
+    const others = acc.memberUids.filter((u) => u !== user.uid);
+    if (!others.length) { delete state.accounts[a.id]; delete state.data[a.id]; continue; }
+    if (acc.members[user.uid]?.role === 'owner' && !others.some((u) => acc.members[u]?.role === 'owner')) {
+      acc.members[others[0]] = { ...acc.members[others[0]], role: 'owner' };
+    }
+    delete acc.members[user.uid];
+    acc.memberUids = others;
+  }
+  for (const [id, iv] of Object.entries(state.invites)) if (iv.email === user.email) delete state.invites[id];
+  state = seed();
+  save();
+}
 export const idToken = async () => null;
 export function resetDemo() { state = seed(); state.signedIn = true; save(); }
 

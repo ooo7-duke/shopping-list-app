@@ -29,6 +29,7 @@ export function SignIn() {
         </button>
         {DEMO_MODE && <p className="small muted">Demo mode: sample data stays on this device. Connect Firebase to sign in with Google and share lists.</p>}
         {err && <p className="small" style={{ color: 'var(--danger)' }}>{err}</p>}
+        <p className="small"><a className="link" href="/privacy/" target="_blank" rel="noopener">Privacy policy</a></p>
       </div>
     </div>
   );

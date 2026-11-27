@@ -4,6 +4,8 @@ import Sheet from './Sheet.jsx';
 import { ROLES, can, DEMO_MODE, APP_NAME } from '../lib/config.js';
 import { initials } from '../lib/format.js';
 import { HOUSEHOLD_CATEGORIES, ORG_CATEGORIES } from '../lib/categories.js';
+import { FeedbackSheet, InboxSheet } from './FeedbackSheet.jsx';
+import { inboxStatus } from '../lib/feedback.js';
 
 export default function AccountSheet({ onClose }) {
   const { backend, user, accounts, account, role, switchAccount, showToast } = useApp();
@@ -99,6 +101,8 @@ export default function AccountSheet({ onClose }) {
           <button type="button" className="btn block" onClick={() => setCreating(true)}>Start another list (household or organization)</button>
         )}
         {DEMO_MODE && backend.resetDemo && <button type="button" className="btn ghost block" onClick={() => { backend.resetDemo(); onClose(); }}>Reset demo data</button>}
+
+        <DeleteAccount onClose={onClose} />
       </div>
     </Sheet>
   );
@@ -127,5 +131,66 @@ export function CreateAccount({ onDone }) {
       <label className="field"><span>Name</span><input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder={type === 'household' ? 'Our household' : 'Main office'} /></label>
       <button type="submit" className="btn primary">Create list</button>
     </form>
+  );
+}
+
+// Store rules (Google Play and Apple) require a way to delete your account from inside the app.
+function DeleteAccount({ onClose }) {
+  const { backend, user, accounts, showToast } = useApp();
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const [sheet, setSheet] = useState(null); // 'feedback' | 'inbox'
+  const [inbox, setInbox] = useState(null);
+  useEffect(() => { let live = true; inboxStatus().then((s) => { if (live) setInbox(s); }); return () => { live = false; }; }, [sheet]);
+
+  const plan = (accounts || []).map((a) => {
+    const others = a.memberUids.filter((u) => u !== user.uid);
+    if (!others.length) return { id: a.id, text: `${a.name}: deleted, with all its items, purchases, receipts and photos.` };
+    const next = a.members?.[others[0]]?.name || 'another member';
+    const passOn = a.members?.[user.uid]?.role === 'owner' && !others.some((u) => a.members?.[u]?.role === 'owner');
+    return { id: a.id, text: `${a.name}: you leave it and the others keep it${passOn ? `. ${next} becomes its owner` : ''}.` };
+  });
+
+  async function confirm() {
+    setBusy(true); setErr('');
+    try {
+      await backend.deleteMyAccount(user, accounts || []);
+      onClose();
+      showToast('Your account and data are deleted.');
+    } catch (e) {
+      setErr(`Couldn't finish: ${e?.message || e}. Nothing more was deleted. Try again, or use the request form at loye10-shopping-list.netlify.app/delete-account/.`);
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="card stack account-privacy" style={{ background: '#fff' }}>
+      <h3>Privacy and your data</h3>
+      <a className="link" href="/privacy/" target="_blank" rel="noopener">Privacy policy</a>
+      <button type="button" className="btn block" onClick={() => setSheet('feedback')}>Send feedback</button>
+      {inbox?.admin && (
+        <button type="button" className="btn block" onClick={() => setSheet('inbox')}>Feedback inbox{inbox.open ? ` (${inbox.open} new)` : ''}</button>
+      )}
+      {sheet === 'feedback' && <FeedbackSheet onClose={() => setSheet(null)} />}
+      {sheet === 'inbox' && <InboxSheet onClose={() => setSheet(null)} />}
+      {!open ? (
+        <button type="button" className="btn danger block" onClick={() => setOpen(true)}>Delete my account</button>
+      ) : (
+        <div className="stack">
+          <p className="small">This can't be undone. Here is what happens:</p>
+          <ul className="small delete-plan">
+            {plan.map((p) => <li key={p.id}>{p.text}</li>)}
+            <li>Invites you sent or received are deleted.</li>
+            <li>Your sign-in is removed. Google may ask you to confirm it's you.</li>
+          </ul>
+          {err && <p className="small" style={{ color: 'var(--danger)' }}>{err}</p>}
+          <div className="grid2">
+            <button type="button" className="btn" onClick={() => setOpen(false)} disabled={busy}>Keep my account</button>
+            <button type="button" className="btn danger" onClick={confirm} disabled={busy}>{busy ? 'Deleting…' : 'Delete my account'}</button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

@@ -67,3 +67,24 @@ export function findDuplicates(entries, onList) {
   });
   return out;
 }
+
+/**
+ * Items on the list that match what is being typed, so "sa" finds Salt and Salsa before the name is finished.
+ * Every typed word has to start a word of the item's name. Best matches first: whole names, then by position.
+ */
+export function listMatches(query, onList, limit = 4) {
+  const q = normalizeName(query).split(' ').filter(Boolean);
+  const typed = q.filter((w) => !FILLER.has(w));
+  const want = typed.length ? typed : q;
+  if (!want.length || want.join('').length < 2) return [];
+  const scored = [];
+  for (const it of onList) {
+    const ws = normalizeName(it.name).split(' ').filter(Boolean);
+    const at = want.map((w) => ws.findIndex((x) => x.startsWith(w)));
+    if (at.some((i) => i < 0)) continue;
+    const whole = want.every((w) => ws.includes(w));
+    scored.push({ it, score: (whole ? 0 : 100) + Math.min(...at) * 10 + ws.length });
+  }
+  scored.sort((a, b) => a.score - b.score || a.it.name.localeCompare(b.it.name));
+  return scored.slice(0, limit).map((s) => s.it);
+}

@@ -5,7 +5,7 @@ import { addEntries, isOnList } from '../data/actions.js';
 import { fmtMoney, fmtQty } from '../lib/format.js';
 import { MicIcon, PlusIcon } from './Icons.jsx';
 import { saveErrorMessage } from '../lib/errors.js';
-import { findDuplicates } from '../lib/dupes.js';
+import { findDuplicates, listMatches } from '../lib/dupes.js';
 import { guessCategory, HOUSEHOLD_CATEGORIES } from '../lib/categories.js';
 import { classifyNames } from '../lib/classify.js';
 import { DEMO_MODE } from '../lib/config.js';
@@ -27,6 +27,14 @@ export default function QuickAdd() {
   // Shown live while typing, and again (with buttons) if Add is pressed anyway.
   const liveDupes = useMemo(() => findDuplicates(parsed, onList), [parsed, onList]);
   const dupes = pending ? pending.dupes : liveDupes;
+
+  // While typing, look through the list for the name after the last comma, so "sal" already shows Salt.
+  const typedMatches = useMemo(() => {
+    const last = text.split(/[,\n]/).pop().trim();
+    const name = parseQuickAdd(last)[0]?.name || '';
+    const seen = new Set(liveDupes.filter((d) => d.onList).map((d) => d.match.id));
+    return listMatches(name, onList, 5).filter((it) => !seen.has(it.id));
+  }, [text, onList, liveDupes]);
 
   // Sort each item into a type as it's typed: the word list answers at once, and for names it doesn't
   // know the AI is asked once typing pauses, so the item lands in the right group when it's added.
@@ -215,7 +223,13 @@ export default function QuickAdd() {
           </button>
         )}
       </form>
-      {dupes.length > 0 && (
+      {!pending && (liveDupes.length > 0 || typedMatches.length > 0) && (
+        <div className="onlist-note" role="status" aria-live="polite">
+          {liveDupes.map((d, i) => <p key={`d${i}`}>{dupeLine(d)}</p>)}
+          {typedMatches.length > 0 && <p>{matchesLine(typedMatches, liveDupes.length > 0)}</p>}
+        </div>
+      )}
+      {pending && dupes.length > 0 && (
         <div className="dupe-banner" role="alert">
           <strong>{dupes.length === 1 ? 'This may be a duplicate.' : `${dupes.length} of these may be duplicates.`}</strong>
           <ul>
@@ -256,9 +270,19 @@ export default function QuickAdd() {
   );
 }
 
+function withDetail(item) {
+  const detail = [fmtQty(item.qty, item.unit), item.store].filter((x) => x && x !== '1').join(', ');
+  return `${item.name}${detail ? ` (${detail})` : ''}`;
+}
+
+function matchesLine(found, also) {
+  if (found.length === 1) return `${also ? 'Also on the list: ' : ''}${withDetail(found[0])}${also ? '.' : ' is on the list.'}`;
+  const names = found.map((it) => it.name);
+  return `${also ? 'Also on the list' : 'On the list'}: ${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}.`;
+}
+
 function dupeLine({ entry, match, kind, onList }) {
   if (!onList) return `${entry.name} is in this entry twice.`;
-  const detail = [fmtQty(match.qty, match.unit), match.store].filter((x) => x && x !== '1').join(', ');
-  const where = `${match.name}${detail ? ` (${detail})` : ''}`;
+  const where = withDetail(match);
   return kind === 'same' ? `${where} is already on your list.` : `${entry.name} looks like ${where}, already on your list.`;
 }

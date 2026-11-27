@@ -222,7 +222,7 @@ describe('saving searches', () => {
   });
 });
 
-import { planTrips, deptOf } from './tripPlan.js';
+import { planTrips, deptOf, storeLabel } from './tripPlan.js';
 describe('trip planner', () => {
   const stores = [
     { id: 'g', type: 'grocery', place: 'Monrovia', miles: 2 },
@@ -247,6 +247,19 @@ describe('trip planner', () => {
   it('keeps an item pinned with @store at that store', () => {
     const { stops } = planTrips([...items, { id: 5, name: 'Wipers', store: 'Auto parts' }], stores);
     expect(stops.map((s) => s.store.id).sort()).toEqual(['a', 'w']);
+  });
+  it('lets you name your own store and move items to it', () => {
+    const mine = [...stores, { id: 'h', type: 'other', name: 'H-Mart', place: 'Frederick', miles: 12 }];
+    expect(storeLabel(mine[3])).toBe('H-Mart · Frederick');
+    const { stops } = planTrips([...items, { id: 6, name: 'Tilapia', store: 'H-Mart · Frederick' }], mine);
+    expect(stops.find((s) => s.store.id === 'h').items.map((i) => i.name)).toEqual(['Tilapia']);
+    // A store with no kind gets nothing on its own.
+    expect(planTrips(items, [mine[3]]).stops.length).toBe(0);
+  });
+  it('keeps a named grocery store apart from another grocery store', () => {
+    const two = [{ id: 'g', type: 'grocery', name: 'Giant', miles: 2 }, { id: 'h', type: 'grocery', name: 'H-Mart', miles: 12 }];
+    const { stops } = planTrips([{ id: 1, name: 'Milk', store: 'Giant' }, { id: 2, name: 'Tilapia', store: 'H-Mart' }], two);
+    expect(stops.map((s) => [s.store.id, s.items.length]).sort()).toEqual([['g', 1], ['h', 1]]);
   });
 });
 
@@ -333,7 +346,7 @@ describe('theme groups', () => {
   });
 });
 
-import { matchKind, findDuplicates } from './dupes.js';
+import { matchKind, findDuplicates, listMatches } from './dupes.js';
 
 describe('duplicate check', () => {
   it('sees the same item in another spelling or plural', () => {
@@ -356,6 +369,15 @@ describe('duplicate check', () => {
     const d = findDuplicates([{ name: 'milk' }, { name: 'bread' }, { name: 'Bread' }], list);
     expect(d.map((x) => [x.entry.name, x.kind, x.onList])).toEqual([['milk', 'same', true], ['Bread', 'same', false]]);
   });
+  it('finds list items while the name is still being typed', () => {
+    const list = [{ name: 'Salsa' }, { name: 'Salt' }, { name: 'Sea salt' }, { name: 'Paper towels' }, { name: 'Toilet paper' }];
+    expect(listMatches('sal', list).map((x) => x.name)).toEqual(['Salsa', 'Salt', 'Sea salt']);
+    expect(listMatches('salt', list).map((x) => x.name)).toEqual(['Salt', 'Sea salt']);
+    expect(listMatches('paper', list).map((x) => x.name)).toEqual(['Paper towels', 'Toilet paper']);
+    expect(listMatches('toilet pa', list).map((x) => x.name)).toEqual(['Toilet paper']);
+    expect(listMatches('s', list)).toEqual([]);
+    expect(listMatches('milk', list)).toEqual([]);
+  });
 });
 
 import { pickCategories } from './classify.js';
@@ -376,5 +398,26 @@ describe('sorting items into types', () => {
       { name: 'Something else', category: 'Pantry' },
     ] }, ['French fries', 'Cheerios'], ['Frozen', 'Pantry', 'Other']);
     expect([...m]).toEqual([['French fries', 'Frozen']]);
+  });
+});
+
+import { checkSubmission } from './feedbackCheck.js';
+describe('feedback spam checks', () => {
+  const now = 1_800_000_000_000;
+  const base = { kind: 'feedback', message: 'Love the app, please add H-Mart', email: 'a@b.com', startedAt: now - 20000 };
+  it('keeps a real message', () => {
+    expect(checkSubmission(base, { now }).ok).toBe(true);
+  });
+  it('drops the honeypot, a form filled too fast, and link spam', () => {
+    expect(checkSubmission({ ...base, website: 'http://spam' }, { now }).drop).toBe(true);
+    expect(checkSubmission({ ...base, startedAt: now - 1000 }, { now }).drop).toBe(true);
+    expect(checkSubmission({ ...base, message: 'buy http://a http://b http://c' }, { now }).drop).toBe(true);
+  });
+  it('asks for an email from people who are not signed in', () => {
+    expect(checkSubmission({ ...base, email: '' }, { now }).error).toBeTruthy();
+    expect(checkSubmission({ ...base, email: '', startedAt: now }, { now, signedIn: true }).ok).toBe(true);
+  });
+  it('lets a deletion request have no message', () => {
+    expect(checkSubmission({ ...base, kind: 'delete', message: '' }, { now }).ok).toBe(true);
   });
 });

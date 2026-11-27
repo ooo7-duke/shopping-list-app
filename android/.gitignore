@@ -1,0 +1,20 @@
+# Never commit signing keys or their passwords.
+*.keystore
+*.jks
+*.p12
+# Bubblewrap build output
+app/
+build/
+gradle/
+.gradle/
+*.aab
+*.apk
+*.idsig
+local.properties
+gradlew
+gradlew.bat
+*.gradle
+settings.gradle
+gradle.properties
+store_icon.png
+manifest-checksum.txt
