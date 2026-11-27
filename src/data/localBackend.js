@@ -105,6 +105,7 @@ export function onAuth(cb) {
 }
 export async function signIn() { state.signedIn = true; save(); }
 export async function signOut() { state.signedIn = false; save(); }
+export const idToken = async () => null;
 export function resetDemo() { state = seed(); state.signedIn = true; save(); }
 
 function watch(get, cb) {

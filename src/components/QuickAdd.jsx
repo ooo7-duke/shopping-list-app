@@ -1,15 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useApp } from '../AppContext.jsx';
 import { parseQuickAdd, normalizeName } from '../lib/parse.js';
-import { addEntries, isOnList } from '../data/actions.js';
+import { addEntries, isOnList, refreshPrices } from '../data/actions.js';
+import { hasPriceProvider } from '../lib/prices.js';
 import { fmtMoney, fmtQty } from '../lib/format.js';
-import { can } from '../lib/config.js';
 import { MicIcon, PlusIcon } from './Icons.jsx';
 
 const SpeechRec = typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition);
 
 export default function QuickAdd() {
-  const { ctx, items, role, showToast } = useApp();
+  const { ctx, items, showToast } = useApp();
   const [text, setText] = useState('');
   const [sel, setSel] = useState(-1);
   const [listening, setListening] = useState(false);
@@ -44,8 +44,11 @@ export default function QuickAdd() {
   async function submit(entries, label) {
     if (!entries.length) return;
     const { added, undo } = await addEntries(ctx, entries);
+    // Look up today's prices in the background; the list updates when they arrive.
+    for (const a of added) refreshPrices(ctx, a).catch(() => {});
     const names = added.map((a) => a.name);
-    showToast(label || `Added ${names.length > 3 ? `${names.slice(0, 3).join(', ')} and ${names.length - 3} more` : names.join(', ')}`, undo);
+    const pricing = hasPriceProvider() ? '. Looking up prices.' : '';
+    showToast(label || `Added ${names.length > 3 ? `${names.slice(0, 3).join(', ')} and ${names.length - 3} more` : names.join(', ')}${pricing}`, undo);
   }
 
   async function onSubmit(e) {
@@ -119,7 +122,7 @@ export default function QuickAdd() {
         <label htmlFor="qa" className="sr-only">Add items</label>
         <input
           id="qa" ref={inputRef} value={text} autoComplete="off" enterKeyHint="done"
-          placeholder={can(role, 'edit') ? 'Add: 2 gal milk @costco, eggs' : 'Request an item'}
+          placeholder="Add an item, like milk or eggs"
           onChange={(e) => { setText(e.target.value); setSel(-1); }}
           onKeyDown={onKeyDown} onPaste={onPaste}
           aria-autocomplete="list" aria-controls="qa-suggest"

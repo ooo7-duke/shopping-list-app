@@ -121,3 +121,45 @@ describe('price checks', () => {
     expect(best.storeId).toBe('walmart');
   });
 });
+
+import { pickQuotes, storeIdFor } from './storeMatch.js';
+import { mergeQuotes } from './prices.js';
+import { describePrediction as describe2 } from './predict.js';
+
+describe('automatic price lookup', () => {
+  it('matches store names from shopping results', () => {
+    expect(storeIdFor("Sam's Club")).toBe('samsclub');
+    expect(storeIdFor('Amazon.com - Seller')).toBe('amazon');
+    expect(storeIdFor('Walmart - Seller')).toBe('walmart');
+    expect(storeIdFor('Kroger')).toBe(null);
+  });
+  it('keeps the cheapest result per store and the cheapest elsewhere', () => {
+    const q = pickQuotes([
+      { source: 'Walmart', extracted_price: 24.97, title: 'A', product_link: 'https://x/1' },
+      { source: 'Walmart', extracted_price: 21.5, title: 'B' },
+      { source: "Sam's Club", price: '$22.98' },
+      { source: 'Kroger', extracted_price: 19.99 },
+      { source: 'Meijer', extracted_price: 25 },
+      { source: 'Bad', extracted_price: 0 },
+      { source: 'Evil', extracted_price: 5, product_link: 'javascript:alert(1)' },
+    ]);
+    const by = Object.fromEntries(q.map((x) => [x.storeId, x]));
+    expect(by.walmart.price).toBe(21.5);
+    expect(by.samsclub.price).toBe(22.98);
+    expect(by.any.storeName).toBe('Evil');
+    expect(by.any.url).toBe(null);
+  });
+  it('does not overwrite a price someone typed today', () => {
+    const now = 10 * 86400e3;
+    const seen = { walmart: { price: 20, at: now - 3600e3, by: 'Sola' }, amazon: { price: 30, at: now - 3 * 86400e3, by: 'Sola' } };
+    const out = mergeQuotes(seen, [{ storeId: 'walmart', price: 25, by: 'auto' }, { storeId: 'amazon', price: 28, by: 'auto' }, { storeId: 'nope', price: 1 }], now);
+    expect(out.walmart.price).toBe(20);
+    expect(out.amazon.price).toBe(28);
+    expect(out.nope).toBeUndefined();
+  });
+  it('says when something runs out in plain words', () => {
+    expect(describe2({ basis: 'history', daysLeft: 3 })).toBe('Runs out in 3 days');
+    expect(describe2({ basis: 'history', daysLeft: 0.2 })).toBe('Runs out today');
+    expect(describe2({ basis: 'history', daysLeft: -2 })).toBe('Ran out 2 days ago');
+  });
+});

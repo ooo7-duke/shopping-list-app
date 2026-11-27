@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useApp } from '../AppContext.jsx';
 import Sheet from './Sheet.jsx';
-import { markBought, putOnList, isOnList, setSeenPrice } from '../data/actions.js';
-import { storeLinks, seenPrices } from '../lib/prices.js';
+import { markBought, putOnList, isOnList, setSeenPrice, refreshPrices } from '../data/actions.js';
+import { storeLinks, seenPrices, hasPriceProvider } from '../lib/prices.js';
 import { lastPurchaseMap, lastBuy } from '../lib/history.js';
 import { fmtMoney, fmtDate, toInputDate, fromInputDate, fmtQty } from '../lib/format.js';
 import { HOUSEHOLD_CATEGORIES } from '../lib/categories.js';
@@ -27,6 +27,21 @@ export default function ItemSheet({ item, focus, onClose }) {
   const last = lastBuy(item, lastPurchaseMap(history)[item.id]);
   const links = storeLinks(item);
   const { best } = seenPrices(item);
+  const [looking, setLooking] = useState(false);
+  const elsewhere = item.seenPrices?.any;
+  const seenLabel = (seen) => {
+    if (!seen?.at) return '';
+    if (seen.by === 'sample') return 'sample price';
+    if (seen.by === 'auto') return `found ${fmtDate(seen.at)}`;
+    return `you saw ${fmtDate(seen.at)}`;
+  };
+  async function lookUp() {
+    setLooking(true);
+    try {
+      const { found } = await refreshPrices(ctx, item, { force: true });
+      showToast(found ? 'Prices updated' : 'No prices found. Try a more specific name, like "Bounty paper towels 12 rolls".');
+    } finally { setLooking(false); }
+  }
 
   const save = (patch) => backend.update(ctx.accountId, 'items', item.id, patch);
   const num = (v) => (v === '' || v == null ? null : Number(v));
@@ -107,16 +122,20 @@ export default function ItemSheet({ item, focus, onClose }) {
             </div>
 
             <div className="card" style={{ background: '#fff', scrollMarginTop: 12 }} ref={pricesRef}>
-              <h3 style={{ marginBottom: 4 }}>Check today's price</h3>
-              <p className="small muted" style={{ marginBottom: 8 }}>Tap a store to search it, then type the price you see. {best ? `Best so far: ${best.store} at ${fmtMoney(best.price)}.` : ''}</p>
+              <h3 style={{ marginBottom: 4 }}>Today's prices</h3>
+              <p className="small muted" style={{ marginBottom: 8 }}>
+                {hasPriceProvider() ? 'Prices fill in when you add an item. ' : ''}Tap a store to check it, or type a price you see.
+                {best ? ` Cheapest: ${best.store} at ${fmtMoney(best.price)}.` : ''}
+              </p>
+              {looking && <p className="small" role="status" style={{ marginBottom: 8 }}>Looking up prices…</p>}
               <div className="price-list">
                 {links.filter((l) => l.id !== 'any').map((l) => {
                   const seen = item.seenPrices?.[l.id];
                   return (
                     <div key={l.id} className="price-line">
                       <a className="chip blue" href={l.href} target="_blank" rel="noopener noreferrer">{l.name} ↗</a>
-                      <span className="grow tiny muted">{seen?.at ? `seen ${fmtDate(seen.at)}` : ''}</span>
-                      <input className="input price-input" inputMode="decimal" aria-label={`Price at ${l.name}`} placeholder="$" defaultValue={seen?.price ?? ''}
+                      <span className="grow tiny muted">{seenLabel(seen)}</span>
+                      <input key={seen?.at || 'none'} className="input price-input" inputMode="decimal" aria-label={`Price at ${l.name}`} placeholder="$" defaultValue={seen?.price ?? ''}
                         onBlur={async (e) => {
                           const v = e.target.value.replace(/[$,\s]/g, '');
                           if (String(seen?.price ?? '') === v) return;
@@ -126,8 +145,20 @@ export default function ItemSheet({ item, focus, onClose }) {
                     </div>
                   );
                 })}
+                {elsewhere?.price != null && (
+                  <div className="price-line">
+                    {elsewhere.url
+                      ? <a className="chip blue" href={elsewhere.url} target="_blank" rel="noopener noreferrer">{elsewhere.storeName || 'Elsewhere'} ↗</a>
+                      : <span className="chip">{elsewhere.storeName || 'Elsewhere'}</span>}
+                    <span className="grow tiny muted">{elsewhere.by === 'sample' ? 'sample price' : 'cheapest elsewhere'}</span>
+                    <strong className="price-input" style={{ display: 'inline-block' }}>{fmtMoney(elsewhere.price)}</strong>
+                  </div>
+                )}
               </div>
-              <a className="small" href={links.find((l) => l.id === 'any').href} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block', marginTop: 8, minHeight: 44, lineHeight: '44px' }}>Compare every store on Google Shopping ↗</a>
+              {hasPriceProvider() && (
+                <button type="button" className="btn" style={{ marginTop: 10 }} onClick={lookUp} disabled={looking}>{looking ? 'Looking…' : 'Look up prices again'}</button>
+              )}
+              <a className="small" href={links.find((l) => l.id === 'any').href} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block', marginTop: 8, minHeight: 44, lineHeight: '44px' }}>Compare more stores on Google Shopping ↗</a>
             </div>
 
             <div className="card" style={{ background: '#fff' }}>

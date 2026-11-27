@@ -54,6 +54,7 @@ export async function signIn() {
 }
 
 export const signOut = () => fbSignOut(auth);
+export const idToken = async () => { init(); return auth.currentUser ? auth.currentUser.getIdToken() : null; };
 
 const snapList = (snap) => snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 

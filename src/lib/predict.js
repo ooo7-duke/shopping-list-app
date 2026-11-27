@@ -83,8 +83,10 @@ export function describePrediction(pred) {
   if (pred.basis === 'off') return 'Not predicted';
   if (pred.basis === 'learning') return pred.samples === 0 ? 'Learning' : 'Learning (1 purchase)';
   const d = Math.round(pred.daysLeft);
-  if (d < 0) return `Overdue ${-d}d`;
-  if (d === 0) return 'Due today';
-  if (d === 1) return 'Due tomorrow';
-  return `Due in ${d}d`;
+  // Plain words, so nobody has to decode "3d".
+  if (d < -1) return `Ran out ${-d} days ago`;
+  if (d === -1) return 'Ran out yesterday';
+  if (d === 0) return 'Runs out today';
+  if (d === 1) return 'Runs out tomorrow';
+  return `Runs out in ${d} days`;
 }

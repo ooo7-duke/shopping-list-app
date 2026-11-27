@@ -1,10 +1,11 @@
 // Price checks by store.
 //
-// Retailers don't let a browser app read their prices directly: their sites block
-// automated reads, Amazon's and Walmart's price feeds need approved developer accounts,
-// and Sam's Club has no public feed. So the default provider builds a search link per
-// store, and the person records the price they see. A paid lookup service can be added
-// later by registering a provider with a quote() function (see registerPriceProvider).
+// Retailers don't let a browser app read their prices directly, and Sam's Club has no
+// public price feed. So prices come from two places:
+// 1. Automatic: when an item is added, a provider looks it up. With Firebase, that's the
+//    server function netlify/functions/prices.mjs (Google Shopping through SerpApi).
+//    In the demo, a sample provider makes up clearly labeled prices.
+// 2. By hand: a search link per store, and the person types the price they see.
 
 // Preferred order. Stores after the first three are extras, not a limit.
 export const PRICE_STORES = [
@@ -31,7 +32,8 @@ export function storeLinks(item) {
 export function seenPrices(item, now = Date.now(), maxAgeDays = 30) {
   const seen = item.seenPrices || {};
   const rows = PRICE_STORES.filter((s) => seen[s.id]?.price != null).map((s) => ({
-    store: s.name, storeId: s.id, price: Number(seen[s.id].price), at: seen[s.id].at,
+    store: seen[s.id].storeName || s.name, storeId: s.id, price: Number(seen[s.id].price), at: seen[s.id].at,
+    by: seen[s.id].by || '', url: seen[s.id].url || null,
     stale: now - (seen[s.id].at || 0) > maxAgeDays * 86400e3,
   }));
   const fresh = rows.filter((r) => !r.stale);
@@ -39,14 +41,64 @@ export function seenPrices(item, now = Date.now(), maxAgeDays = 30) {
   return { rows, best };
 }
 
-// Provider registry. A provider is { id, quote(item) => Promise<[{ storeId, price, url }]> }.
-// The link provider returns no prices, only links, so the app never shows a guessed price.
+// Provider registry. A provider is { id, by, quote(item) => Promise<[{ storeId, storeName, price, title, url }]> }.
+// by is how the price is labeled: 'auto' for a real lookup, 'sample' for the demo's made-up ones.
 const providers = [];
 export function registerPriceProvider(p) { providers.push(p); }
+export const hasPriceProvider = () => providers.length > 0;
 export async function fetchQuotes(item) {
   const out = [];
   for (const p of providers) {
-    try { out.push(...((await p.quote(item)) || [])); } catch { /* a provider failing never breaks the list */ }
+    try {
+      for (const q of (await p.quote(item)) || []) out.push({ ...q, by: p.by || 'auto' });
+    } catch { /* a provider failing never breaks the list */ }
   }
   return out;
+}
+
+// Merges looked-up quotes into an item's seenPrices. A price a person typed in the last
+// day wins over a lookup, because they saw it themselves.
+export function mergeQuotes(seen = {}, quotes = [], now = Date.now()) {
+  const out = { ...seen };
+  for (const q of quotes) {
+    if (!PRICE_STORES.some((s) => s.id === q.storeId)) continue;
+    const cur = out[q.storeId];
+    const typedRecently = cur && cur.by && cur.by !== 'auto' && cur.by !== 'sample' && now - (cur.at || 0) < 86400e3;
+    if (typedRecently) continue;
+    out[q.storeId] = { price: q.price, at: now, by: q.by || 'auto', ...(q.storeName ? { storeName: q.storeName } : {}), ...(q.title ? { title: q.title } : {}), ...(q.url ? { url: q.url } : {}) };
+  }
+  return out;
+}
+
+// The demo's provider: steady made-up prices per item, always labeled as samples.
+export const samplePriceProvider = {
+  id: 'sample', by: 'sample',
+  async quote(item) {
+    const seed = [...(item.name || '')].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7);
+    const base = Number(item.lastPrice) > 0 ? Number(item.lastPrice) : 3 + (seed % 1700) / 100;
+    const jig = (k) => Math.round(base * (0.88 + ((seed >> k) % 25) / 100) * 100) / 100;
+    await new Promise((r) => setTimeout(r, 600));
+    return [
+      { storeId: 'samsclub', storeName: "Sam's Club", price: jig(1) },
+      { storeId: 'amazon', storeName: 'Amazon', price: jig(4) },
+      { storeId: 'walmart', storeName: 'Walmart', price: jig(7) },
+      { storeId: 'any', storeName: 'Kroger', price: jig(10) },
+    ];
+  },
+};
+
+// The live provider: asks the app's own server function, which holds the search key.
+export function serverPriceProvider(getToken) {
+  return {
+    id: 'server', by: 'auto',
+    async quote(item) {
+      const token = await getToken();
+      if (!token) return [];
+      const q = [item.name, item.note].filter(Boolean).join(' ').trim();
+      const r = await fetch(`/.netlify/functions/prices?q=${encodeURIComponent(q)}`, { headers: { authorization: `Bearer ${token}` } });
+      if (!r.ok) return [];
+      const data = await r.json();
+      return data.configured ? data.quotes || [] : [];
+    },
+  };
 }

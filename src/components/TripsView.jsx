@@ -98,7 +98,7 @@ export default function TripsView() {
                 <div className="row wrap" style={{ gap: 6 }}>
                   {g.pullForward.map(({ it, p }) => (
                     <button key={it.id} type="button" className="chip" onClick={async () => { const u = await putOnList(ctx, it); showToast(`Added ${it.name} to this trip`, u); }}>
-                      + {it.name} · {describePrediction(p).replace('Due ', '')}
+                      + {it.name} · {describePrediction(p).toLowerCase()}
                     </button>
                   ))}
                 </div>

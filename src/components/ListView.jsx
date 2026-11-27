@@ -78,11 +78,11 @@ export default function ListView() {
 
       {editor && suggestions.length > 0 && (
         <section aria-labelledby="sug-h">
-          <div className="section-h"><h2 id="sug-h">Running low soon</h2><span className="small muted">tap to add</span></div>
+          <div className="section-h"><h2 id="sug-h">Running low soon</h2><span className="small muted">tap one to add it</span></div>
           <div className="suggest-strip">
             {(showAllLow ? suggestions : suggestions.slice(0, LOW_LIMIT)).map(({ it, p }) => (
               <button key={it.id} type="button" className={`chip${p.daysLeft < 1 ? ' gold' : ''}`} onClick={() => doAdd(it)} title={`Usually every ${Math.round(p.intervalDays)} days`}>
-                + {it.name} · {describePrediction(p).replace('Due ', '')}
+                + {it.name} · {describePrediction(p).toLowerCase()}
               </button>
             ))}
             {suggestions.length > LOW_LIMIT && (
@@ -100,7 +100,7 @@ export default function ListView() {
           {total > 0 && editor && <div className="small muted">About {fmtMoney(total)} at last prices</div>}
         </div>
         <div className="seg" role="group" aria-label="Group list by">
-          <button type="button" aria-pressed={groupBy === 'category'} onClick={() => setGroup('category')}>Aisle</button>
+          <button type="button" aria-pressed={groupBy === 'category'} onClick={() => setGroup('category')}>Category</button>
           <button type="button" aria-pressed={groupBy === 'store'} onClick={() => setGroup('store')}>Store</button>
         </div>
       </div>

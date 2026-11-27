@@ -10,7 +10,7 @@ A shared shopping list for households and organizations. You add items the momen
 - Trips and orders: The list is grouped by store with an estimated total. Each store card offers items that will be due soon at the same store, so one trip covers both. Online orders can be marked "Ordered" and then "It arrived," which logs the purchases.
 - Predictions: After two or more purchases, the app estimates how long an item lasts, adjusted for how much you bought. Items due within your chosen window appear under "Running low soon." On any item you can switch to a fixed schedule ("every 14 days") or turn predictions off.
 - Receipts: Snap a photo or paste a screenshot. Gemini reads each line, matches it to items on your list, and shows you the matches to confirm before anything is saved. Prices then appear next to items on the list.
-- Last time and price checks: Each item on the list shows when you last bought it, how many and what you paid. Tap Check price to search Sam's Club, Amazon, Walmart, Target, Costco or Google Shopping, then type the price you see. The cheapest recent one shows on the list. The app doesn't fetch store prices on its own, because those retailers don't offer an open price feed. `src/lib/prices.js` has a hook for adding a paid price service later.
+- Last time and prices: Each item on the list shows when you last bought it, how many and what you paid. When you add an item, the app looks up today's prices at Sam's Club, Amazon, Walmart, Target, Costco and the cheapest other store, and shows the cheapest on the list. Tap an item to see every price, open a store's search, or type a price you saw yourself. A price you type wins over a lookup for a day. Lookups need the free SerpApi key described under setup; without it, the store links and typed prices still work.
 - Insights: Spending by week or month, by category, by store, and top items, plus a 30-day forecast. Filter by date, category, store, cost, quantity or item name, and export to CSV.
 
 Without Firebase settings the app runs in demo mode with sample data stored on the device. Adding `?demo` to any URL forces demo mode, which is handy on deploy previews.
@@ -46,6 +46,13 @@ Receipt images are compressed and stored in Firestore, so you do not need Cloud 
    - Deploy Previews: on
 
 The preview branch then lives at `preview--your-site.netlify.app`.
+
+### 3. Automatic prices (optional, free)
+
+1. Create a free account at [serpapi.com](https://serpapi.com). The free plan covers 250 lookups a month, and each new item uses one.
+2. Copy your private API key from the SerpApi dashboard.
+3. In Netlify, add an environment variable named `SERPAPI_KEY` with that key. Keep it out of the code and out of any `VITE_` name, so it never reaches the browser.
+4. Redeploy. New items now get prices on their own.
 
 ## How changes reach production
 
@@ -83,5 +90,7 @@ npm test
 | `src/data/localBackend.js` | Demo mode, stored in the browser |
 | `firestore.rules` | Server-side permissions: members edit everything, owners also manage people |
 | `src/lib/history.js` | Last date, quantity and price bought for each item |
-| `src/lib/prices.js` | Store price-check links (Sam's Club, Amazon, Walmart first) and the price-provider hook |
+| `src/lib/prices.js` | Store links (Sam's Club, Amazon, Walmart first), price providers, and merging looked-up prices |
+| `src/lib/storeMatch.js` | Turns Google Shopping results into one price per store |
+| `netlify/functions/prices.mjs` | Server lookup that holds the SerpApi key, for signed-in members only |
 | `scripts/netlify-ignore.sh` | Production deploy guard |

@@ -3,6 +3,7 @@
 import { normalizeName } from '../lib/parse.js';
 import { guessCategory, HOUSEHOLD_CATEGORIES } from '../lib/categories.js';
 import { DAY } from '../lib/predict.js';
+import { fetchQuotes, hasPriceProvider, mergeQuotes } from '../lib/prices.js';
 
 const clean = (o) => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined));
 
@@ -99,6 +100,17 @@ export const takeOffList = (ctx, item) => setStatus(ctx, item, 'stocked');
 export const putOnList = (ctx, item) => setStatus(ctx, item, 'needed', { addedAt: Date.now(), addedBy: ctx.user.uid, addedByName: ctx.user.name });
 
 // Record a price someone saw at a store (after tapping Check price). Undo restores the old one.
+// Looks up today's prices for an item and saves them. Skips items looked up in the last
+// day unless force is set, so each add spends at most one search.
+export async function refreshPrices(ctx, item, { force = false } = {}) {
+  if (!hasPriceProvider()) return { found: 0 };
+  if (!force && item.pricesCheckedAt && Date.now() - item.pricesCheckedAt < 86400e3) return { found: 0, skipped: true };
+  const quotes = await fetchQuotes(item);
+  const latest = (ctx.items || []).find((i) => i.id === item.id) || item;
+  await ctx.backend.update(ctx.accountId, 'items', item.id, { seenPrices: mergeQuotes(latest.seenPrices, quotes), pricesCheckedAt: Date.now() });
+  return { found: quotes.length };
+}
+
 export async function setSeenPrice(ctx, item, storeId, price) {
   const prev = item.seenPrices?.[storeId] ?? null;
   const next = price == null || price === '' || Number.isNaN(Number(price)) ? null
