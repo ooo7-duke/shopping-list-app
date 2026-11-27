@@ -14,6 +14,7 @@ export default function TripsView() {
   const { ctx, items, batches, predictions, account, role, showToast } = useApp();
   const [shopStore, setShopStore] = useState(null);
   const [editStores, setEditStores] = useState(false);
+  const [storesFor, setStoresFor] = useState(null); // item waiting for a store being added now
   const savedStores = account?.settings?.stores || [];
   const editor = can(role, 'edit');
   const now = Date.now();
@@ -225,8 +226,8 @@ export default function TripsView() {
       )}
 
       {shopStore !== null && <ShopMode store={shopStore.store} ids={shopStore.ids} onClose={() => setShopStore(null)} />}
-      {editStores && <StoresSheet onClose={() => setEditStores(false)} />}
-      {moving && <MoveSheet item={moving} stores={allStores} saved={savedStores.length > 0} onPick={(st) => { setMoving(null); moveTo(moving, st); }} onAddStore={() => { setMoving(null); setEditStores(true); }} onClose={() => setMoving(null)} />}
+      {editStores && <StoresSheet forItem={storesFor} onAdded={(st) => moveTo(storesFor, storeLabel(st))} onClose={() => { setEditStores(false); setStoresFor(null); }} />}
+      {moving && <MoveSheet item={moving} stores={allStores} saved={savedStores.length > 0} onPick={(st) => { setMoving(null); moveTo(moving, st); }} onAddStore={() => { setStoresFor(moving); setMoving(null); setEditStores(true); }} onClose={() => setMoving(null)} />}
     </>
   );
 }
@@ -348,7 +349,7 @@ function MoveSheet({ item, stores, saved, onPick, onAddStore, onClose }) {
         {saved && (
           <>
             <button type="button" className="btn block" onClick={onAddStore}>+ Add a store</button>
-            <p className="small muted">A store that isn't here? Add it to your stores first, then move {item.name} to it.</p>
+            <p className="small muted">A store that isn't here? Add it, and {item.name} moves to it when you save.</p>
           </>
         )}
         {stores.map((st) => (
@@ -371,25 +372,38 @@ function MoveSheet({ item, stores, saved, onPick, onAddStore, onClose }) {
 function ShopMode({ store, ids, onClose }) {
   const { ctx, items, predictions, showToast } = useApp();
   const [got, setGot] = useState([]);
+  const undos = useRef({}); // item id -> undo for its check-off on this trip
   const now = Date.now();
   const list = items.filter((it) => (ids ? ids.includes(it.id) : (it.store || '') === store) && isOnList(it, now) && it.status !== 'ordered');
   const gotItems = items.filter((it) => got.includes(it.id));
 
   async function buy(it) {
-    await markBought(ctx, it, { store });
+    if (got.includes(it.id) || undos.current[it.id]) return;
+    undos.current[it.id] = 'pending';
+    const { undo } = await markBought(ctx, it, { store });
+    undos.current[it.id] = undo;
     setGot((g) => [...g, it.id]);
+  }
+  // A second tap on a crossed-off item puts it back on the list and drops the purchase.
+  async function unbuy(it) {
+    const undo = undos.current[it.id];
+    if (typeof undo !== 'function') return;
+    delete undos.current[it.id];
+    setGot((g) => g.filter((id) => id !== it.id));
+    await undo();
+    showToast(`${it.name} is back on the list`);
   }
   const total = got.length + list.length;
   return (
     <Sheet title={`Shopping at ${store || 'any store'}`} onClose={() => { if (got.length) showToast(`Logged ${got.length} item${got.length === 1 ? '' : 's'} from ${store || 'this trip'}`); onClose(); }}>
-      <p className="small muted" style={{ marginBottom: 10 }}>{got.length} of {total} in the cart. Tap or swipe right as you go. Each one is dated today.</p>
+      <p className="small muted" style={{ marginBottom: 10 }}>{got.length} of {total} in the cart. Tap or swipe right as you go. Tapped one by mistake? Tap it again to put it back.</p>
       <div className="list shopmode">
         {list.map((it) => (
           <SwipeRow key={it.id} onRight={() => buy(it)} rightLabel="In the cart">
             <ItemRow item={it} pred={predictions[it.id]} showStore={false} onToggle={() => buy(it)} onOpen={() => buy(it)} />
           </SwipeRow>
         ))}
-        {gotItems.map((it) => <ItemRow key={it.id} item={it} done readOnly={false} onToggle={() => {}} showStore={false} />)}
+        {gotItems.map((it) => <ItemRow key={it.id} item={it} done showStore={false} onToggle={() => unbuy(it)} onOpen={() => unbuy(it)} />)}
       </div>
       {list.length === 0 && <p className="empty">All done. Nice run.</p>}
       <button type="button" className="btn primary block" style={{ marginTop: 14 }} onClick={() => { if (got.length) showToast(`Logged ${got.length} item${got.length === 1 ? '' : 's'}`); onClose(); }}>Finish trip</button>
@@ -399,9 +413,13 @@ function ShopMode({ store, ids, onClose }) {
 
 // The household's nearby stores, saved once on the account so everyone shares them.
 // New stores go on top. Stores named before are remembered and offered in the Kind of store list.
-function StoresSheet({ onClose }) {
+function StoresSheet({ forItem, onAdded, onClose }) {
   const { backend, account, showToast } = useApp();
-  const [rows, setRows] = useState(() => (account?.settings?.stores || []).map((r) => ({ ...r })));
+  // Opened from an item's Where to buy, it starts with an empty row on top for the new store.
+  const [rows, setRows] = useState(() => [
+    ...(forItem ? [{ id: `s${Date.now().toString(36)}n`, type: '', name: '', place: '', miles: '' }] : []),
+    ...(account?.settings?.stores || []).map((r) => ({ ...r })),
+  ]);
   const original = account?.settings?.stores || [];
   // The saved names: the list kept on the account, or, before there is one, the names of the saved stores.
   const [kinds, setKinds] = useState(() => (Array.isArray(account?.settings?.storeKinds) ? rememberStoreKinds(account.settings.storeKinds, []) : rememberStoreKinds([], original)));
@@ -434,7 +452,10 @@ function StoresSheet({ onClose }) {
     // Only stores added or renamed now join the saved names, so a name you removed stays removed.
     const changed = clean.filter((r) => { const o = original.find((x) => x.id === r.id); return !o || o.name !== r.name || o.type !== r.type; });
     await backend.updateAccount(account.id, { 'settings.stores': clean, 'settings.storeKinds': rememberStoreKinds(kinds, changed) });
-    showToast(clean.length ? `Saved ${clean.length} store${clean.length === 1 ? '' : 's'}` : 'Stores cleared');
+    // The item that opened this goes to the store just added (the top one, if several).
+    const added = forItem ? clean.find((r) => !original.some((o) => o.id === r.id)) : null;
+    if (added) await onAdded?.(added);
+    else showToast(clean.length ? `Saved ${clean.length} store${clean.length === 1 ? '' : 's'}` : 'Stores cleared');
     onClose();
   }
   return (
@@ -444,6 +465,7 @@ function StoresSheet({ onClose }) {
           <button type="button" className="btn grow" onClick={addRow}>+ Add a store</button>
           <button type="button" className="btn primary grow" onClick={save}>Save stores</button>
         </div>
+        {forItem && <p className="small"><strong>Add the store for {forItem.name}.</strong> When you save, {forItem.name} moves to it.</p>}
         <p className="small muted">Pick the kind of store, then its name, the town or street, and roughly how many miles it is from home. The kind tells the app what it sells. For a store like H-Mart, pick Grocery store and name it H-Mart so groceries can go there, or pick + Add a new store to get only what you move there yourself. Stores you name are remembered for next time.</p>
         {kinds.length > 0 && (
           <div className="saved-stores">
