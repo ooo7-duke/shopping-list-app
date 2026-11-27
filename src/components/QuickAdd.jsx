@@ -128,7 +128,7 @@ export default function QuickAdd() {
         <label htmlFor="qa" className="sr-only">Add items</label>
         <input
           id="qa" ref={inputRef} value={text} autoComplete="off" enterKeyHint="done"
-          placeholder="Add an item, like milk or eggs"
+          placeholder="Add an item"
           onChange={(e) => { setText(e.target.value); setSel(-1); }}
           onKeyDown={onKeyDown} onPaste={onPaste}
           aria-autocomplete="list" aria-controls="qa-suggest"
