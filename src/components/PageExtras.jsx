@@ -19,7 +19,7 @@ export function LookupMeter() {
   );
 }
 
-// A round button that floats in once a long page has been scrolled, and returns to the top.
+// A see-through caret at the bottom center that floats in once a long page has been scrolled, and returns to the top.
 export function BackToTop() {
   const [show, setShow] = useState(false);
   useEffect(() => {
@@ -32,7 +32,7 @@ export function BackToTop() {
   const smooth = !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
   return (
     <button type="button" className="to-top" aria-label="Back to top" onClick={() => window.scrollTo({ top: 0, behavior: smooth ? 'smooth' : 'auto' })}>
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7" /></svg>
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 15l7-7 7 7" /></svg>
     </button>
   );
 }
