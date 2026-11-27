@@ -148,7 +148,7 @@ export default function TripsView() {
               {g.list.map((it) => (
                 <li key={it.id} className={drag.item?.id === it.id ? 'dragging' : ''}>
                   <button type="button" className="grip" aria-label={`Drag ${it.name} to another store`} title="Drag to another store" onPointerDown={(e) => drag.start(e, it, g.key)} onContextMenu={(e) => e.preventDefault()}><GripIcon /></button>
-                  <button type="button" className="trip-name grow ellipsis" onClick={() => setMoving(it)} title="Move to another store">{it.name}{fmtQty(it.qty, it.unit) ? <span className="muted"> · {fmtQty(it.qty, it.unit)}</span> : null}</button>
+                  <button type="button" className="trip-name grow ellipsis" onClick={() => { if (!drag.tookClick()) setMoving(it); }} onPointerDown={(e) => { if (e.pointerType === 'touch') drag.start(e, it, g.key); }} onContextMenu={(e) => e.preventDefault()} title="Move to another store">{it.name}{fmtQty(it.qty, it.unit) ? <span className="muted"> · {fmtQty(it.qty, it.unit)}</span> : null}</button>
                   <span>{it.lastPrice != null ? fmtMoney(it.lastPrice * (Number(it.qty) || 1)) : ''}</span>
                 </li>
               ))}
@@ -174,7 +174,7 @@ export default function TripsView() {
       </div>
 
       {groups.length > 0 && (
-        <p className="tiny muted" style={{ marginTop: 10 }}>Press and hold an item's handle, then drag it to another store, or tap its name to pick one.</p>
+        <p className="tiny muted" style={{ marginTop: 10 }}>On a phone, press and hold an item, then drag it to another store. Or tap its name to pick one.</p>
       )}
 
       {drag.item && (
@@ -242,11 +242,12 @@ function useDrag(onDrop) {
   const ref = useRef(null);
   ref.current = state;
   const held = useRef(false); // a finger has held a handle long enough to drag
+  const dragged = useRef(0); // when the last finger drag ended, so the tap that follows it isn't read as a tap
   // Once a finger drag has started, keep the page from scrolling under it. This listener is always
   // there, so it is in place before the finger moves, even in the moment before the drag shows.
   useEffect(() => {
     const noScroll = (e) => { if ((held.current || ref.current?.item) && e.cancelable) e.preventDefault(); };
-    const release = () => { held.current = false; };
+    const release = () => { if (held.current) dragged.current = Date.now(); held.current = false; };
     window.addEventListener('touchmove', noScroll, { passive: false });
     window.addEventListener('touchend', release);
     window.addEventListener('touchcancel', release);
@@ -290,6 +291,8 @@ function useDrag(onDrop) {
   }, [!!state?.item]); // eslint-disable-line react-hooks/exhaustive-deps
   return {
     item: state?.item || null, x: state?.x, y: state?.y, over: state?.over,
+    // True right after a press-and-hold drag, so lifting the finger doesn't also open the item.
+    tookClick: () => Date.now() - dragged.current < 600,
     start(e, item, from) {
       if (e.button != null && e.button !== 0) return;
       const begin = (x, y) => setState({ item, from, x, y, over: from, store: null });

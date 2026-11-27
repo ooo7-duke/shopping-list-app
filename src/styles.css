@@ -211,6 +211,9 @@ label.field > span { display: block; font-size: 0.85rem; color: var(--muted); ma
 .trip ul { list-style: none; padding: 0; margin: 10px 0; }
 .trip li { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 2px 0; border-top: 1px dashed var(--line-soft); }
 .trip li.dragging { opacity: 0.4; }
+.trip .trip-name { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.drag-ghost { animation: lift 160ms ease-out; }
+@keyframes lift { from { transform: translate(-50%, -100%) scale(0.85); box-shadow: 0 1px 3px rgba(12, 18, 40, 0.2); } to { transform: translate(-50%, -130%) scale(1); box-shadow: 0 6px 18px rgba(12, 18, 40, 0.3); } }
 .trip .grip { flex: none; display: grid; place-items: center; width: 36px; min-height: 44px; margin-left: -8px; border: 0; background: none; color: var(--muted); cursor: grab; touch-action: pan-y; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 .trip .grip:active { cursor: grabbing; }
 .trip .trip-name { border: 0; background: none; padding: 10px 0; text-align: left; font: inherit; color: inherit; cursor: pointer; min-width: 0; }
