@@ -6,7 +6,7 @@ import ReceiptsView from './components/ReceiptsView.jsx';
 import InsightsView from './components/InsightsView.jsx';
 import AccountSheet from './components/AccountSheet.jsx';
 import { SignIn, Onboarding } from './components/Welcome.jsx';
-import { ListIcon, CartIcon, ReceiptIcon, ChartIcon, ChevronDown, LogoMark } from './components/Icons.jsx';
+import { ListIcon, CartIcon, ReceiptIcon, ChartIcon, ChevronDown, LogoMark, MenuIcon } from './components/Icons.jsx';
 import { isOnList } from './data/actions.js';
 import { can, DEMO_MODE, APP_NAME } from './lib/config.js';
 import { initials } from './lib/format.js';
@@ -33,7 +33,15 @@ function Shell() {
   const { user, accounts, account, role, items, toast, dismissToast } = useApp();
   const [tab, go] = useHashTab();
   const [sheet, setSheet] = useState(false);
+  const [menu, setMenu] = useState(false);
   const headRef = useRef();
+
+  useEffect(() => {
+    if (!menu) return undefined;
+    const onKey = (e) => { if (e.key === 'Escape') setMenu(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [menu]);
 
   useLayoutEffect(() => {
     if (!headRef.current) return undefined;
@@ -56,8 +64,13 @@ function Shell() {
       <header className="topwrap" ref={headRef}>
         {DEMO_MODE && <div className="demo-banner">Demo mode · sample data on this device only</div>}
         <div className="topbar">
+          <button type="button" className="icon-btn menu-btn" onClick={() => setMenu((m) => !m)} aria-label="Menu" aria-expanded={menu} aria-controls="main-menu">
+            <MenuIcon />
+            {listCount > 0 && <span className="badge">{listCount}</span>}
+          </button>
           <button type="button" className="acct grow" onClick={() => setSheet(true)} aria-label="Accounts and people">
             <h1 className="ellipsis">{account.name}</h1>
+            <span className="page-name">· {tabs.find((t) => t.id === current)?.label}</span>
             <ChevronDown width="20" height="20" style={{ color: 'var(--bb)', flex: 'none' }} />
           </button>
           <button type="button" className="avatar" onClick={() => setSheet(true)} aria-label="Account menu" style={{ cursor: 'pointer' }}>
@@ -66,16 +79,20 @@ function Shell() {
         </div>
       </header>
 
-      <nav className="nav" aria-label="Main">
-        <div className="brand"><LogoMark width="34" height="34" /> {APP_NAME}</div>
-        {tabs.map(({ id, label, Icon }) => (
-          <button key={id} type="button" aria-current={current === id ? 'page' : undefined} onClick={() => go(id)}>
-            <Icon />
-            <span>{label}</span>
-            {id === 'list' && listCount > 0 && <span className="badge">{listCount}</span>}
-          </button>
-        ))}
-      </nav>
+      {menu && (
+        <div className="menu-scrim" onClick={() => setMenu(false)}>
+          <nav id="main-menu" className="menu" aria-label="Main" onClick={(e) => e.stopPropagation()}>
+            <div className="brand"><LogoMark width="30" height="30" /> {APP_NAME}</div>
+            {tabs.map(({ id, label, Icon }) => (
+              <button key={id} type="button" aria-current={current === id ? 'page' : undefined} onClick={() => { go(id); setMenu(false); }}>
+                <Icon />
+                <span>{label}</span>
+                {id === 'list' && listCount > 0 && <span className="badge">{listCount}</span>}
+              </button>
+            ))}
+          </nav>
+        </div>
+      )}
 
       <main className={current === 'insights' || current === 'trips' ? 'wide' : ''}>
         <View />
