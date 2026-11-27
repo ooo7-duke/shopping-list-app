@@ -77,7 +77,6 @@ export default function TripsView() {
 
   const openOrders = batches.filter((b) => b.status === 'ordered').sort((a, b) => b.orderedAt - a.orderedAt);
   const done = batches.filter((b) => b.status === 'done').sort((a, b) => (b.arrivedAt || 0) - (a.arrivedAt || 0)).slice(0, 5);
-  const smallRuns = savedStores.length ? [] : groups.filter((g) => g.canWait);
 
   async function order(g) {
     const undo = await markOrdered(ctx, g.store, g.list);
@@ -126,12 +125,6 @@ export default function TripsView() {
 
       {!savedStores.length && storesCard}
 
-      {smallRuns.length >= 2 && (
-        <p className="hint" style={{ marginBottom: 14 }}>
-          {smallRuns.length} stores have only one or two items and nothing urgent: {smallRuns.map((g) => g.store).join(', ')}. Holding them until the list grows saves {smallRuns.length - 1} or more trips.
-        </p>
-      )}
-
       {groups.length === 0 && openOrders.length === 0 && (
         <div className="card empty"><h2>No trips needed</h2><p>Items you add to the list show up here grouped by store.</p></div>
       )}
@@ -148,7 +141,6 @@ export default function TripsView() {
             </div>
             {g.unplaced && <p className="small muted" style={{ marginTop: 6 }}>None of your saved stores is a sure match for these. Add the right kind of store, or put @store on the item.</p>}
             {!g.store && !g.unplaced && <p className="small muted" style={{ marginTop: 6 }}>Add @store when you type an item, or set a store on the item, to fold these into a run.</p>}
-            {g.canWait && <p className="hint" style={{ marginTop: 10 }}>{g.planned ? 'Extra stop for one or two items, nothing urgent. This can wait for the next run.' : 'Small run, nothing urgent. This can wait for more items.'}</p>}
             <ul>
               {g.list.map((it) => (
                 <li key={it.id} className={drag.item?.id === it.id ? 'dragging' : ''}>
