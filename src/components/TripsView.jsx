@@ -352,7 +352,16 @@ function ShopMode({ store, ids, onClose }) {
 function StoresSheet({ onClose }) {
   const { backend, account, showToast } = useApp();
   const [rows, setRows] = useState(() => (account?.settings?.stores || []).map((r) => ({ ...r })));
-  const kinds = useMemo(() => rememberStoreKinds(account?.settings?.storeKinds, account?.settings?.stores), [account]);
+  const original = account?.settings?.stores || [];
+  // The saved names: the list kept on the account, or, before there is one, the names of the saved stores.
+  const [kinds, setKinds] = useState(() => (Array.isArray(account?.settings?.storeKinds) ? rememberStoreKinds(account.settings.storeKinds, []) : rememberStoreKinds([], original)));
+  async function forget(j) {
+    const gone = kinds[j];
+    const next = kinds.filter((_, x) => x !== j);
+    setKinds(next);
+    await backend.updateAccount(account.id, { 'settings.storeKinds': next });
+    showToast(`Removed ${gone.name} from your saved stores`);
+  }
   const set = (i, patch) => setRows((r) => r.map((x, j) => (j === i ? { ...x, ...patch } : x)));
   const addRow = () => setRows((r) => [{ id: `s${Date.now().toString(36)}${r.length}`, type: '', name: '', place: '', miles: '' }, ...r]);
   const others = STORE_TYPES.filter((t) => t.id !== 'other');
@@ -372,7 +381,9 @@ function StoresSheet({ onClose }) {
     const missing = rows.find((r) => r.type === 'other' && !String(r.name || '').trim());
     if (missing) { showToast('Type a name for each new store you added.'); return; }
     const clean = rows.map((r) => ({ id: r.id, type: r.type, name: String(r.name || '').trim().slice(0, 30), place: String(r.place || '').trim().slice(0, 40), miles: r.miles === '' || r.miles == null ? null : Math.max(0, Math.round(Number(r.miles) * 10) / 10) }));
-    await backend.updateAccount(account.id, { 'settings.stores': clean, 'settings.storeKinds': rememberStoreKinds(kinds, clean) });
+    // Only stores added or renamed now join the saved names, so a name you removed stays removed.
+    const changed = clean.filter((r) => { const o = original.find((x) => x.id === r.id); return !o || o.name !== r.name || o.type !== r.type; });
+    await backend.updateAccount(account.id, { 'settings.stores': clean, 'settings.storeKinds': rememberStoreKinds(kinds, changed) });
     showToast(clean.length ? `Saved ${clean.length} store${clean.length === 1 ? '' : 's'}` : 'Stores cleared');
     onClose();
   }
@@ -381,6 +392,18 @@ function StoresSheet({ onClose }) {
       <div className="stack">
         <button type="button" className="btn block" onClick={addRow}>+ Add a store</button>
         <p className="small muted">Pick the kind of store, then its name, the town or street, and roughly how many miles it is from home. The kind tells the app what it sells. For a store like H-Mart, pick Grocery store and name it H-Mart so groceries can go there, or pick + Add a new store to get only what you move there yourself. Stores you name are remembered for next time.</p>
+        {kinds.length > 0 && (
+          <div className="saved-stores">
+            <p className="small"><strong>Saved store names.</strong> Tap ✕ to remove one you no longer want in the list.</p>
+            <div className="chips">
+              {kinds.map((k, j) => (
+                <button key={`${k.name}${j}`} type="button" className="chip" onClick={() => forget(j)} aria-label={`Remove ${k.name} from saved stores`}>
+                  {k.name} <span aria-hidden="true">✕</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         {rows.map((r, i) => (
           <div key={r.id} className="card" style={{ background: 'var(--card)' }}>
             <label className="field"><span>Kind of store</span>

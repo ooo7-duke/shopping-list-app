@@ -341,3 +341,8 @@ table.data td.num, table.data th.num { text-align: right; }
 .look-dots { display: flex; gap: 4px; }
 .look-dots i { width: 22px; height: 22px; border-radius: 50%; border: 1px solid transparent; display: block; }
 .look-on { font-size: 0.78rem; font-weight: 700; }
+
+/* Saved store names in the stores sheet, each with a remove button */
+.saved-stores { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; color: var(--bb-ink); }
+.saved-stores .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.saved-stores .chip span { margin-left: 4px; font-weight: 700; }
