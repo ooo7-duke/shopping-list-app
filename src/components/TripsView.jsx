@@ -3,7 +3,7 @@ import { useApp } from '../AppContext.jsx';
 import Sheet from './Sheet.jsx';
 import SwipeRow from './SwipeRow.jsx';
 import ItemRow from './ItemRow.jsx';
-import { isOnList, markBought, markOrdered, markArrived, putOnList, estimate } from '../data/actions.js';
+import { isOnList, markBought, markOrdered, markArrived, putOnList, estimate, cancelOrder } from '../data/actions.js';
 import { describePrediction } from '../lib/predict.js';
 import { fmtMoney, fmtDate, fmtQty, firstName } from '../lib/format.js';
 import { can } from '../lib/config.js';
@@ -59,8 +59,13 @@ export default function TripsView() {
   const smallRuns = savedStores.length ? [] : groups.filter((g) => g.canWait);
 
   async function order(g) {
-    await markOrdered(ctx, g.store, g.list);
-    showToast(`Marked ${g.list.length} item${g.list.length === 1 ? '' : 's'} as ordered from ${g.store || 'online'}`);
+    const undo = await markOrdered(ctx, g.store, g.list);
+    showToast(`Marked ${g.list.length} item${g.list.length === 1 ? '' : 's'} as ordered from ${g.store || 'online'}`, undo);
+  }
+  async function notOrdered(b) {
+    const list = items.filter((i) => b.itemIds?.includes(i.id) && i.status === 'ordered');
+    await cancelOrder(ctx, b, list);
+    showToast(`Put ${list.length} item${list.length === 1 ? '' : 's'} back on the list`);
   }
   async function arrived(b) {
     const list = items.filter((i) => b.itemIds?.includes(i.id) && i.status === 'ordered');
@@ -153,7 +158,10 @@ export default function TripsView() {
                   <div className="grow"><h2>{b.name}</h2><p className="small muted">Ordered {fmtDate(b.orderedAt, { withYear: true })} by {firstName(b.orderedByName)}{b.estTotal ? ` · about ${fmtMoney(b.estTotal)}` : ''}</p></div>
                 </div>
                 <ul>{items.filter((i) => b.itemIds?.includes(i.id) && i.status === 'ordered').map((i) => <li key={i.id}><span>{i.name}</span><span className="muted">{fmtQty(i.qty, i.unit)}</span></li>)}</ul>
-                <button type="button" className="btn gold block" onClick={() => arrived(b)}>It arrived</button>
+                <div className="row">
+                  <button type="button" className="btn gold grow" onClick={() => arrived(b)}>It arrived</button>
+                  <button type="button" className="btn" onClick={() => notOrdered(b)}>Not ordered</button>
+                </div>
               </article>
             ))}
           </div>

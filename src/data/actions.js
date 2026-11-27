@@ -139,6 +139,18 @@ export async function markOrdered(ctx, store, items) {
   }];
   for (const it of items) ops.push({ type: 'update', coll: 'items', id: it.id, data: { status: 'ordered', batchId: bid } });
   await backend.commit(accountId, ops);
+  return () => cancelOrder(ctx, { id: bid }, items);
+}
+
+// Takes back an order marked by mistake: the items go back on the list and the order is removed.
+export async function cancelOrder(ctx, batch, items) {
+  const { backend, accountId } = ctx;
+  const ops = [{ type: 'remove', coll: 'batches', id: batch.id }];
+  for (const it of items) {
+    const back = it.status && it.status !== 'ordered' ? it.status : 'needed';
+    ops.push({ type: 'update', coll: 'items', id: it.id, data: { status: back, batchId: null } });
+  }
+  await backend.commit(accountId, ops);
 }
 
 export async function markArrived(ctx, batch, items, date = Date.now()) {

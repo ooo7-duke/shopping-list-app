@@ -249,3 +249,17 @@ describe('trip planner', () => {
     expect(stops.map((s) => s.store.id).sort()).toEqual(['a', 'w']);
   });
 });
+
+import { markOrdered } from '../data/actions.js';
+describe('ordered by mistake', () => {
+  it('undo puts items back on the list and removes the order', async () => {
+    const commits = [];
+    const backend = { newId: () => 'b1', commit: async (a, ops) => commits.push(ops) };
+    const ctx = { backend, accountId: 'x', user: { uid: 'u', name: 'Sola' } };
+    const undo = await markOrdered(ctx, 'Costco', [{ id: 'i1', name: 'Ink', status: 'needed' }]);
+    await undo();
+    const ops = commits[1];
+    expect(ops[0]).toEqual({ type: 'remove', coll: 'batches', id: 'b1' });
+    expect(ops[1].data).toEqual({ status: 'needed', batchId: null });
+  });
+});
