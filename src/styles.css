@@ -172,7 +172,8 @@ label.field > span { display: block; font-size: 0.85rem; color: var(--muted); ma
 .empty { text-align: center; padding: 32px 16px; color: var(--muted); }
 .empty h2 { margin-bottom: 6px; }
 .seg { display: inline-flex; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 3px; }
-.seg button { border: 0; background: none; padding: 6px 12px; border-radius: 8px; min-height: 36px; cursor: pointer; color: var(--muted); font-size: 0.9rem; }
+.seg { flex: none; }
+.seg button { white-space: nowrap; border: 0; background: none; padding: 6px 12px; border-radius: 8px; min-height: 36px; cursor: pointer; color: var(--muted); font-size: 0.9rem; }
 .seg button[aria-pressed='true'] { background: var(--bb); color: var(--cream); font-weight: 600; }
 
 /* ---------- sheet / dialog ---------- */
@@ -257,16 +258,30 @@ table.data td.num, table.data th.num { text-align: right; }
 .price-input { width: 104px; text-align: right; }
 
 /* Type filter above the list: tap several to combine. */
-.filter-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 10px; }
-.filter-row .chip .muted { margin-left: 4px; font-weight: 400; }
-.filter-row .chip.gold .muted { color: inherit; opacity: 0.75; }
+.type-pick { margin: 4px 0 6px; }
+.type-pick-btn {
+  width: 100%; display: flex; align-items: center; gap: 8px; min-height: var(--tap); padding: 0 14px;
+  background: var(--card); border: 1px solid var(--line); border-radius: 12px; cursor: pointer;
+  color: var(--bb-ink); font-size: 0.95rem; text-align: left;
+}
+.type-pick-btn .ellipsis { flex: 1; min-width: 0; font-weight: 600; }
+.type-pick-btn .chev { transform: rotate(90deg); transition: transform 0.15s; color: var(--bb); }
+.type-pick-btn .chev.open { transform: rotate(-90deg); }
+.type-pick-list {
+  margin-top: 6px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 6px;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 2px;
+}
+.type-opt { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 10px; border-radius: 8px; cursor: pointer; }
+.type-opt:hover { background: var(--bb-soft); }
+.type-opt input { width: 20px; height: 20px; accent-color: var(--bb); flex: none; }
+.type-done { grid-column: 1 / -1; margin: 6px 4px 4px; }
 
 /* Foldable list groups */
 .fold-h { width: 100%; background: none; border: 0; padding: 6px 2px; margin: 12px 0 4px; cursor: pointer; font: inherit; color: inherit; text-align: left; }
 .fold-h h3 { display: flex; align-items: center; gap: 6px; margin: 0; }
 .chev { display: inline-block; width: 1em; text-align: center; font-size: 1.1em; transition: transform .15s; }
 .chev.open { transform: rotate(90deg); }
-.fold-all { display: flex; justify-content: flex-end; margin: 2px 2px -6px; }
+.fold-all { display: flex; justify-content: flex-end; margin: 0 2px -8px; font-size: 0.85rem; }
 .linkish { background: none; border: 0; padding: 4px 0; font: inherit; font-size: 0.85rem; color: var(--muted); text-decoration: underline; cursor: pointer; }
 
 /* Duplicate warning under the add box */
@@ -283,3 +298,6 @@ table.data td.num, table.data th.num { text-align: right; }
 .photo-view { position: fixed; inset: 0; z-index: 1000; background: rgba(12, 18, 40, 0.92); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 16px; cursor: zoom-out; }
 .photo-view img { max-width: 100%; max-height: 78vh; border-radius: 12px; background: #fff; }
 .photo-cap { color: #fffbee; text-align: center; font-weight: 600; }
+
+.invite-banner { margin: 4px 0 14px; padding: 12px 14px; background: var(--card); border: 2px solid var(--bb); border-radius: 14px; }
+.invite-banner .row { gap: 12px; }

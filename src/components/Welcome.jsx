@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useApp } from '../AppContext.jsx';
 import { CreateAccount } from './AccountSheet.jsx';
 import { LogoMark } from './Icons.jsx';
@@ -35,42 +35,50 @@ export function SignIn() {
 }
 
 export function Onboarding() {
-  const { backend, user, switchAccount, showToast } = useApp();
-  const [invites, setInvites] = useState([]);
-  useEffect(() => backend.subscribeMyInvites(user, setInvites), [user.uid]);
-
-  async function accept(iv) {
-    try {
-      await backend.acceptInvite(iv, user);
-      switchAccount(iv.accountId);
-    } catch (e) {
-      showToast(`Couldn't join: ${e?.message || e}`);
-    }
-  }
+  const { backend, user, switchAccount, invites, joinInvite } = useApp();
+  const [ownList, setOwnList] = useState(false);
+  const invited = invites.length > 0;
 
   return (
     <div className="signin">
       <div className="stack" style={{ maxWidth: 480, width: '100%' }}>
         <div className="card stack" style={{ textAlign: 'left' }}>
           <h1>Welcome, {user.name.split(' ')[0]}</h1>
-          {invites.length > 0 ? (
+          {invited ? (
             <>
               <p>You've been invited to join:</p>
               {invites.map((iv) => (
                 <div key={iv.id} className="row">
                   <div className="grow"><strong>{iv.accountName}</strong><div className="small muted">as {ROLES[iv.role]?.label}, from {iv.invitedBy}</div></div>
-                  <button type="button" className="btn primary" onClick={() => accept(iv)}>Join</button>
+                  <button type="button" className="btn primary" onClick={() => joinInvite(iv)}>Join</button>
                 </div>
               ))}
-              <p className="small muted">Or start your own list below.</p>
             </>
           ) : (
             <p>Start a list for your home or your organization. If someone invited you, ask them to use <strong>{user.email}</strong>, and the invite will appear here.</p>
           )}
         </div>
-        <CreateAccount onDone={(id) => switchAccount(id)} />
+        {invited && !ownList
+          ? <button type="button" className="btn ghost" onClick={() => setOwnList(true)}>Start my own separate list instead</button>
+          : <CreateAccount onDone={(id) => switchAccount(id)} />}
         <button type="button" className="btn ghost" onClick={() => backend.signOut()}>Use a different Google account</button>
       </div>
+    </div>
+  );
+}
+
+// Shown at the top of every page while an invite waits, so joining never depends on the first screen.
+export function InviteBanner() {
+  const { invites, joinInvite } = useApp();
+  if (!invites.length) return null;
+  return (
+    <div className="invite-banner stack" role="status">
+      {invites.map((iv) => (
+        <div key={iv.id} className="row">
+          <div className="grow"><strong>{iv.invitedBy} invited you to {iv.accountName}</strong><div className="small muted">Join to see and share that list.</div></div>
+          <button type="button" className="btn primary" onClick={() => joinInvite(iv)}>Join</button>
+        </div>
+      ))}
     </div>
   );
 }

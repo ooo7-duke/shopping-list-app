@@ -97,3 +97,7 @@ npm test
 | `src/lib/storeMatch.js` | Turns Google Shopping results into one price per store |
 | `netlify/functions/prices.mjs` | Server lookup that holds the SerpApi key, for signed-in members only |
 | `scripts/netlify-ignore.sh` | Production deploy guard |
+
+## License
+
+MIT. See the LICENSE file. Anyone may use, copy, change and share this code, including for business use, as long as the copyright notice stays with it.

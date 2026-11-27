@@ -56,6 +56,7 @@ export default function ListView() {
     return () => clearTimeout(t);
   }, [items, role, backend, account, ctx.accountId]);
   const [showAllLow, setShowAllLow] = useState(false);
+  const [filterOpen, setFilterOpen] = useState(false);
   const editor = can(role, 'edit');
   const now = Date.now();
   const lookahead = account?.settings?.lookaheadDays ?? 10;
@@ -183,31 +184,37 @@ export default function ListView() {
             <h2>{activeFilter.size ? `${shown.length} of ${onList.length} items` : `${onList.length} item${onList.length === 1 ? '' : 's'} to get`}</h2>
             {total > 0 && editor && <div className="small muted">About {fmtMoney(total)} at last prices</div>}
           </div>
-          <div className="row" style={{ gap: 6 }}>
-            <span className="small muted" id="groupby-l">Group by</span>
-            <div className="seg" role="group" aria-labelledby="groupby-l">
-              <button type="button" aria-pressed={groupBy === 'category'} onClick={() => setGroup('category')}>Type</button>
-              <button type="button" aria-pressed={groupBy === 'store'} onClick={() => setGroup('store')}>Where to buy</button>
-            </div>
+          <div className="seg" role="group" aria-label="Group by">
+            <button type="button" aria-pressed={groupBy === 'category'} onClick={() => setGroup('category')}>By type</button>
+            <button type="button" aria-pressed={groupBy === 'store'} onClick={() => setGroup('store')}>By store</button>
           </div>
         </div>
       )}
 
       {typeCounts.length > 1 && (
-        <div className="filter-row" role="group" aria-label="Show only these types">
-          <button type="button" className={`chip${activeFilter.size ? '' : ' gold'}`} aria-pressed={!activeFilter.size} onClick={() => saveFilter(new Set())}>All</button>
-          {typeCounts.map(([t, n]) => (
-            <button key={t} type="button" className={`chip${activeFilter.has(t) ? ' gold' : ''}`} aria-pressed={activeFilter.has(t)} onClick={() => toggleType(t)}>
-              {t} <span className="muted">{n}</span>
-            </button>
-          ))}
-        </div>
-      )}
-
-      {onList.length === 0 && ordered.length === 0 && (
-        <div className="card empty">
-          <h2>Nothing to buy right now</h2>
-          <p>When you notice something running low, type it above or tap the mic and say it. Separate several items with commas.</p>
+        <div className="type-pick">
+          <button type="button" className="type-pick-btn" aria-expanded={filterOpen} aria-controls="type-pick-list" onClick={() => setFilterOpen((o) => !o)}>
+            <span className="muted">Show:</span>
+            <span className="ellipsis">{activeFilter.size ? [...activeFilter].join(', ') : 'All types'}</span>
+            <span className={`chev${filterOpen ? ' open' : ''}`} aria-hidden="true">›</span>
+          </button>
+          {filterOpen && (
+            <div id="type-pick-list" className="type-pick-list" role="group" aria-label="Show only these types">
+              <label className="type-opt">
+                <input type="checkbox" checked={!activeFilter.size} onChange={() => saveFilter(new Set())} />
+                <span className="grow">All types</span>
+                <span className="muted">{onList.length}</span>
+              </label>
+              {typeCounts.map(([t, n]) => (
+                <label key={t} className="type-opt">
+                  <input type="checkbox" checked={activeFilter.has(t)} onChange={() => toggleType(t)} />
+                  <span className="grow">{t}</span>
+                  <span className="muted">{n}</span>
+                </label>
+              ))}
+              <button type="button" className="btn primary type-done" onClick={() => setFilterOpen(false)}>Done</button>
+            </div>
+          )}
         </div>
       )}
 
@@ -218,6 +225,14 @@ export default function ListView() {
             : <button type="button" className="linkish" onClick={() => saveFolded(new Set([...folded, ...groups.map(([n]) => foldId(n))]))}>Fold all groups</button>}
         </div>
       )}
+
+      {onList.length === 0 && ordered.length === 0 && (
+        <div className="card empty">
+          <h2>Nothing to buy right now</h2>
+          <p>When you notice something running low, type it above or tap the mic and say it. Separate several items with commas.</p>
+        </div>
+      )}
+
 
       {groups.map(([name, list]) => {
         const isFolded = folded.has(foldId(name));
