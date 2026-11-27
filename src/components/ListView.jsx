@@ -107,7 +107,7 @@ export default function ListView() {
   const doRemove = act(takeOffList, (it) => `Took ${it.name} off the list`);
   const doAdd = act(putOnList, (it) => `Added ${it.name}`);
 
-  const total = estimate(onList);
+  const total = estimate(shown);
   const openItem = items.find((i) => i.id === openId);
 
   return (
