@@ -5,7 +5,7 @@ import { can } from './lib/config.js';
 import { saveErrorMessage } from './lib/errors.js';
 import { setPriceAccount } from './lib/prices.js';
 import { applyLook, rememberLookLocal, savedLookLocal, lookById } from './lib/looks.js';
-import { foldCategory } from './lib/categories.js';
+import { foldCategory, householdCategories, isHouseholdList } from './lib/categories.js';
 
 const Ctx = createContext(null);
 export const useApp = () => useContext(Ctx);
@@ -17,7 +17,7 @@ export function AppProvider({ children }) {
   const [accounts, setAccounts] = useState(null);
   const [activeId, setActiveId] = useState(() => localStorage.getItem(ACTIVE_KEY));
   const [rawItems, setItems] = useState([]);
-  const [purchases, setPurchases] = useState([]);
+  const [rawPurchases, setPurchases] = useState([]);
   const [receipts, setReceipts] = useState([]);
   const [batches, setBatches] = useState([]);
   const [toast, setToast] = useState(null);
@@ -46,23 +46,20 @@ export function AppProvider({ children }) {
   const account = useMemo(() => {
     if (!accounts?.length) return null;
     const a = accounts.find((x) => x.id === activeId) || accounts[0];
-    // Household lists no longer have a Paper goods category; those things live in Pantry.
-    if (a?.categories?.includes('Pantry') && a.categories.includes('Paper goods')) {
-      return { ...a, categories: a.categories.filter((c) => c !== 'Paper goods') };
-    }
-    return a;
+    // Household lists use the broad store-order groups, whatever older list they started with.
+    return isHouseholdList(a) ? { ...a, categories: householdCategories(a.categories) } : a;
   }, [accounts, activeId]);
 
   useEffect(() => { setPriceAccount(account?.id); }, [account?.id]);
 
-  // Items saved under a category the list no longer has (Paper goods) show in Pantry.
-  const items = useMemo(() => {
+  // Items saved under an older fine group show in the broad group that now holds it.
+  const foldAll = useCallback((rows) => {
     const cats = account?.categories;
-    if (!cats?.includes('Pantry') || cats.includes('Paper goods')) return rawItems;
-    return rawItems.some((it) => it.category === 'Paper goods')
-      ? rawItems.map((it) => (it.category === 'Paper goods' ? { ...it, category: foldCategory(it.category, cats) } : it))
-      : rawItems;
-  }, [rawItems, account?.categories]);
+    if (!cats || !isHouseholdList(account) || !rows.some((r) => foldCategory(r.category, cats) !== r.category)) return rows;
+    return rows.map((r) => { const c = foldCategory(r.category, cats); return c === r.category ? r : { ...r, category: c }; });
+  }, [account]);
+  const items = useMemo(() => foldAll(rawItems), [rawItems, foldAll]);
+  const purchases = useMemo(() => foldAll(rawPurchases), [rawPurchases, foldAll]);
 
   const role = account && user ? account.members?.[user.uid]?.role || 'editor' : null;
 
