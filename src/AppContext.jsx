@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import backend from './data/backend.js';
 import { predictAll } from './lib/predict.js';
 import { can } from './lib/config.js';
+import { saveErrorMessage } from './lib/errors.js';
 
 const Ctx = createContext(null);
 export const useApp = () => useContext(Ctx);
@@ -18,6 +19,7 @@ export function AppProvider({ children }) {
   const [batches, setBatches] = useState([]);
   const [toast, setToast] = useState(null);
   const toastTimer = useRef();
+  const showToastRef = useRef();
 
   useEffect(() => backend.onAuth(setUser), []);
 
@@ -35,9 +37,10 @@ export function AppProvider({ children }) {
 
   useEffect(() => {
     if (!account) return undefined;
-    const subs = [backend.subscribe(account.id, 'items', setItems), backend.subscribe(account.id, 'batches', setBatches)];
+    const onError = (e) => showToastRef.current?.(saveErrorMessage(e, 'load your list'));
+    const subs = [backend.subscribe(account.id, 'items', setItems, onError), backend.subscribe(account.id, 'batches', setBatches, onError)];
     if (can(role, 'spend')) {
-      subs.push(backend.subscribe(account.id, 'purchases', setPurchases), backend.subscribe(account.id, 'receipts', setReceipts));
+      subs.push(backend.subscribe(account.id, 'purchases', setPurchases, onError), backend.subscribe(account.id, 'receipts', setReceipts, onError));
     } else {
       setPurchases([]);
       setReceipts([]);
@@ -64,6 +67,7 @@ export function AppProvider({ children }) {
     setToast({ message, undo, key: Date.now() });
     toastTimer.current = setTimeout(() => setToast(null), undo ? 6000 : 3500);
   }, []);
+  showToastRef.current = showToast;
 
   const ctx = useMemo(() => ({ backend, accountId: account?.id, user, role, items, account }), [account, user, role, items]);
 

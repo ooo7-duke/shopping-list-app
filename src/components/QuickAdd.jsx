@@ -5,6 +5,7 @@ import { addEntries, isOnList, refreshPrices } from '../data/actions.js';
 import { hasPriceProvider } from '../lib/prices.js';
 import { fmtMoney, fmtQty } from '../lib/format.js';
 import { MicIcon, PlusIcon } from './Icons.jsx';
+import { saveErrorMessage } from '../lib/errors.js';
 
 const SpeechRec = typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition);
 
@@ -43,7 +44,15 @@ export default function QuickAdd() {
 
   async function submit(entries, label) {
     if (!entries.length) return;
-    const { added, undo } = await addEntries(ctx, entries);
+    let result;
+    try {
+      result = await addEntries(ctx, entries);
+    } catch (e) {
+      console.error('Add failed', e);
+      showToast(saveErrorMessage(e, 'add that'));
+      return;
+    }
+    const { added, undo } = result;
     // Look up today's prices in the background; the list updates when they arrive.
     for (const a of added) refreshPrices(ctx, a).catch(() => {});
     const names = added.map((a) => a.name);
