@@ -44,6 +44,13 @@ export function seenPrices(item, now = Date.now(), maxAgeDays = 30) {
   return { rows, best };
 }
 
+// The certified refurbished price found by the last lookup, if it is recent.
+export function refurbPrice(item, now = Date.now(), maxAgeDays = 30) {
+  const r = item?.seenPrices?.refurb;
+  if (!r || r.price == null || isBlockedSeller(r.storeName, r.url) || now - (r.at || 0) > maxAgeDays * 86400e3) return null;
+  return { ...r, price: Number(r.price) };
+}
+
 // Provider registry. A provider is { id, by, quote(item) => Promise<[{ storeId, storeName, price, title, url }]> }.
 // by is how the price is labeled: 'auto' for a looked-up price, a person's name for a typed one.
 const providers = [];
@@ -80,7 +87,13 @@ export async function fetchQuotes(item) {
 // day wins over a lookup, because they saw it themselves.
 export function mergeQuotes(seen = {}, quotes = [], now = Date.now()) {
   const out = { ...seen };
+  // A new lookup replaces the old refurbished find, so one that sold out doesn't linger.
+  if (quotes.length) delete out.refurb;
   for (const q of quotes) {
+    if (q.storeId === 'refurb') {
+      if (!isBlockedSeller(q.storeName, q.url)) out.refurb = { price: q.price, at: now, by: q.by || 'auto', storeName: q.storeName, condition: 'Certified refurbished', ...(q.title ? { title: q.title } : {}), ...(q.url ? { url: q.url } : {}) };
+      continue;
+    }
     if (!PRICE_STORES.some((s) => s.id === q.storeId)) continue;
     if (isBlockedSeller(q.storeName, q.url)) continue;
     const cur = out[q.storeId];

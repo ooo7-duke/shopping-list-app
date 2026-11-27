@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useApp } from '../AppContext.jsx';
 import Sheet from './Sheet.jsx';
 import { markBought, putOnList, isOnList, setSeenPrice, refreshPrices, canLookUpAgain } from '../data/actions.js';
-import { storeLinks, seenPrices, hasPriceProvider, currentQuota, onQuota, refreshQuota } from '../lib/prices.js';
+import { storeLinks, seenPrices, refurbPrice, hasPriceProvider, currentQuota, onQuota, refreshQuota } from '../lib/prices.js';
+import { deptOf } from '../lib/tripPlan.js';
 import { linkHost, isBlockedSeller, isKnownRetailer } from '../lib/storeMatch.js';
 import { lastPurchaseMap, lastBuy } from '../lib/history.js';
 import { fmtMoney, fmtDate, toInputDate, fromInputDate, fmtQty } from '../lib/format.js';
@@ -36,6 +37,9 @@ export default function ItemSheet({ item, focus, onClose }) {
   const last = lastBuy(item, lastPurchaseMap(history)[item.id]);
   const links = storeLinks(item);
   const { best } = seenPrices(item);
+  // Electronics: a certified refurbished price, when a lookup found one, comes first.
+  const isTech = deptOf(item) === 'electronics';
+  const refurb = isTech ? refurbPrice(item) : null;
   const [looking, setLooking] = useState(false);
   const real = (seen) => (seen && seen.by !== 'sample' ? seen : null);
   const elsewhereRaw = real(item.seenPrices?.any);
@@ -182,10 +186,26 @@ export default function ItemSheet({ item, focus, onClose }) {
               <h3 style={{ marginBottom: 4 }}>Today's prices</h3>
               <p className="small muted" style={{ marginBottom: 8 }}>
                 {hasPriceProvider() ? 'Tap Look up prices to check stores. ' : ''}Tap a store to open it, or type a price you see.
-                {best ? ` Cheapest: ${best.store} at ${fmtMoney(best.price)}.` : ''}
+                {refurb ? ` Certified refurbished: ${fmtMoney(refurb.price)} at ${refurb.storeName}.` : ''}
+                {best ? ` Cheapest new: ${best.store} at ${fmtMoney(best.price)}.` : ''}
               </p>
               {DEMO_MODE && <p className="small" style={{ marginBottom: 8 }}>This demo can't look up live prices. On your site they fill in from Google Shopping once the price key is set up.</p>}
               {looking && <p className="small" role="status" style={{ marginBottom: 8 }}>Looking up prices…</p>}
+              {isTech && (refurb ? (
+                <div className="refurb-line">
+                  <div className="row" style={{ gap: 8, alignItems: 'center' }}>
+                    <span className="chip gold">Certified refurbished</span>
+                    <strong className="grow" style={{ textAlign: 'right', fontSize: '1.1rem' }}>{fmtMoney(refurb.price)}</strong>
+                  </div>
+                  <p className="tiny muted" style={{ margin: '4px 0 0' }}>
+                    {refurb.storeName}{refurb.title ? ` · ${refurb.title}` : ''} · {seenLabel(refurb)}
+                    {refurb.url && <> · <a href={refurb.url} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block', minHeight: 44, lineHeight: '44px' }}>{linkHost(refurb.url)} ↗</a></>}
+                  </p>
+                </div>
+              ) : item.pricesCheckedAt ? (
+                <p className="tiny muted" style={{ marginBottom: 8 }}>No certified refurbished listing from a maker or major retailer turned up in the last lookup.</p>
+              ) : null)}
+              {isTech && <h4 className="tiny muted" style={{ margin: '8px 0 4px', textTransform: 'uppercase', letterSpacing: '.04em' }}>New</h4>}
               <div className="price-list">
                 {links.filter((l) => l.id !== 'any').map((l) => {
                   const seen = real(item.seenPrices?.[l.id]);

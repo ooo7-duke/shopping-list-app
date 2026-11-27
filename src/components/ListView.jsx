@@ -124,9 +124,38 @@ export default function ListView() {
   };
   const shown = activeFilter.size ? onList.filter((it) => activeFilter.has(typeInfo.map.get(it.id))) : onList;
 
+  const groupKey = (it) => (groupBy === 'store' ? it.store || 'Anywhere' : typeInfo.map.get(it.id) || 'Other');
+
+  // Tapping "already on the list" under the add box brings that item into view: its type filter and
+  // folded group are opened, then the row is scrolled to the middle of the screen and lit up briefly.
+  const [jump, setJump] = useState(null);
+  const jumpTo = (it) => {
+    if (it.status !== 'ordered') {
+      if (activeFilter.size && !activeFilter.has(typeInfo.map.get(it.id))) saveFilter(new Set());
+      const id = foldId(groupKey(it));
+      if (folded.has(id)) { const next = new Set(folded); next.delete(id); saveFolded(next); }
+    }
+    setJump({ id: it.id, at: Date.now() });
+  };
+  useEffect(() => {
+    if (!jump) return undefined;
+    let timer;
+    const frame = requestAnimationFrame(() => {
+      const el = document.querySelector(`.item[data-item-id="${CSS.escape(jump.id)}"]`);
+      if (!el) return;
+      const still = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+      el.scrollIntoView({ block: 'center', behavior: still ? 'auto' : 'smooth' });
+      el.classList.remove('jump-hl');
+      void el.offsetWidth; // restart the glow if the same row is tapped twice
+      el.classList.add('jump-hl');
+      timer = setTimeout(() => el.classList.remove('jump-hl'), 2400);
+    });
+    return () => { cancelAnimationFrame(frame); clearTimeout(timer); };
+  }, [jump]);
+
   const groups = useMemo(() => {
     const m = new Map();
-    const key = (it) => (groupBy === 'store' ? it.store || 'Anywhere' : typeInfo.map.get(it.id) || 'Other');
+    const key = groupKey;
     for (const it of shown) {
       const k = key(it);
       if (!m.has(k)) m.set(k, []);
@@ -161,7 +190,7 @@ export default function ListView() {
 
   return (
     <>
-      <QuickAdd />
+      <QuickAdd onJump={jumpTo} />
 
       {editor && suggestions.length > 0 && (
         <section aria-labelledby="sug-h">

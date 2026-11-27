@@ -41,7 +41,8 @@ export function matchKind(newName, oldName) {
   if (short.some((w) => w.length >= 3) && long.length - short.length <= 2 && short.every((w) => long.includes(w))) return 'close';
   const ja = wa.join('');
   const jb = wb.join('');
-  if (ja.length >= 5 && jb.length >= 5 && closeSpelling(ja, jb)) return 'close';
+  // A typo, not a different word: long enough, and the same first two letters ("bananna", not "toffee" for "coffee").
+  if (ja.length >= 6 && jb.length >= 6 && ja.slice(0, 2) === jb.slice(0, 2) && closeSpelling(ja, jb)) return 'close';
   return null;
 }
 

@@ -370,6 +370,9 @@ describe('duplicate check', () => {
     expect(matchKind('eggs', 'eggplant')).toBe(null);
     expect(matchKind('ink', 'pink')).toBe(null);
     expect(matchKind('Canon PG-240XL ink', 'Canon CL-241XL ink')).toBe(null);
+    expect(matchKind('coffee', 'toffee')).toBe(null);
+    expect(matchKind('pasta', 'paste')).toBe(null);
+    expect(matchKind('butter', 'batter')).toBe(null);
   });
   it('checks the list and the entries themselves', () => {
     const list = [{ id: '1', name: 'Milk' }];
@@ -448,5 +451,37 @@ describe('remembered stores', () => {
     const prev = [{ name: 'H-Mart', type: 'other' }, { name: 'Giant', type: 'grocery' }];
     const rows = [{ name: 'Lidl', type: 'grocery' }, { name: 'giant', type: 'grocery' }, { name: '', type: 'walmart' }];
     expect(rememberStoreKinds(prev, rows).map((k) => k.name)).toEqual(['Lidl', 'giant', 'H-Mart']);
+  });
+});
+
+import { refurbQuote, isCertifiedRefurb } from './storeMatch.js';
+import { refurbPrice } from './prices.js';
+describe('certified refurbished prices', () => {
+  const results = [
+    { title: 'Apple AirPods Pro 2 (Renewed Premium)', source: 'Amazon.com', extracted_price: 169.99, link: 'https://www.amazon.com/dp/x' },
+    { title: 'Apple AirPods Pro 2 - Open Box', source: 'Best Buy', extracted_price: 150, link: 'https://www.bestbuy.com/x' },
+    { title: 'Apple AirPods Pro 2 Refurbished', source: 'Gadget Bargains LLC', extracted_price: 120, link: 'https://gadgetbargains.example/x' },
+    { title: 'Apple AirPods Pro 2 used good condition', source: 'Walmart', extracted_price: 110, link: 'https://www.walmart.com/x' },
+    { title: 'Apple AirPods Pro 2', source: 'Target', extracted_price: 199.99, link: 'https://www.target.com/x' },
+  ];
+  it('counts only certified programs from makers or major retailers', () => {
+    expect(isCertifiedRefurb(results[0])).toBe(true);
+    expect(isCertifiedRefurb(results[1])).toBe(false); // open box
+    expect(isCertifiedRefurb(results[2])).toBe(false); // unknown seller
+    expect(isCertifiedRefurb(results[3])).toBe(false); // used
+    expect(isCertifiedRefurb(results[4])).toBe(false); // new
+  });
+  it('picks the refurbished quote and keeps it out of the new prices', () => {
+    const q = refurbQuote(results, 'AirPods Pro 2');
+    expect(q).toMatchObject({ storeId: 'refurb', price: 169.99, condition: 'Certified refurbished' });
+    const quotes = pickQuotes(results, 'AirPods Pro 2');
+    expect(quotes.find((x) => x.storeId === 'refurb')?.price).toBe(169.99);
+    expect(quotes.find((x) => x.storeId === 'target')?.price).toBe(199.99);
+  });
+  it('stores the refurbished price beside the new ones', () => {
+    const now = Date.now();
+    const item = { seenPrices: mergeQuotes({}, pickQuotes(results, 'AirPods Pro 2'), now) };
+    expect(refurbPrice(item, now)).toMatchObject({ price: 169.99 });
+    expect(seenPrices(item).best.price).toBe(199.99);
   });
 });
