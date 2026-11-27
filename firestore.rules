@@ -31,9 +31,20 @@ service cloud.firestore {
         || (signedIn() && resource.data.members[request.auth.uid].role in ['editor', 'requester']
           && changed().hasOnly(['settings']))
         // Accepting an invite: add yourself, with exactly the invited role.
-        || joining(accountId);
+        || joining(accountId)
+        // Leaving a list (also part of deleting your account): remove yourself and nothing else.
+        || leaving();
 
       allow delete: if signedIn() && resource.data.members[request.auth.uid].role == 'owner';
+
+      function leaving() {
+        return signedIn()
+          && request.auth.uid in resource.data.memberUids
+          && changed().hasOnly(['members', 'memberUids'])
+          && request.resource.data.memberUids.toSet() == resource.data.memberUids.toSet().difference([request.auth.uid].toSet())
+          && request.resource.data.members.diff(resource.data.members).affectedKeys().hasOnly([request.auth.uid])
+          && !(request.auth.uid in request.resource.data.members);
+      }
 
       function joining(accountId) {
         let invite = get(/databases/$(database)/documents/invites/$(request.resource.data.lastInvite)).data;

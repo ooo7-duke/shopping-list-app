@@ -2,12 +2,12 @@
 import { initializeApp } from 'firebase/app';
 import {
   getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult,
-  onAuthStateChanged, signOut as fbSignOut,
+  onAuthStateChanged, signOut as fbSignOut, deleteUser, reauthenticateWithPopup,
 } from 'firebase/auth';
 import {
   initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
   collection, doc, addDoc, updateDoc, deleteDoc, getDoc, onSnapshot, query, where,
-  orderBy, limit, writeBatch, deleteField, arrayUnion,
+  orderBy, limit, writeBatch, deleteField, arrayUnion, getDocs,
 } from 'firebase/firestore';
 import { initializeAppCheck, ReCaptchaV3Provider } from 'firebase/app-check';
 import { firebaseConfig, RECAPTCHA_SITE_KEY } from '../lib/config.js';
@@ -170,3 +170,52 @@ export async function acceptInvite(invite, user) {
 }
 
 export const cancelInvite = (inviteId) => deleteDoc(doc(db, 'invites', inviteId));
+
+// Deletes the signed-in person's account, as the app stores require. For each list:
+// - if they are its only member, every item, purchase, receipt and photo in it is deleted,
+//   then the list itself;
+// - otherwise they leave it and the others keep it. If they were its only owner, the next
+//   member becomes owner first, so the list is never left with nobody to manage it.
+// Then their invites (sent and received) go, and finally their sign-in itself.
+const SUBCOLLECTIONS = ['items', 'batches', 'purchases', 'receipts', 'receiptImages'];
+
+async function wipeList(accountId) {
+  for (const coll of SUBCOLLECTIONS) {
+    const snap = await getDocs(collection(db, 'accounts', accountId, coll));
+    for (let i = 0; i < snap.docs.length; i += 400) {
+      const batch = writeBatch(db);
+      snap.docs.slice(i, i + 400).forEach((d) => batch.delete(d.ref));
+      await batch.commit();
+    }
+  }
+  await deleteDoc(doc(db, 'accounts', accountId));
+}
+
+export async function deleteMyAccount(user, accounts) {
+  init();
+  const me = user.uid;
+  for (const a of accounts) {
+    const others = a.memberUids.filter((u) => u !== me);
+    if (!others.length) { await wipeList(a.id); continue; }
+    const otherOwner = others.some((u) => a.members?.[u]?.role === 'owner');
+    if (a.members?.[me]?.role === 'owner' && !otherOwner) {
+      const next = others[0];
+      await updateDoc(doc(db, 'accounts', a.id), { [`members.${next}.role`]: 'owner' });
+    }
+    await updateDoc(doc(db, 'accounts', a.id), { [`members.${me}`]: deleteField(), memberUids: others });
+  }
+  const sent = await getDocs(query(collection(db, 'invites'), where('invitedByUid', '==', me)));
+  const received = user.email ? await getDocs(query(collection(db, 'invites'), where('email', '==', user.email))) : { docs: [] };
+  await Promise.all([...sent.docs, ...received.docs].map((d) => deleteDoc(d.ref)));
+  try { localStorage.removeItem('sla-active-account'); } catch { /* storage unavailable */ }
+  try {
+    await deleteUser(auth.currentUser);
+  } catch (e) {
+    if (e?.code !== 'auth/requires-recent-login') throw e;
+    // Firebase only deletes a sign-in made in the last few minutes, so confirm with Google once more.
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' });
+    await reauthenticateWithPopup(auth.currentUser, provider);
+    await deleteUser(auth.currentUser);
+  }
+}
