@@ -351,3 +351,12 @@ table.data td.num, table.data th.num { text-align: right; }
 .saved-stores { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; color: var(--bb-ink); }
 .saved-stores .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
 .saved-stores .chip span { margin-left: 4px; font-weight: 700; }
+
+.refurb-line { border: 1px solid var(--line, rgba(0,0,0,.12)); border-radius: 12px; padding: 10px 12px; margin-bottom: 4px; background: var(--card); }
+
+/* A name under the add box that takes you to the item on the list. */
+.onlist-jump { background: none; border: 0; padding: 6px 0; margin: -6px 0; font: inherit; font-weight: 700; color: inherit; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.onlist-jump:focus-visible { outline: 2px solid var(--bb); outline-offset: 2px; border-radius: 4px; }
+.item.jump-hl { animation: jump-hl 2.4s ease-out; }
+@keyframes jump-hl { 0%, 35% { background: var(--gold-soft); box-shadow: inset 4px 0 0 var(--bb); } 100% { background: transparent; box-shadow: inset 0 0 0 transparent; } }
+@media (prefers-reduced-motion: reduce) { .item.jump-hl { animation: none; background: var(--gold-soft); box-shadow: inset 4px 0 0 var(--bb); } }

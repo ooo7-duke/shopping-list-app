@@ -112,6 +112,17 @@ function seed() {
   d.items[rq] = { id: rq, name: 'Sticky notes', category: 'Office & stationery', store: 'Amazon', qty: 1, unit: 'pack', status: 'needed', addedAt: now - 3600e3, addedBy: 'demo-spouse', addedByName: 'Spouse', cadence: { mode: 'auto' } };
   // A couple of prices someone checked, so the price comparison shows.
   const towels = Object.values(d.items).find((i) => i.name === 'Paper towels');
+  const buds = uid();
+  d.items[buds] = {
+    id: buds, name: 'Apple AirPods Pro 2', category: 'Household', store: '', qty: 1, unit: '', status: 'needed', lastPrice: null,
+    addedAt: now - 2 * DAY, addedBy: 'demo-user', addedByName: 'Demo user', cadence: { mode: 'off' }, pricesCheckedAt: now - 3600e3,
+    seenPrices: {
+      refurb: { price: 169.99, at: now - 3600e3, by: 'auto', storeName: 'Amazon', condition: 'Certified refurbished', title: 'Apple AirPods Pro 2 (Renewed Premium)' },
+      amazon: { price: 199.0, at: now - 3600e3, by: 'auto', storeName: 'Amazon' },
+      walmart: { price: 199.0, at: now - 3600e3, by: 'auto', storeName: 'Walmart' },
+      target: { price: 199.99, at: now - 3600e3, by: 'auto', storeName: 'Target' },
+    },
+  };
   if (towels) towels.seenPrices = { samsclub: { price: 22.98, at: now - 2 * DAY, by: 'Demo user' }, amazon: { price: 27.49, at: now - 2 * DAY, by: 'Demo user' }, walmart: { price: 24.97, at: now - 2 * DAY, by: 'Demo user' } };
   return s;
 }

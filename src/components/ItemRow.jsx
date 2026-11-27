@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { describePrediction } from '../lib/predict.js';
 import { fmtMoney, fmtQty, fmtDate } from '../lib/format.js';
-import { seenPrices } from '../lib/prices.js';
+import { seenPrices, refurbPrice } from '../lib/prices.js';
+import { deptOf } from '../lib/tripPlan.js';
 import { ClockIcon, TrashIcon } from './Icons.jsx';
 
 export default function ItemRow({ item, pred, done, last, showHistory = false, onPrices, showStore = true, showCategory = false, onToggle, onOpen, onSnooze, onRemove, readOnly, extra }) {
@@ -13,6 +14,7 @@ export default function ItemRow({ item, pred, done, last, showHistory = false, o
   const price = item.lastPrice != null ? Number(item.lastPrice) : null;
   const total = price != null && Number(item.qty) > 1 ? price * Number(item.qty) : null;
   const { best } = seenPrices(item);
+  const refurb = item.seenPrices?.refurb && deptOf(item) === 'electronics' ? refurbPrice(item) : null;
   const lastParts = last ? [
     fmtDate(last.at),
     last.qty != null ? fmtQty(last.qty, last.unit) || '1' : '',
@@ -28,7 +30,7 @@ export default function ItemRow({ item, pred, done, last, showHistory = false, o
   };
 
   return (
-    <div className={`item${done ? ' done' : ''}`} onClick={onOpen} onKeyDown={onKeyDown} tabIndex={0} role="group" aria-label={`${item.name}${qty ? `, ${qty}` : ''}${done ? ', bought' : ''}`}>
+    <div className={`item${done ? ' done' : ''}`} data-item-id={done ? undefined : item.id} onClick={onOpen} onKeyDown={onKeyDown} tabIndex={0} role="group" aria-label={`${item.name}${qty ? `, ${qty}` : ''}${done ? ', bought' : ''}`}>
       <button
         type="button" className={`check${done ? ' on' : ''}`} onClick={(e) => { e.stopPropagation(); onToggle?.(); }}
         aria-label={done ? `Put ${item.name} back on the list` : `Mark ${item.name} as bought`} disabled={readOnly} style={readOnly ? { visibility: 'hidden' } : undefined}
@@ -45,6 +47,7 @@ export default function ItemRow({ item, pred, done, last, showHistory = false, o
         <div className="meta">
           {item.urgent && !done && <span className="chip warn">Needed now</span>}
           {item.status === 'ordered' && <span className="chip blue">Ordered</span>}
+          {refurb && !done && <span className="chip gold">Refurbished {fmtMoney(refurb.price)}</span>}
           {showStore && item.store && <span>{item.store}</span>}
           {showCategory && item.category && <span>{item.category}</span>}
           {predText && !done && <span className={overdue ? 'chip warn' : ''}>{predText}</span>}

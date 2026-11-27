@@ -51,7 +51,7 @@ export function linkHost(u) {
 
 // Knock-offs undercut the real thing, so they'd always win "cheapest". Skip them unless
 // the item's own name asks for one.
-const KNOCKOFF = /\b(compatible|remanufactured|refurbished|replacement for|refill|generic|for use with|used)\b/i;
+const KNOCKOFF = /\b(compatible|remanufactured|refurbished|renewed|restored|open[\s-]?box|pre-?owned|replacement for|refill|generic|for use with|used)\b/i;
 
 // Words with a digit in them, like "240XL" or "12oz", identify the exact product.
 // A result has to contain every one of them.
@@ -59,10 +59,41 @@ function modelTokens(query = '') {
   return query.toLowerCase().split(/[^a-z0-9]+/).filter((t) => /\d/.test(t) && t.length >= 2);
 }
 
-export function fitsQuery(title = '', query = '') {
+function hasModel(title = '', query = '') {
   const t = title.toLowerCase().replace(/[^a-z0-9]+/g, ' ');
-  if (KNOCKOFF.test(title) && !KNOCKOFF.test(query)) return false;
   return modelTokens(query).every((tok) => t.includes(tok) || t.replace(/ /g, '').includes(tok));
+}
+
+export function fitsQuery(title = '', query = '') {
+  if (KNOCKOFF.test(title) && !KNOCKOFF.test(query)) return false;
+  return hasModel(title, query);
+}
+
+// Certified refurbished: a maker's or a big retailer's own refurbished program (Amazon Renewed,
+// Walmart Restored, Best Buy, Apple, Dell and the like). Open-box, used or pre-owned listings,
+// and refurbished items from other sellers, don't count.
+const REFURB = /\b(certified\s+refurbished|refurbished|renewed(\s+premium)?|restored|re-?newed)\b/i;
+const NOT_REFURB = /\b(open[\s-]?box|pre-?owned|used|for\s+parts|as[\s-]is|remanufactured|compatible)\b/i;
+const REFURB_SELLER = /amazon|walmart|best\s*buy|target|costco|sam'?s\s*club|apple|dell\b|\bhp\b|lenovo|samsung|microsoft|bose|sony|logitech/i;
+
+export function isCertifiedRefurb(r = {}) {
+  const text = [r.second_hand_condition, r.title, ...(Array.isArray(r.extensions) ? r.extensions : [])].filter(Boolean).join(' ');
+  return REFURB.test(text) && !NOT_REFURB.test(text) && REFURB_SELLER.test(String(r.source || ''));
+}
+
+// The cheapest certified refurbished listing that is the same product, as storeId 'refurb'.
+export function refurbQuote(results = [], query = '') {
+  let best = null;
+  for (const r of results) {
+    if (!isCertifiedRefurb(r) || !hasModel(String(r.title || ''), query)) continue;
+    const price = priceOf(r);
+    if (price == null || !(price > 0)) continue;
+    const storeName = String(r.source || '').slice(0, 60);
+    if (isBlockedSeller(storeName, r.link)) continue;
+    const q = { storeId: 'refurb', storeName, price: Math.round(price * 100) / 100, title: String(r.title || '').slice(0, 140), url: directUrl(r), condition: 'Certified refurbished' };
+    if (!best || q.price < best.price) best = q;
+  }
+  return best;
 }
 
 // Returns [{ storeId, storeName, price, title, url }]: the cheapest matching result at each
@@ -80,5 +111,6 @@ export function pickQuotes(results = [], query = '') {
     const q = { storeId, storeName, price: Math.round(price * 100) / 100, title: String(r.title || '').slice(0, 140), url: directUrl(r) };
     if (!best[storeId] || q.price < best[storeId].price) best[storeId] = q;
   }
-  return Object.values(best);
+  const refurb = refurbQuote(results, query);
+  return refurb ? [...Object.values(best), refurb] : Object.values(best);
 }

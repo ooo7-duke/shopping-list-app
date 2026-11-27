@@ -12,7 +12,7 @@ import { DEMO_MODE } from '../lib/config.js';
 
 const SpeechRec = typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition);
 
-export default function QuickAdd() {
+export default function QuickAdd({ onJump }) {
   const { ctx, items, showToast } = useApp();
   const [text, setText] = useState('');
   const [sel, setSel] = useState(-1);
@@ -23,7 +23,16 @@ export default function QuickAdd() {
 
   const parsed = useMemo(() => parseQuickAdd(text), [text]);
   const first = parsed[0];
-  const onList = useMemo(() => items.filter(isOnList), [items]);
+  // Items this device just added are left out of the checks for a few seconds. The list updates the
+  // moment an item is saved, and a phone keyboard can put the typed word back in the box right after
+  // Add (Android does this when Enter is pressed mid-word), which would then read as a duplicate.
+  const justAdded = useRef({ ids: new Set(), names: new Set(), at: 0 });
+  const [tick, refresh] = useState(0);
+  const fresh = () => Date.now() - justAdded.current.at < 4000;
+  const onList = useMemo(
+    () => items.filter((it) => isOnList(it) && !(fresh() && justAdded.current.ids.has(it.id))),
+    [items, text, tick], // eslint-disable-line react-hooks/exhaustive-deps
+  );
   // Shown live while typing, and again (with buttons) if Add is pressed anyway.
   const liveDupes = useMemo(() => findDuplicates(parsed, onList), [parsed, onList]);
   const dupes = pending ? pending.dupes : liveDupes;
@@ -107,6 +116,8 @@ export default function QuickAdd() {
       return false;
     }
     const { added, undo } = result;
+    justAdded.current = { ids: new Set(added.map((a) => a.id)), names: new Set(entries.map((e) => normalizeName(e.name))), at: Date.now() };
+    setTimeout(() => refresh((x) => x + 1), 4100);
     // Prices are looked up only when someone taps Look up prices on the item, to save searches.
     const names = added.map((a) => a.name);
     showToast(label || `Added ${names.length > 3 ? `${names.slice(0, 3).join(', ')} and ${names.length - 3} more` : names.join(', ')}`, undo);
@@ -118,7 +129,9 @@ export default function QuickAdd() {
   // text still in the box would then flash "already on your list" for the item just added.
   // If the save fails, the typed text comes back.
   async function tryAdd(entries, { clear = false } = {}) {
-    const found = findDuplicates(entries, onList);
+    // Only an exact match holds the add. A look-alike ("milk" and "almond milk") is shown while
+    // typing but never stops the add, since it is often a different item.
+    const found = findDuplicates(entries, onList).filter((d) => d.kind === 'same');
     if (found.length) { setPending({ entries, dupes: found }); return false; }
     const typed = text;
     if (clear) { setText(''); setSel(-1); }
@@ -154,6 +167,17 @@ export default function QuickAdd() {
     setSel(-1);
     await tryAdd(entries, { clear: true });
   }
+
+  // Tap a match under the box to go to that item on the list. The box is cleared and the keyboard
+  // put away, so the list has the screen.
+  function jumpTo(it) {
+    setText(''); setSel(-1); setPending(null);
+    inputRef.current?.blur();
+    onJump?.(it);
+  }
+  const jumpBtn = (it, label) => (onJump ? (
+    <button type="button" className="onlist-jump" onClick={() => jumpTo(it)} aria-label={`Show ${it.name} on the list`}>{label}</button>
+  ) : label);
 
   async function pickSuggestion(it) {
     const head = text.split(/[,\n]/).slice(0, -1).join(',');
@@ -217,7 +241,12 @@ export default function QuickAdd() {
         <input
           id="qa" ref={inputRef} value={text} autoComplete="off" enterKeyHint="done"
           placeholder="Add an item"
-          onChange={(e) => { setText(e.target.value); setSel(-1); setPending(null); }}
+          onChange={(e) => {
+            const v = e.target.value;
+            // A keyboard putting back the word that was just added: keep the box empty.
+            if (fresh() && !text && justAdded.current.names.has(normalizeName(v))) return;
+            setText(v); setSel(-1); setPending(null);
+          }}
           onKeyDown={onKeyDown} onPaste={onPaste}
           aria-autocomplete="list" aria-controls="qa-suggest"
         />
@@ -232,8 +261,8 @@ export default function QuickAdd() {
       </form>
       {!pending && (liveDupes.length > 0 || typedMatches.length > 0) && (
         <div className="onlist-note" role="status" aria-live="polite">
-          {liveDupes.map((d, i) => <p key={`d${i}`}>{dupeLine(d)}</p>)}
-          {typedMatches.length > 0 && <p>{matchesLine(typedMatches, liveDupes.length > 0)}</p>}
+          {liveDupes.map((d, i) => <p key={`d${i}`}>{dupeLine(d, jumpBtn)}</p>)}
+          {typedMatches.length > 0 && <p>{matchesLine(typedMatches, liveDupes.length > 0, jumpBtn)}</p>}
         </div>
       )}
       {pending && dupes.length > 0 && (
@@ -241,7 +270,7 @@ export default function QuickAdd() {
           <strong>{dupes.length === 1 ? 'This may be a duplicate.' : `${dupes.length} of these may be duplicates.`}</strong>
           <ul>
             {dupes.map((d, i) => (
-              <li key={i}>{dupeLine(d)}</li>
+              <li key={i}>{dupeLine(d, jumpBtn)}</li>
             ))}
           </ul>
           {pending && (
@@ -282,14 +311,23 @@ function withDetail(item) {
   return `${item.name}${detail ? ` (${detail})` : ''}`;
 }
 
-function matchesLine(found, also) {
-  if (found.length === 1) return `${also ? 'Also on the list: ' : ''}${withDetail(found[0])}${also ? '.' : ' is on the list.'}`;
-  const names = found.map((it) => it.name);
-  return `${also ? 'Also on the list' : 'On the list'}: ${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}.`;
+function matchesLine(found, also, link) {
+  if (found.length === 1) return <>{also ? 'Also on the list: ' : ''}{link(found[0], withDetail(found[0]))}{also ? '.' : ' is on the list.'}</>;
+  return (
+    <>
+      {also ? 'Also on the list' : 'On the list'}:{' '}
+      {found.map((it, i) => (
+        <span key={it.id}>{i > 0 && (i === found.length - 1 ? ' and ' : ', ')}{link(it, it.name)}</span>
+      ))}.
+    </>
+  );
 }
 
-function dupeLine({ entry, match, kind, onList }) {
+function dupeLine({ entry, match, kind, onList }, link) {
   if (!onList) return `${entry.name} is in this entry twice.`;
-  const where = withDetail(match);
-  return kind === 'same' ? `${where} is already on your list.` : `${entry.name} looks like ${where}, already on your list.`;
+  const where = link(match, withDetail(match));
+  const state = match.status === 'ordered' ? 'already ordered' : 'already on your list';
+  return kind === 'same'
+    ? <>{where} is {state}.</>
+    : <>Similar item {match.status === 'ordered' ? 'ordered' : 'on the list'}: {where}.</>;
 }

@@ -42,7 +42,7 @@ const KEYWORDS = {
   'Office & stationery': ['pen', 'pencil', 'stapler', 'staple', 'sticky note', 'post-it', 'folder', 'binder', 'notebook', 'envelope', 'tape', 'marker', 'highlighter', 'clip', 'label', 'scissors'],
   'Printing': ['toner', 'ink', 'printer paper', 'copy paper', 'ream', 'cartridge'],
   'Kitchen & breakroom': ['cups', 'plates', 'utensil', 'fork', 'spoon', 'foil', 'plastic wrap', 'ziploc', 'filter'],
-  'Tech & electronics': ['battery', 'batteries', 'cable', 'charger', 'usb', 'mouse', 'keyboard', 'hdmi', 'headphone'],
+  'Tech & electronics': ['battery', 'batteries', 'cable', 'charger', 'usb', 'mouse', 'keyboard', 'hdmi', 'headphone', 'earbud', 'airpods', 'laptop', 'chromebook', 'macbook', 'tablet', 'ipad', 'iphone', 'smartphone', 'phone', 'monitor', 'tv', 'television', 'camera', 'webcam', 'speaker', 'soundbar', 'router', 'smartwatch', 'apple watch', 'kindle', 'console', 'playstation', 'xbox', 'nintendo', 'ssd', 'hard drive'],
   'Safety & first aid': ['first aid', 'gloves', 'mask', 'sanitizer'],
   'Mailing & shipping': ['stamp', 'box', 'mailer', 'bubble wrap', 'shipping'],
 };
