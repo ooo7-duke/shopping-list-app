@@ -9,6 +9,7 @@ export const ReceiptIcon = I(<><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z" /><path d=
 export const ChartIcon = I(<><path d="M4 20V10M10 20V4M16 20v-7M21 20H3" /></>);
 export const MicIcon = I(<><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0014 0M12 18v3" /></>);
 export const PlusIcon = I(<path d="M12 5v14M5 12h14" />);
+export const MenuIcon = I(<path d="M4 5h16M4 10h16M4 15h16M4 20h16" />);
 export const ChevronDown = I(<path d="M6 9l6 6 6-6" />);
 export const ClockIcon = I(<><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>);
 export const TrashIcon = I(<><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" /></>);
