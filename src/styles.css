@@ -175,8 +175,8 @@ label.field > span { display: block; font-size: 0.85rem; color: var(--muted); ma
   .item:hover .hover-actions { display: flex; }
   .item:hover .price { display: none; }
 }
-.suggest-strip { display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 8px; scrollbar-width: thin; }
-.suggest-strip .chip { flex: none; }
+.suggest-strip { display: flex; flex-wrap: wrap; gap: 8px; padding: 2px 2px 8px; }
+.suggest-strip .chip { flex: none; max-width: 100%; white-space: normal; text-align: left; }
 .empty { text-align: center; padding: 32px 16px; color: var(--muted); }
 .empty h2 { margin-bottom: 6px; }
 .seg { display: inline-flex; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 3px; }

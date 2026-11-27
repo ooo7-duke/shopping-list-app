@@ -11,6 +11,7 @@ import { can } from '../lib/config.js';
 import { fmtMoney } from '../lib/format.js';
 
 const GROUP_KEY = 'sla-group-by';
+const LOW_LIMIT = 6; // chips shown before "Show all"
 
 export default function ListView() {
   const { ctx, items, purchases, predictions, role, account, showToast, backend } = useApp();
@@ -20,6 +21,7 @@ export default function ListView() {
   const latest = useMemo(() => lastPurchaseMap(purchases), [purchases]);
   const open = (id, focus = null) => { setOpenId(id); setOpenFocus(focus); };
   const [showSnoozed, setShowSnoozed] = useState(false);
+  const [showAllLow, setShowAllLow] = useState(false);
   const editor = can(role, 'edit');
   const now = Date.now();
   const lookahead = account?.settings?.lookaheadDays ?? 10;
@@ -78,11 +80,16 @@ export default function ListView() {
         <section aria-labelledby="sug-h">
           <div className="section-h"><h2 id="sug-h">Running low soon</h2><span className="small muted">tap to add</span></div>
           <div className="suggest-strip">
-            {suggestions.map(({ it, p }) => (
+            {(showAllLow ? suggestions : suggestions.slice(0, LOW_LIMIT)).map(({ it, p }) => (
               <button key={it.id} type="button" className={`chip${p.daysLeft < 1 ? ' gold' : ''}`} onClick={() => doAdd(it)} title={`Usually every ${Math.round(p.intervalDays)} days`}>
                 + {it.name} · {describePrediction(p).replace('Due ', '')}
               </button>
             ))}
+            {suggestions.length > LOW_LIMIT && (
+              <button type="button" className="chip blue" onClick={() => setShowAllLow((v) => !v)} aria-expanded={showAllLow}>
+                {showAllLow ? 'Show fewer' : `Show all ${suggestions.length}`}
+              </button>
+            )}
           </div>
         </section>
       )}

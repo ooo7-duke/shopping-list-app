@@ -116,11 +116,14 @@ export default function InsightsView() {
       return new Date(d.getFullYear(), d.getMonth(), 1).getTime();
     };
     for (const p of filtered) m.set(keyOf(p.purchasedAt), (m.get(keyOf(p.purchasedAt)) || 0) + (Number(p.total) || 0));
-    const keys = [...m.keys()].sort((a, b) => a - b);
+    // Newest first, so the latest week or month is the left-most bar.
+    const keys = [...m.keys()].sort((a, b) => b - a);
+    const current = keyOf(Date.now());
     return {
-      labels: keys.map((k) => (weekly ? fmtDate(k) : new Date(k).toLocaleDateString('en-US', { month: 'short', year: '2-digit' }))),
+      labels: keys.map((k) => (k === current ? (weekly ? 'This week' : 'This month') : weekly ? fmtDate(k) : new Date(k).toLocaleDateString('en-US', { month: 'short', year: '2-digit' }))),
       data: keys.map((k) => Math.round(m.get(k) * 100) / 100),
       title: weekly ? 'Spending by week' : 'Spending by month',
+      note: weekly ? 'Newest week on the left. Each bar starts on a Sunday.' : 'Newest month on the left.',
     };
   }, [filtered, start, end]);
 
@@ -200,7 +203,7 @@ export default function InsightsView() {
       ) : (
         <>
           <div className="charts">
-            <div className="card"><h2 style={{ marginBottom: 8 }}>{overTime.title}</h2><div className="chart-box"><BarChart labels={overTime.labels} data={overTime.data} label={overTime.title} /></div></div>
+            <div className="card"><h2 style={{ marginBottom: 2 }}>{overTime.title}</h2><p className="tiny muted" style={{ marginBottom: 8 }}>{overTime.note}</p><div className="chart-box"><BarChart labels={overTime.labels} data={overTime.data} label={overTime.title} /></div></div>
             <div className="card"><h2 style={{ marginBottom: 8 }}>By category</h2><div className="chart-box"><BarChart horizontal labels={byCat.map((x) => x[0])} data={byCat.map((x) => Math.round(x[1] * 100) / 100)} label="Spending by category" /></div></div>
             <div className="card"><h2 style={{ marginBottom: 8 }}>Top items</h2><div className="chart-box"><BarChart horizontal color={GOLD} labels={byItem.map((x) => x[0])} data={byItem.map((x) => Math.round(x[1] * 100) / 100)} label="Top items by spending" /></div></div>
             <div className="card"><h2 style={{ marginBottom: 8 }}>By store</h2><div className="chart-box"><BarChart labels={byStore.map((x) => x[0])} data={byStore.map((x) => Math.round(x[1] * 100) / 100)} label="Spending by store" /></div></div>
