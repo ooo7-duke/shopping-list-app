@@ -333,7 +333,7 @@ describe('theme groups', () => {
   });
 });
 
-import { matchKind, findDuplicates } from './dupes.js';
+import { matchKind, findDuplicates, listMatches } from './dupes.js';
 
 describe('duplicate check', () => {
   it('sees the same item in another spelling or plural', () => {
@@ -355,6 +355,15 @@ describe('duplicate check', () => {
     const list = [{ id: '1', name: 'Milk' }];
     const d = findDuplicates([{ name: 'milk' }, { name: 'bread' }, { name: 'Bread' }], list);
     expect(d.map((x) => [x.entry.name, x.kind, x.onList])).toEqual([['milk', 'same', true], ['Bread', 'same', false]]);
+  });
+  it('finds list items while the name is still being typed', () => {
+    const list = [{ name: 'Salsa' }, { name: 'Salt' }, { name: 'Sea salt' }, { name: 'Paper towels' }, { name: 'Toilet paper' }];
+    expect(listMatches('sal', list).map((x) => x.name)).toEqual(['Salsa', 'Salt', 'Sea salt']);
+    expect(listMatches('salt', list).map((x) => x.name)).toEqual(['Salt', 'Sea salt']);
+    expect(listMatches('paper', list).map((x) => x.name)).toEqual(['Paper towels', 'Toilet paper']);
+    expect(listMatches('toilet pa', list).map((x) => x.name)).toEqual(['Toilet paper']);
+    expect(listMatches('s', list)).toEqual([]);
+    expect(listMatches('milk', list)).toEqual([]);
   });
 });
 

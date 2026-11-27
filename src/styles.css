@@ -287,6 +287,9 @@ table.data td.num, table.data th.num { text-align: right; }
 /* Duplicate warning under the add box */
 .dupe-banner { margin: 8px 0 4px; padding: 10px 12px; background: #fff1ec; border: 1px solid #f0c2b4; border-left: 4px solid var(--danger); border-radius: var(--radius); color: var(--bb-ink); font-size: 0.92rem; }
 .dupe-banner strong { color: var(--danger); }
+.onlist-note { margin: 8px 0 4px; padding: 8px 12px; background: var(--gold-soft); border: 1px solid var(--line); border-left: 4px solid var(--bb); border-radius: var(--radius); color: var(--bb-ink); font-size: 0.92rem; }
+.onlist-note p { margin: 0; }
+.onlist-note p + p { margin-top: 2px; }
 .dupe-banner ul { margin: 4px 0 0; padding-left: 18px; }
 .dupe-banner .row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
 
