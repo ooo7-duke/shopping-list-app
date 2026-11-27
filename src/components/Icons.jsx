@@ -20,8 +20,8 @@ export const TruckIcon = I(<><path d="M3 6h11v10H3zM14 10h4l3 3v3h-7" /><circle 
 export const DownloadIcon = I(<><path d="M12 4v11M7 10l5 5 5-5M5 20h14" /></>);
 export const LogoMark = (props) => (
   <svg viewBox="0 0 48 48" aria-hidden="true" {...props}>
-    <rect width="48" height="48" rx="12" fill="#243b8f" />
-    <path d="M12 15h3l3.5 15h14l3.5-10H17" fill="none" stroke="#fdf1c9" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-    <circle cx="20" cy="35" r="2.5" fill="#ffc20d" /><circle cx="31" cy="35" r="2.5" fill="#ffc20d" />
+    <rect width="48" height="48" rx="12" style={{ fill: 'var(--bb, #243b8f)' }} />
+    <path d="M12 15h3l3.5 15h14l3.5-10H17" fill="none" style={{ stroke: 'var(--cream, #fdf1c9)' }} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+    <circle cx="20" cy="35" r="2.5" style={{ fill: 'var(--gold, #ffc20d)' }} /><circle cx="31" cy="35" r="2.5" style={{ fill: 'var(--gold, #ffc20d)' }} />
   </svg>
 );

@@ -8,7 +8,7 @@ import { describePrediction } from '../lib/predict.js';
 import { fmtMoney, fmtDate, fmtQty, firstName } from '../lib/format.js';
 import { can } from '../lib/config.js';
 import { CartIcon, TruckIcon } from './Icons.jsx';
-import { planTrips, carries, storeLabel, STORE_TYPES } from '../lib/tripPlan.js';
+import { planTrips, carries, storeLabel, STORE_TYPES, rememberStoreKinds } from '../lib/tripPlan.js';
 
 export default function TripsView() {
   const { ctx, items, batches, predictions, account, role, showToast } = useApp();
@@ -295,18 +295,19 @@ function MoveSheet({ item, stores, saved, onPick, onAddStore, onClose }) {
   return (
     <Sheet title={`Where to buy ${item.name}`} onClose={onClose}>
       <div className="stack">
+        {saved && (
+          <>
+            <button type="button" className="btn block" onClick={onAddStore}>+ Add a store</button>
+            <p className="small muted">A store that isn't here? Add it to your stores first, then move {item.name} to it.</p>
+          </>
+        )}
         {stores.map((st) => (
           <button key={st} type="button" className={`btn block${st === current ? ' primary' : ''}`} onClick={() => onPick(st)} aria-pressed={st === current}>
             {st}{st === current ? ' (now)' : ''}
           </button>
         ))}
         <button type="button" className={`btn block${!current ? ' primary' : ''}`} onClick={() => onPick('')}>Any store{saved ? ', let the app pick' : ''}</button>
-        {saved ? (
-          <>
-            <p className="small muted">A store that isn't here? Add it to your stores first, then move {item.name} to it.</p>
-            <button type="button" className="btn block" onClick={onAddStore}>+ Add a store</button>
-          </>
-        ) : (
+        {!saved && (
           <form className="row" onSubmit={(e) => { e.preventDefault(); if (typed.trim()) onPick(typed.trim()); }}>
             <input className="input grow" value={typed} onChange={(e) => setTyped(e.target.value)} placeholder="Another store, like H-Mart" aria-label="Another store" />
             <button type="submit" className="btn" disabled={!typed.trim()}>Move</button>
@@ -347,41 +348,92 @@ function ShopMode({ store, ids, onClose }) {
 }
 
 // The household's nearby stores, saved once on the account so everyone shares them.
+// New stores go on top. Stores named before are remembered and offered in the Kind of store list.
 function StoresSheet({ onClose }) {
   const { backend, account, showToast } = useApp();
   const [rows, setRows] = useState(() => (account?.settings?.stores || []).map((r) => ({ ...r })));
+  const original = account?.settings?.stores || [];
+  // The saved names: the list kept on the account, or, before there is one, the names of the saved stores.
+  const [kinds, setKinds] = useState(() => (Array.isArray(account?.settings?.storeKinds) ? rememberStoreKinds(account.settings.storeKinds, []) : rememberStoreKinds([], original)));
+  async function forget(j) {
+    const gone = kinds[j];
+    const next = kinds.filter((_, x) => x !== j);
+    setKinds(next);
+    await backend.updateAccount(account.id, { 'settings.storeKinds': next });
+    showToast(`Removed ${gone.name} from your saved stores`);
+  }
   const set = (i, patch) => setRows((r) => r.map((x, j) => (j === i ? { ...x, ...patch } : x)));
-  const addRow = () => setRows((r) => [...r, { id: `s${Date.now().toString(36)}${r.length}`, type: 'walmart', name: '', place: '', miles: '' }]);
+  const addRow = () => setRows((r) => [{ id: `s${Date.now().toString(36)}${r.length}`, type: '', name: '', place: '', miles: '' }, ...r]);
+  const others = STORE_TYPES.filter((t) => t.id !== 'other');
+  // What the Kind of store list shows for a row: a remembered store, a kind, or the prompt.
+  const pickOf = (r) => {
+    if (!r.type) return '';
+    const name = String(r.name || '').trim().toLowerCase();
+    const k = name ? kinds.findIndex((x) => x.type === r.type && x.name.toLowerCase() === name) : -1;
+    return k >= 0 ? `saved:${k}` : r.type;
+  };
+  const pick = (i, value) => {
+    if (value.startsWith('saved:')) { const k = kinds[Number(value.slice(6))]; if (k) set(i, { type: k.type, name: k.name }); return; }
+    set(i, { type: value, ...(value === 'other' ? { name: '' } : {}) });
+  };
   async function save() {
+    if (rows.some((r) => !r.type)) { showToast('Pick a kind for each store, or remove the empty one.'); return; }
     const missing = rows.find((r) => r.type === 'other' && !String(r.name || '').trim());
-    if (missing) { showToast('Type a name for each store you added as Other store.'); return; }
+    if (missing) { showToast('Type a name for each new store you added.'); return; }
     const clean = rows.map((r) => ({ id: r.id, type: r.type, name: String(r.name || '').trim().slice(0, 30), place: String(r.place || '').trim().slice(0, 40), miles: r.miles === '' || r.miles == null ? null : Math.max(0, Math.round(Number(r.miles) * 10) / 10) }));
-    await backend.updateAccount(account.id, { 'settings.stores': clean });
+    // Only stores added or renamed now join the saved names, so a name you removed stays removed.
+    const changed = clean.filter((r) => { const o = original.find((x) => x.id === r.id); return !o || o.name !== r.name || o.type !== r.type; });
+    await backend.updateAccount(account.id, { 'settings.stores': clean, 'settings.storeKinds': rememberStoreKinds(kinds, changed) });
     showToast(clean.length ? `Saved ${clean.length} store${clean.length === 1 ? '' : 's'}` : 'Stores cleared');
     onClose();
   }
   return (
     <Sheet title="Your nearby stores" onClose={onClose}>
-      <p className="small muted" style={{ marginBottom: 10 }}>Add each store you shop at, with its name, the town or street, and roughly how many miles it is from home. The kind of store tells the app what it sells. For a store like H-Mart, pick Grocery store and name it H-Mart so groceries can go there, or pick Other store to get only what you move there yourself.</p>
       <div className="stack">
+        <button type="button" className="btn block" onClick={addRow}>+ Add a store</button>
+        <p className="small muted">Pick the kind of store, then its name, the town or street, and roughly how many miles it is from home. The kind tells the app what it sells. For a store like H-Mart, pick Grocery store and name it H-Mart so groceries can go there, or pick + Add a new store to get only what you move there yourself. Stores you name are remembered for next time.</p>
+        {kinds.length > 0 && (
+          <div className="saved-stores">
+            <p className="small"><strong>Saved store names.</strong> Tap ✕ to remove one you no longer want in the list.</p>
+            <div className="chips">
+              {kinds.map((k, j) => (
+                <button key={`${k.name}${j}`} type="button" className="chip" onClick={() => forget(j)} aria-label={`Remove ${k.name} from saved stores`}>
+                  {k.name} <span aria-hidden="true">✕</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         {rows.map((r, i) => (
-          <div key={r.id} className="card" style={{ background: '#fff' }}>
+          <div key={r.id} className="card" style={{ background: 'var(--card)' }}>
             <label className="field"><span>Kind of store</span>
-              <select className="input" value={r.type} onChange={(e) => set(i, { type: e.target.value })}>
-                {STORE_TYPES.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+              <select className="input" value={pickOf(r)} onChange={(e) => pick(i, e.target.value)}>
+                <option value="" disabled>Select your store or add new ones</option>
+                <option value="other">+ Add a new store (type its name)</option>
+                {kinds.length > 0 && (
+                  <optgroup label="Your stores">
+                    {kinds.map((k, j) => <option key={`${k.name}${j}`} value={`saved:${j}`}>{k.name}</option>)}
+                  </optgroup>
+                )}
+                <optgroup label="Kinds of store">
+                  {others.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </optgroup>
               </select>
             </label>
-            <label className="field"><span>Store name{r.type === 'other' ? '' : ' (optional)'}</span>
-              <input className="input" value={r.name || ''} maxLength={30} placeholder={r.type === 'other' ? 'H-Mart' : r.type === 'grocery' ? 'Giant' : storeLabel({ type: r.type })} onChange={(e) => set(i, { name: e.target.value })} />
-            </label>
-            <div className="grid2">
-              <label className="field"><span>Where</span><input className="input" value={r.place || ''} placeholder="Town or street" onChange={(e) => set(i, { place: e.target.value })} /></label>
-              <label className="field"><span>Miles from home</span><input className="input" inputMode="decimal" value={r.miles ?? ''} placeholder="5" onChange={(e) => set(i, { miles: e.target.value.replace(/[^0-9.]/g, '') })} /></label>
-            </div>
+            {r.type && (
+              <>
+                <label className="field"><span>Store name{r.type === 'other' ? '' : ' (optional)'}</span>
+                  <input className="input" value={r.name || ''} maxLength={30} placeholder={r.type === 'other' ? 'H-Mart' : r.type === 'grocery' ? 'Giant' : storeLabel({ type: r.type })} onChange={(e) => set(i, { name: e.target.value })} />
+                </label>
+                <div className="grid2">
+                  <label className="field"><span>Where</span><input className="input" value={r.place || ''} placeholder="Town or street" onChange={(e) => set(i, { place: e.target.value })} /></label>
+                  <label className="field"><span>Miles from home</span><input className="input" inputMode="decimal" value={r.miles ?? ''} placeholder="5" onChange={(e) => set(i, { miles: e.target.value.replace(/[^0-9.]/g, '') })} /></label>
+                </div>
+              </>
+            )}
             <button type="button" className="chip" style={{ marginTop: 8 }} onClick={() => setRows((x) => x.filter((_, j) => j !== i))}>Remove</button>
           </div>
         ))}
-        <button type="button" className="btn block" onClick={addRow}>+ Add a store</button>
         <button type="button" className="btn primary block" onClick={save}>Save stores</button>
       </div>
     </Sheet>

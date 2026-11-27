@@ -421,3 +421,25 @@ describe('feedback spam checks', () => {
     expect(checkSubmission({ ...base, kind: 'delete', message: '' }, { now }).ok).toBe(true);
   });
 });
+
+import { LOOKS, contrast } from './looks.js';
+import { rememberStoreKinds } from './tripPlan.js';
+
+describe('color looks', () => {
+  it('offers five looks whose text pairs all reach 4.5:1', () => {
+    expect(LOOKS).toHaveLength(5);
+    for (const l of LOOKS) {
+      const v = l.vars;
+      const pairs = [['bb-ink', 'cream'], ['bb-ink', 'card'], ['bb', 'cream'], ['bb', 'card'], ['muted', 'cream'], ['muted', 'card'], ['on-gold', 'gold'], ['gold-ink', 'gold-soft'], ['gold-ink', 'card'], ['cream', 'bb'], ['bb', 'bb-soft'], ['bb-ink', 'bb-soft'], ['bb-ink', 'gold-soft'], ['cream', 'bb-ink']];
+      for (const [a, b] of pairs) expect(contrast(v[a], v[b]), `${l.id} ${a} on ${b}`).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+});
+
+describe('remembered stores', () => {
+  it('puts new names first, keeps each name once and skips blank names', () => {
+    const prev = [{ name: 'H-Mart', type: 'other' }, { name: 'Giant', type: 'grocery' }];
+    const rows = [{ name: 'Lidl', type: 'grocery' }, { name: 'giant', type: 'grocery' }, { name: '', type: 'walmart' }];
+    expect(rememberStoreKinds(prev, rows).map((k) => k.name)).toEqual(['Lidl', 'giant', 'H-Mart']);
+  });
+});

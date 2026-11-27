@@ -4,6 +4,7 @@ import { predictAll } from './lib/predict.js';
 import { can } from './lib/config.js';
 import { saveErrorMessage } from './lib/errors.js';
 import { setPriceAccount } from './lib/prices.js';
+import { applyLook, rememberLookLocal, savedLookLocal, lookById } from './lib/looks.js';
 
 const Ctx = createContext(null);
 export const useApp = () => useContext(Ctx);
@@ -94,11 +95,22 @@ export function AppProvider({ children }) {
   }, []);
   showToastRef.current = showToast;
 
+  // Each person's color look, saved on every list they belong to so it follows them to
+  // other devices, and on this device so it paints before the lists load.
+  const look = lookById((user && account?.settings?.looks?.[user.uid]) || savedLookLocal(user?.uid) || savedLookLocal('last')).id;
+  useEffect(() => { applyLook(look); if (user) rememberLookLocal(user.uid, look); }, [look, user?.uid]);
+  const setLook = useCallback(async (id) => {
+    if (!user) return;
+    applyLook(id);
+    rememberLookLocal(user.uid, id);
+    await Promise.all((accounts || []).map((a) => backend.updateAccount(a.id, { [`settings.looks.${user.uid}`]: id }).catch(() => {})));
+  }, [user, accounts]);
+
   const ctx = useMemo(() => ({ backend, accountId: account?.id, user, role, items, account }), [account, user, role, items]);
 
   const value = {
     backend, user, accounts, account, role, items, purchases, receipts, batches, predictions,
-    switchAccount, invites, joinInvite, ctx, toast, showToast, dismissToast: () => setToast(null),
+    switchAccount, invites, joinInvite, ctx, look, setLook, toast, showToast, dismissToast: () => setToast(null),
   };
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

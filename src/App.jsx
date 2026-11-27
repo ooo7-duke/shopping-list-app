@@ -6,7 +6,7 @@ import ReceiptsView from './components/ReceiptsView.jsx';
 import InsightsView from './components/InsightsView.jsx';
 import AccountSheet from './components/AccountSheet.jsx';
 import { SignIn, Onboarding, InviteBanner } from './components/Welcome.jsx';
-import { LookupMeter, BackToTop } from './components/PageExtras.jsx';
+import { LookupMeter, BackToTop, LookPicker } from './components/PageExtras.jsx';
 import { ListIcon, CartIcon, ReceiptIcon, ChartIcon, ChevronDown, LogoMark, MenuIcon } from './components/Icons.jsx';
 import { isOnList } from './data/actions.js';
 import { can, DEMO_MODE, APP_NAME } from './lib/config.js';
@@ -80,24 +80,23 @@ function Shell() {
         </div>
       </header>
 
-      {menu && (
-        <div className="menu-scrim" onClick={() => setMenu(false)}>
-          <nav id="main-menu" className="menu" aria-label="Main" onClick={(e) => e.stopPropagation()}>
-            <div className="brand"><LogoMark width="30" height="30" /> {APP_NAME}</div>
-            {tabs.map(({ id, label, Icon }) => (
-              <button key={id} type="button" aria-current={current === id ? 'page' : undefined} onClick={() => { go(id); setMenu(false); }}>
-                <Icon />
-                <span>{label}</span>
-                {id === 'list' && listCount > 0 && <span className="badge">{listCount}</span>}
-              </button>
-            ))}
-          </nav>
-        </div>
-      )}
+      {/* On a phone the menu slides in from the hamburger; on a wider screen it stays open on the left. */}
+      {menu && <div className="menu-scrim" onClick={() => setMenu(false)} />}
+      <nav id="main-menu" className={`menu${menu ? ' open' : ''}`} aria-label="Main">
+        <div className="brand"><LogoMark width="30" height="30" /> {APP_NAME}</div>
+        {tabs.map(({ id, label, Icon }) => (
+          <button key={id} type="button" aria-current={current === id ? 'page' : undefined} onClick={() => { go(id); setMenu(false); }}>
+            <Icon />
+            <span>{label}</span>
+            {id === 'list' && listCount > 0 && <span className="badge">{listCount}</span>}
+          </button>
+        ))}
+      </nav>
 
       <main className={current === 'insights' || current === 'trips' ? 'wide' : ''}>
         <InviteBanner />
         <View />
+        <LookPicker />
         <LookupMeter />
       </main>
       <BackToTop />

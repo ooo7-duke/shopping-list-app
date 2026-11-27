@@ -170,8 +170,10 @@ export async function updateAccount(id, patch) {
   const a = state.accounts[id];
   for (const [k, v] of Object.entries(patch)) {
     if (k.includes('.')) {
-      const [top, sub] = k.split('.');
-      a[top] = { ...a[top], [sub]: v };
+      const path = k.split('.');
+      let obj = a;
+      for (const p of path.slice(0, -1)) { obj[p] = { ...(obj[p] || {}) }; obj = obj[p]; }
+      obj[path[path.length - 1]] = v;
     } else a[k] = v;
   }
   save();

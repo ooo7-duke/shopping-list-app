@@ -25,6 +25,25 @@ export const STORE_TYPES = [
 ];
 export const storeType = (id) => STORE_TYPES.find((t) => t.id === id) || null;
 
+// Stores the household has named before, newest first, so they show in the Kind of store
+// list next time. A name is kept once, whatever its case, and the list stays short.
+export function rememberStoreKinds(prev, rows, max = 20) {
+  const out = [];
+  const seen = new Set();
+  const push = (k) => {
+    const name = String(k?.name || '').trim().slice(0, 30);
+    const type = k?.type;
+    if (!name || !type || !storeType(type)) return;
+    const key = name.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push({ name, type });
+  };
+  (rows || []).forEach(push);
+  (prev || []).forEach(push);
+  return out.slice(0, max);
+}
+
 const CATEGORY_DEPT = {
   'Produce': 'grocery', 'Dairy & eggs': 'grocery', 'Meat & seafood': 'grocery', 'Bakery': 'grocery',
   'Pantry': 'grocery', 'Frozen': 'grocery', 'Beverages': 'grocery', 'Snacks': 'grocery',
@@ -99,7 +118,7 @@ export function planTrips(items, stores = []) {
     const pinned = pinnedStore(saved, it.store);
     if (pinned) add(pinned.id, it); else remaining.push(it);
   }
-  const miles = (s) => (Number.isFinite(Number(s.miles)) && s.miles !== '' ? Number(s.miles) : 999);
+  const miles = (s) => (s.miles != null && s.miles !== '' && Number.isFinite(Number(s.miles)) ? Number(s.miles) : 999);
   const order = [];
   for (const id of byStore.keys()) order.push(id);
   while (remaining.length) {
