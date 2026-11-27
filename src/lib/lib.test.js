@@ -545,3 +545,23 @@ describe('snooze lengths', () => {
     expect(new Date(snoozeEnd({ months: 1 }, jan31)).toDateString()).toBe(new Date(2027, 1, 28).toDateString());
   });
 });
+
+import { guessStoreType } from './tripPlan.js';
+describe('store name only', () => {
+  it('reads what a store sells from its name', () => {
+    expect(guessStoreType('Costco')).toBe('costco');
+    expect(guessStoreType('Giant')).toBe('grocery');
+    expect(guessStoreType('H-Mart')).toBe('grocery');
+    expect(guessStoreType('Home Depot')).toBe('hardware');
+    expect(guessStoreType('Office store')).toBe('office');
+    expect(guessStoreType('Walmart Neighborhood Market')).toBe('walmart_market');
+    expect(guessStoreType('Walmart')).toBe('walmart');
+    expect(guessStoreType('CVS')).toBe('pharmacy');
+    expect(guessStoreType("Sam's Club")).toBe('samsclub');
+    expect(guessStoreType('Best Buy')).toBe('electronics');
+  });
+  it('treats a name it does not know as an Other store', () => {
+    expect(guessStoreType("Bob's")).toBe('other');
+    expect(guessStoreType('')).toBe('other');
+  });
+});

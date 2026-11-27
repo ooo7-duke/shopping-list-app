@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useApp } from '../AppContext.jsx';
 import Sheet from './Sheet.jsx';
-import { markBought, putOnList, isOnList, setSeenPrice, refreshPrices, canLookUpAgain, snoozeUntil } from '../data/actions.js';
+import { markBought, putOnList, takeOffList, isOnList, setSeenPrice, refreshPrices, canLookUpAgain, snoozeUntil } from '../data/actions.js';
 import SnoozePicker from './SnoozePicker.jsx';
 import { storeLinks, seenPrices, refurbPrice, hasPriceProvider, currentQuota, onQuota, refreshQuota } from '../lib/prices.js';
 import { deptOf } from '../lib/tripPlan.js';
@@ -98,8 +98,16 @@ export default function ItemSheet({ item, focus, onClose }) {
   }
   async function remove() {
     if (!confirmDelete) { setConfirmDelete(true); return; }
+    // Keep a copy so a delete tapped by mistake can be undone from the message.
+    const copy = Object.fromEntries(Object.entries(item).filter(([k, v]) => k !== 'id' && v !== undefined));
     await backend.remove(ctx.accountId, 'items', item.id);
-    showToast(`Deleted ${item.name}. Purchase history is kept for reports.`);
+    showToast(`Deleted ${item.name}. Past purchases stay in your history.`, () => backend.commit(ctx.accountId, [{ type: 'set', coll: 'items', id: item.id, data: copy }]));
+    onClose();
+  }
+  // Off the list with nothing logged: no purchase, no change to the history or the price.
+  async function removeFromList() {
+    const undo = await takeOffList(ctx, item);
+    showToast(`Removed ${item.name} from the list. Nothing was logged as bought.`, undo);
     onClose();
   }
 
@@ -114,6 +122,12 @@ export default function ItemSheet({ item, focus, onClose }) {
       <div className="stack">
         {editor ? (
           <>
+            {isOnList(item) && (
+              <div>
+                <button type="button" className="btn block" onClick={removeFromList}>Remove from list</button>
+                <p className="tiny muted" style={{ marginTop: 6 }}>Changed your mind? This takes it off the list without logging a purchase.</p>
+              </div>
+            )}
             <label className="field"><span>Name</span>
               <input className="input" defaultValue={item.name} onBlur={(e) => e.target.value.trim() && e.target.value !== item.name && save({ name: e.target.value.trim(), pricesCheckedAt: null })} />
             </label>

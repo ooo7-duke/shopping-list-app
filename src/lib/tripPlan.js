@@ -25,6 +25,35 @@ export const STORE_TYPES = [
 ];
 export const storeType = (id) => STORE_TYPES.find((t) => t.id === id) || null;
 
+// Stores offered in the Store name list before the household has saved any of its own.
+export const COMMON_STORES = [
+  'Aldi', 'AutoZone', 'Best Buy', 'Costco', 'CVS', 'Food Lion', 'Giant', 'H-Mart', 'Harris Teeter',
+  'Home Depot', 'Lidl', "Lowe's", 'Office Depot', 'Safeway', "Sam's Club", 'Staples', 'Target',
+  "Trader Joe's", 'Walgreens', 'Walmart', 'Walmart Neighborhood Market', 'Wegmans', 'Weis', 'Whole Foods',
+];
+
+// What a store sells, read from its name, so a store needs only its name. A name the app
+// doesn't know, like "Bob's", is an Other store: it gets only what you move there yourself.
+const STORE_NAME_TYPES = [
+  [/walmart\s*neighbou?rhood|neighbou?rhood\s*market/i, 'walmart_market'],
+  [/wal-?mart/i, 'walmart'],
+  [/\btarget\b/i, 'target'],
+  [/costco/i, 'costco'],
+  [/\bsam'?s\b/i, 'samsclub'],
+  [/\bcvs\b|walgreens|rite\s*aid|pharmacy|\bdrug/i, 'pharmacy'],
+  [/auto\s*zone|advance\s*auto|o.?reilly|\bnapa\b|auto\s*parts/i, 'autoparts'],
+  [/staples|office\s*(depot|max|store)?\b/i, 'office'],
+  [/home\s*depot|lowe'?s|hardware|menards|true\s*value|home\s*improvement/i, 'hardware'],
+  [/best\s*buy|micro\s*center|electronics/i, 'electronics'],
+  [/giant|safeway|aldi|\bweis\b|lidl|wegmans|harris\s*teeter|food\s*lion|kroger|publix|shoprite|trader\s*joe|whole\s*foods|sprouts|h-?\s?mart|lotte|patel|market|\bmart\b|grocer|foods?\b|supermarket/i, 'grocery'],
+];
+export function guessStoreType(name) {
+  const n = String(name || '').trim();
+  if (!n) return 'other';
+  const hit = STORE_NAME_TYPES.find(([re]) => re.test(n));
+  return hit ? hit[1] : 'other';
+}
+
 // Stores the household has named before, newest first, so they show in the Kind of store
 // list next time. A name is kept once, whatever its case, and the list stays short.
 export function rememberStoreKinds(prev, rows, max = 20) {
