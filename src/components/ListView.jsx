@@ -14,7 +14,7 @@ import { guessCategory, HOUSEHOLD_CATEGORIES } from '../lib/categories.js';
 
 const GROUP_KEY = 'sla-group-by';
 const FILTER_KEY = 'sla-type-filter';
-const FOLD_KEY = 'sla-folded-groups';
+const FOLD_KEY = 'sla-folded-groups'; // sessionStorage: groups open again when the app is reopened
 const LOW_LIMIT = 6; // chips shown before "Show all"
 
 export default function ListView() {
@@ -75,12 +75,12 @@ export default function ListView() {
     saveFilter(next);
   };
   const [folded, setFolded] = useState(() => {
-    try { return new Set(JSON.parse(localStorage.getItem(FOLD_KEY) || '[]')); } catch { return new Set(); }
+    try { return new Set(JSON.parse(sessionStorage.getItem(FOLD_KEY) || '[]')); } catch { return new Set(); }
   });
   const foldId = (name) => `${groupBy}:${name}`;
   const saveFolded = (next) => {
     setFolded(next);
-    try { localStorage.setItem(FOLD_KEY, JSON.stringify([...next])); } catch { /* private mode */ }
+    try { sessionStorage.setItem(FOLD_KEY, JSON.stringify([...next])); } catch { /* private mode */ }
   };
   const toggleFold = (name) => {
     const next = new Set(folded);
