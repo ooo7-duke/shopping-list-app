@@ -3,7 +3,7 @@ import { useApp } from '../AppContext.jsx';
 import Sheet from './Sheet.jsx';
 import { markBought, putOnList, isOnList, setSeenPrice, refreshPrices } from '../data/actions.js';
 import { storeLinks, seenPrices, hasPriceProvider } from '../lib/prices.js';
-import { linkHost, isBlockedSeller } from '../lib/storeMatch.js';
+import { linkHost, isBlockedSeller, isKnownRetailer } from '../lib/storeMatch.js';
 import { lastPurchaseMap, lastBuy } from '../lib/history.js';
 import { fmtMoney, fmtDate, toInputDate, fromInputDate, fmtQty } from '../lib/format.js';
 import { HOUSEHOLD_CATEGORIES } from '../lib/categories.js';
@@ -31,7 +31,7 @@ export default function ItemSheet({ item, focus, onClose }) {
   const [looking, setLooking] = useState(false);
   const real = (seen) => (seen && seen.by !== 'sample' ? seen : null);
   const elsewhereRaw = real(item.seenPrices?.any);
-  const elsewhere = elsewhereRaw && !isBlockedSeller(elsewhereRaw.storeName, elsewhereRaw.url) ? elsewhereRaw : null;
+  const elsewhere = elsewhereRaw && !isBlockedSeller(elsewhereRaw.storeName, elsewhereRaw.url) && isKnownRetailer(elsewhereRaw.storeName) ? elsewhereRaw : null;
   const seenLabel = (seen) => {
     if (!seen?.at) return '';
     if (seen.by === 'auto') return `found ${fmtDate(seen.at)}`;

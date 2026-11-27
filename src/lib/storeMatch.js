@@ -22,6 +22,11 @@ function priceOf(r) {
 
 const safeUrl = (u) => (typeof u === 'string' && /^https:\/\//.test(u) ? u : null);
 
+// "Cheapest elsewhere" only comes from large US retailers, so small or overseas shops
+// (a print shop in Ottawa, say) don't show up as the best price.
+const KNOWN_RETAILER = /best\s*buy|staples|office\s*depot|officemax|home\s*depot|lowe'?s|kroger|cvs|walgreens|bj'?s|dollar\s*general|kohl'?s|macy'?s|newegg|b\s*&\s*h|wayfair|chewy|ulta|whole\s*foods|safeway|giant|aldi|publix|meijer|h-?e-?b\b|rite\s*aid|dick'?s|petco|petsmart|bed\s*bath|ikea|canon\s*(usa|store)|hp\s*store|dell\b|apple\b|samsung/i;
+export const isKnownRetailer = (name = '') => KNOWN_RETAILER.test(String(name || ''));
+
 // Sellers whose prices are never shown (Sola's rule: no eBay).
 const BLOCKED_SELLER = /\bebay\b/i;
 export function isBlockedSeller(name = '', url = '') {
@@ -71,6 +76,7 @@ export function pickQuotes(results = [], query = '') {
     const storeName = String(r.source || '').slice(0, 60);
     if (isBlockedSeller(storeName, r.link)) continue;
     const storeId = storeIdFor(storeName) || 'any';
+    if (storeId === 'any' && !isKnownRetailer(storeName)) continue;
     const q = { storeId, storeName, price: Math.round(price * 100) / 100, title: String(r.title || '').slice(0, 140), url: directUrl(r) };
     if (!best[storeId] || q.price < best[storeId].price) best[storeId] = q;
   }

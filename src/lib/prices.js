@@ -7,7 +7,7 @@
 //    The demo has no provider: it never makes up a price.
 // 2. By hand: a search link per store, and the person types the price they see.
 
-import { isBlockedSeller } from './storeMatch.js';
+import { isBlockedSeller, isKnownRetailer } from './storeMatch.js';
 
 // Preferred order. Stores after the first three are extras, not a limit.
 export const PRICE_STORES = [
@@ -34,7 +34,7 @@ export function storeLinks(item) {
 export function seenPrices(item, now = Date.now(), maxAgeDays = 30) {
   const seen = item.seenPrices || {};
   // Prices the old demo made up (by 'sample') are ignored.
-  const rows = PRICE_STORES.filter((s) => seen[s.id]?.price != null && seen[s.id].by !== 'sample' && !isBlockedSeller(seen[s.id].storeName, seen[s.id].url)).map((s) => ({
+  const rows = PRICE_STORES.filter((s) => seen[s.id]?.price != null && seen[s.id].by !== 'sample' && !isBlockedSeller(seen[s.id].storeName, seen[s.id].url) && (s.id !== 'any' || isKnownRetailer(seen[s.id].storeName))).map((s) => ({
     store: seen[s.id].storeName || s.name, storeId: s.id, price: Number(seen[s.id].price), at: seen[s.id].at,
     by: seen[s.id].by || '', url: seen[s.id].url || null,
     stale: now - (seen[s.id].at || 0) > maxAgeDays * 86400e3,

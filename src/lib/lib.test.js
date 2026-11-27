@@ -138,7 +138,7 @@ describe('automatic price lookup', () => {
       { source: 'Walmart', extracted_price: 24.97, title: 'A', product_link: 'https://x/1' },
       { source: 'Walmart', extracted_price: 21.5, title: 'B' },
       { source: "Sam's Club", price: '$22.98' },
-      { source: 'Kroger', extracted_price: 19.99 },
+      { source: 'Kroger', extracted_price: 19.99, product_link: 'javascript:alert(1)' },
       { source: 'Meijer', extracted_price: 25 },
       { source: 'Bad', extracted_price: 0 },
       { source: 'Evil', extracted_price: 5, product_link: 'javascript:alert(1)' },
@@ -146,7 +146,7 @@ describe('automatic price lookup', () => {
     const by = Object.fromEntries(q.map((x) => [x.storeId, x]));
     expect(by.walmart.price).toBe(21.5);
     expect(by.samsclub.price).toBe(22.98);
-    expect(by.any.storeName).toBe('Evil');
+    expect(by.any.storeName).toBe('Kroger');
     expect(by.any.url).toBe(null);
   });
   it('skips knock-offs and other models', () => {
@@ -178,6 +178,13 @@ describe('automatic price lookup', () => {
     const { best, rows } = seenPrices({ seenPrices: { any: { price: 14.45, at: Date.now(), by: 'auto', storeName: 'eBay - go-ink' }, walmart: { price: 32.99, at: Date.now(), by: 'auto' } } });
     expect(rows.length).toBe(1);
     expect(best.price).toBe(32.99);
+  });
+  it('only takes cheapest elsewhere from large US retailers', () => {
+    const q = pickQuotes([
+      { source: 'Printwell Custom Printing Ottawa', extracted_price: 27.29, title: 'Canon PG-240XL' },
+      { source: 'Staples', extracted_price: 30.49, title: 'Canon PG-240XL' },
+    ], 'Canon PG-240XL');
+    expect(q.map((x) => x.storeName)).toEqual(['Staples']);
   });
   it('ignores prices the old demo made up', () => {
     const { rows } = seenPrices({ seenPrices: { amazon: { price: 9, at: Date.now(), by: 'sample' } } });
