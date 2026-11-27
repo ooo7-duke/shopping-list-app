@@ -3,6 +3,7 @@ import { useApp } from '../AppContext.jsx';
 import Sheet from './Sheet.jsx';
 import { markBought, putOnList, isOnList, setSeenPrice, refreshPrices } from '../data/actions.js';
 import { storeLinks, seenPrices, hasPriceProvider } from '../lib/prices.js';
+import { linkHost } from '../lib/storeMatch.js';
 import { lastPurchaseMap, lastBuy } from '../lib/history.js';
 import { fmtMoney, fmtDate, toInputDate, fromInputDate, fmtQty } from '../lib/format.js';
 import { HOUSEHOLD_CATEGORIES } from '../lib/categories.js';
@@ -137,7 +138,7 @@ export default function ItemSheet({ item, focus, onClose }) {
                   return (
                     <div key={l.id} className="price-line">
                       <a className="chip blue" href={l.href} target="_blank" rel="noopener noreferrer">{l.name} ↗</a>
-                      <span className="grow tiny muted">{seenLabel(seen)}</span>
+                      <span className="grow tiny muted">{seenLabel(seen)}{seen?.url && <> on <a href={seen.url} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block', minHeight: 44, lineHeight: '44px' }}>{linkHost(seen.url)} ↗</a></>}</span>
                       <input key={seen?.at || 'none'} className="input price-input" inputMode="decimal" aria-label={`Price at ${l.name}`} placeholder="$" defaultValue={seen?.price ?? ''}
                         onBlur={async (e) => {
                           const v = e.target.value.replace(/[$,\s]/g, '');
@@ -153,7 +154,7 @@ export default function ItemSheet({ item, focus, onClose }) {
                     {elsewhere.url
                       ? <a className="chip blue" href={elsewhere.url} target="_blank" rel="noopener noreferrer">{elsewhere.storeName || 'Elsewhere'} ↗</a>
                       : <span className="chip">{elsewhere.storeName || 'Elsewhere'}</span>}
-                    <span className="grow tiny muted">cheapest elsewhere</span>
+                    <span className="grow tiny muted">cheapest elsewhere{elsewhere.url && <> on <a href={elsewhere.url} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block', minHeight: 44, lineHeight: '44px' }}>{linkHost(elsewhere.url)} ↗</a></>}</span>
                     <strong className="price-input" style={{ display: 'inline-block' }}>{fmtMoney(elsewhere.price)}</strong>
                   </div>
                 )}

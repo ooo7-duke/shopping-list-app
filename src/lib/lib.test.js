@@ -122,7 +122,7 @@ describe('price checks', () => {
   });
 });
 
-import { pickQuotes, storeIdFor, fitsQuery } from './storeMatch.js';
+import { pickQuotes, storeIdFor, fitsQuery, directUrl, linkHost } from './storeMatch.js';
 import { mergeQuotes } from './prices.js';
 import { describePrediction as describe2 } from './predict.js';
 
@@ -160,6 +160,12 @@ describe('automatic price lookup', () => {
     expect(by.walmart.price).toBe(34.99);
     expect(by.amazon.price).toBe(36.49);
     expect(fitsQuery('Compatible ink', 'compatible ink')).toBe(true);
+  });
+  it('links to the store page when there is one', () => {
+    expect(directUrl({ link: 'https://www.walmart.com/ip/123', product_link: 'https://www.google.com/shopping/product/9' })).toBe('https://www.walmart.com/ip/123');
+    expect(directUrl({ link: 'https://www.google.com/aclk?x', product_link: 'https://www.google.com/shopping/product/9' })).toBe('https://www.google.com/shopping/product/9');
+    expect(directUrl({ link: 'javascript:alert(1)' })).toBe(null);
+    expect(linkHost('https://www.walmart.com/ip/123')).toBe('walmart.com');
   });
   it('ignores prices the old demo made up', () => {
     const { rows } = seenPrices({ seenPrices: { amazon: { price: 9, at: Date.now(), by: 'sample' } } });

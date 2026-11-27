@@ -22,6 +22,21 @@ function priceOf(r) {
 
 const safeUrl = (u) => (typeof u === 'string' && /^https:\/\//.test(u) ? u : null);
 
+const isGoogle = (u) => { try { return /(^|\.)google\./i.test(new URL(u).hostname); } catch { return true; } };
+
+// The store's own product page when Google Shopping gives one, otherwise Google's page
+// for the product (which lists the sellers).
+export function directUrl(r = {}) {
+  const store = safeUrl(r.link);
+  if (store && !isGoogle(store)) return store;
+  return safeUrl(r.product_link) || store;
+}
+
+// The site a link points to, for showing next to a price: "walmart.com".
+export function linkHost(u) {
+  try { return new URL(u).hostname.replace(/^www\./, ''); } catch { return ''; }
+}
+
 // Knock-offs undercut the real thing, so they'd always win "cheapest". Skip them unless
 // the item's own name asks for one.
 const KNOCKOFF = /\b(compatible|remanufactured|refurbished|replacement for|refill|generic|for use with|used)\b/i;
@@ -48,7 +63,7 @@ export function pickQuotes(results = [], query = '') {
     if (price == null || !(price > 0)) continue;
     const storeName = String(r.source || '').slice(0, 60);
     const storeId = storeIdFor(storeName) || 'any';
-    const q = { storeId, storeName, price: Math.round(price * 100) / 100, title: String(r.title || '').slice(0, 140), url: safeUrl(r.product_link || r.link) };
+    const q = { storeId, storeName, price: Math.round(price * 100) / 100, title: String(r.title || '').slice(0, 140), url: directUrl(r) };
     if (!best[storeId] || q.price < best[storeId].price) best[storeId] = q;
   }
   return Object.values(best);
