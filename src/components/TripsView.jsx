@@ -112,7 +112,7 @@ export default function TripsView() {
           <button type="button" className="btn primary" onClick={() => setEditStores(true)}>Add your stores</button>
         </div>
       )}
-          </div>
+    </div>
   );
 
   return (
