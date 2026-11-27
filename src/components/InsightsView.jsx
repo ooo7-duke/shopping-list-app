@@ -9,30 +9,34 @@ import { DownloadIcon } from './Icons.jsx';
 Chart.register(BarController, BarElement, CategoryScale, LinearScale, Tooltip);
 Chart.defaults.font.family = "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
 Chart.defaults.font.size = 13;
-Chart.defaults.color = '#4d5c96';
-
-const BB = '#243b8f';
-const GOLD = '#ffc20d';
+// Chart colors follow the person's chosen look.
+const cssVar = (name, fallback) => (typeof document === 'undefined' ? fallback : getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback);
+const BB = 'var(--bb)';
+const GOLD = 'var(--gold)';
+const resolve = (c) => (c.startsWith('var(') ? cssVar(c.slice(4, -1), '#243b8f') : c);
 
 function BarChart({ labels, data, color = BB, horizontal, label }) {
   const ref = useRef();
+  const { look } = useApp();
   useEffect(() => {
+    Chart.defaults.color = cssVar('--muted', '#4d5c96');
+    const fill = resolve(color);
     const chart = new Chart(ref.current, {
       type: 'bar',
-      data: { labels, datasets: [{ label, data, backgroundColor: color, borderRadius: 6, maxBarThickness: 38 }] },
+      data: { labels, datasets: [{ label, data, backgroundColor: fill, borderRadius: 6, maxBarThickness: 38 }] },
       options: {
         indexAxis: horizontal ? 'y' : 'x',
         maintainAspectRatio: false,
         animation: { duration: 250 },
         plugins: { tooltip: { callbacks: { label: (c) => ` ${fmtMoney(c.parsed[horizontal ? 'x' : 'y'])}` } } },
         scales: {
-          [horizontal ? 'x' : 'y']: { beginAtZero: true, grid: { color: '#efe3b4' }, ticks: { callback: (v) => fmtMoney0(v), maxRotation: 0, autoSkip: true, maxTicksLimit: 6 } },
+          [horizontal ? 'x' : 'y']: { beginAtZero: true, grid: { color: cssVar('--line-soft', '#efe3b4') }, ticks: { callback: (v) => fmtMoney0(v), maxRotation: 0, autoSkip: true, maxTicksLimit: 6 } },
           [horizontal ? 'y' : 'x']: { grid: { display: false }, ticks: { autoSkip: !horizontal, maxRotation: 0 } },
         },
       },
     });
     return () => chart.destroy();
-  }, [JSON.stringify(labels), JSON.stringify(data), color, horizontal]);
+  }, [JSON.stringify(labels), JSON.stringify(data), color, horizontal, look]);
   return <canvas ref={ref} role="img" aria-label={label} />;
 }
 
@@ -195,7 +199,7 @@ export default function InsightsView() {
         <div className="kpi"><div className="v">{filtered.length}</div><div className="l">Purchases</div></div>
         <div className="kpi"><div className="v">{trips}</div><div className="l">Trips · {fmtMoney0(trips ? total / trips : 0)} each</div></div>
         <div className="kpi"><div className="v">{fmtMoney0((total / spanDays) * 30)}</div><div className="l">Per month, on average</div></div>
-        <div className="kpi" style={{ borderColor: GOLD, background: '#fff8dc' }}><div className="v">{fmtMoney0(forecast)}</div><div className="l">Predicted, next 30 days</div></div>
+        <div className="kpi" style={{ borderColor: GOLD, background: 'var(--gold-soft)' }}><div className="v">{fmtMoney0(forecast)}</div><div className="l">Predicted, next 30 days</div></div>
       </div>
 
       {filtered.length === 0 ? (
