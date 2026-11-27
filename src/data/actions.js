@@ -102,9 +102,27 @@ export const putOnList = (ctx, item) => setStatus(ctx, item, 'needed', { addedAt
 // Record a price someone saw at a store (after tapping Check price). Undo restores the old one.
 // Looks up today's prices for an item and saves them. Skips items looked up in the last
 // day unless force is set, so each add spends at most one search.
+// Each lookup spends one paid search, so lookups are rationed:
+// - adding an item looks it up only if it hasn't been checked in the last week;
+// - an item whose name matches one checked in the last week copies those prices instead;
+// - "Look up prices again" works at most once a day per item.
+export const AUTO_LOOKUP_DAYS = 7;
+export const MANUAL_LOOKUP_HOURS = 24;
+const priceKey = (i) => [i.name, i.note].filter(Boolean).join(' ').trim().toLowerCase().replace(/\s+/g, ' ');
+export const canLookUpAgain = (item, now = Date.now()) => !item.pricesCheckedAt || now - item.pricesCheckedAt >= MANUAL_LOOKUP_HOURS * 3600e3;
+
 export async function refreshPrices(ctx, item, { force = false } = {}) {
   if (!hasPriceProvider()) return { found: 0 };
-  if (!force && item.pricesCheckedAt && Date.now() - item.pricesCheckedAt < 86400e3) return { found: 0, skipped: true };
+  const now = Date.now();
+  if (force && !canLookUpAgain(item, now)) return { found: 0, skipped: true, recent: true };
+  if (!force && item.pricesCheckedAt && now - item.pricesCheckedAt < AUTO_LOOKUP_DAYS * 86400e3) return { found: 0, skipped: true };
+  if (!force) {
+    const twin = (ctx.items || []).find((i) => i.id !== item.id && priceKey(i) === priceKey(item) && i.pricesCheckedAt && now - i.pricesCheckedAt < AUTO_LOOKUP_DAYS * 86400e3);
+    if (twin) {
+      await ctx.backend.update(ctx.accountId, 'items', item.id, { seenPrices: twin.seenPrices || {}, pricesCheckedAt: twin.pricesCheckedAt });
+      return { found: Object.keys(twin.seenPrices || {}).length, copied: true };
+    }
+  }
   const quotes = await fetchQuotes(item);
   const latest = (ctx.items || []).find((i) => i.id === item.id) || item;
   await ctx.backend.update(ctx.accountId, 'items', item.id, { seenPrices: mergeQuotes(latest.seenPrices, quotes), pricesCheckedAt: Date.now() });

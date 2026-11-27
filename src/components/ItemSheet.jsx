@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useApp } from '../AppContext.jsx';
 import Sheet from './Sheet.jsx';
-import { markBought, putOnList, isOnList, setSeenPrice, refreshPrices } from '../data/actions.js';
+import { markBought, putOnList, isOnList, setSeenPrice, refreshPrices, canLookUpAgain } from '../data/actions.js';
 import { storeLinks, seenPrices, hasPriceProvider } from '../lib/prices.js';
 import { linkHost, isBlockedSeller, isKnownRetailer } from '../lib/storeMatch.js';
 import { lastPurchaseMap, lastBuy } from '../lib/history.js';
@@ -161,7 +161,7 @@ export default function ItemSheet({ item, focus, onClose }) {
                 )}
               </div>
               {hasPriceProvider() && (
-                <button type="button" className="btn" style={{ marginTop: 10 }} onClick={lookUp} disabled={looking}>{looking ? 'Looking…' : 'Look up prices again'}</button>
+                <button type="button" className="btn" style={{ marginTop: 10 }} onClick={lookUp} disabled={looking || !canLookUpAgain(item)}>{looking ? 'Looking…' : canLookUpAgain(item) ? 'Look up prices again' : 'Checked today'}</button>
               )}
               <a className="small" href={links.find((l) => l.id === 'any').href} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block', marginTop: 8, minHeight: 44, lineHeight: '44px' }}>Compare more stores on Google Shopping ↗</a>
             </div>
