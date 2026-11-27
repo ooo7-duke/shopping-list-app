@@ -183,12 +183,9 @@ export default function ListView() {
             <h2>{activeFilter.size ? `${shown.length} of ${onList.length} items` : `${onList.length} item${onList.length === 1 ? '' : 's'} to get`}</h2>
             {total > 0 && editor && <div className="small muted">About {fmtMoney(total)} at last prices</div>}
           </div>
-          <div className="row" style={{ gap: 6 }}>
-            <span className="small muted" id="groupby-l">Group by</span>
-            <div className="seg" role="group" aria-labelledby="groupby-l">
-              <button type="button" aria-pressed={groupBy === 'category'} onClick={() => setGroup('category')}>Type</button>
-              <button type="button" aria-pressed={groupBy === 'store'} onClick={() => setGroup('store')}>Where to buy</button>
-            </div>
+          <div className="seg" role="group" aria-label="Group by">
+            <button type="button" aria-pressed={groupBy === 'category'} onClick={() => setGroup('category')}>By type</button>
+            <button type="button" aria-pressed={groupBy === 'store'} onClick={() => setGroup('store')}>By store</button>
           </div>
         </div>
       )}
@@ -204,13 +201,6 @@ export default function ListView() {
         </div>
       )}
 
-      {onList.length === 0 && ordered.length === 0 && (
-        <div className="card empty">
-          <h2>Nothing to buy right now</h2>
-          <p>When you notice something running low, type it above or tap the mic and say it. Separate several items with commas.</p>
-        </div>
-      )}
-
       {groups.length > 2 && (
         <div className="fold-all">
           {groups.every(([n]) => folded.has(foldId(n)))
@@ -218,6 +208,14 @@ export default function ListView() {
             : <button type="button" className="linkish" onClick={() => saveFolded(new Set([...folded, ...groups.map(([n]) => foldId(n))]))}>Fold all groups</button>}
         </div>
       )}
+
+      {onList.length === 0 && ordered.length === 0 && (
+        <div className="card empty">
+          <h2>Nothing to buy right now</h2>
+          <p>When you notice something running low, type it above or tap the mic and say it. Separate several items with commas.</p>
+        </div>
+      )}
+
 
       {groups.map(([name, list]) => {
         const isFolded = folded.has(foldId(name));
