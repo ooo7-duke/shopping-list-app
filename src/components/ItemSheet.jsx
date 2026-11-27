@@ -97,11 +97,11 @@ export default function ItemSheet({ item, focus, onClose }) {
               </label>
             </div>
             <div className="grid2">
-              <label className="field"><span>Store</span>
+              <label className="field"><span>Where to buy</span>
                 <input className="input" list="stores" defaultValue={item.store || ''} placeholder="Costco" onBlur={(e) => save({ store: e.target.value.trim() })} />
                 <datalist id="stores">{stores.map((s) => <option key={s} value={s} />)}</datalist>
               </label>
-              <label className="field"><span>Category</span>
+              <label className="field"><span>Type</span>
                 <select className="input" value={item.category || 'Other'} onChange={(e) => save({ category: e.target.value })}>
                   {[...new Set([...cats, item.category || 'Other'])].map((c) => <option key={c}>{c}</option>)}
                 </select>

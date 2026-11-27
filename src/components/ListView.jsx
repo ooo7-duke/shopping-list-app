@@ -39,14 +39,14 @@ export default function ListView() {
 
   const groups = useMemo(() => {
     const m = new Map();
-    const key = (it) => (groupBy === 'store' ? it.store || 'Any store' : it.category || 'Other');
+    const key = (it) => (groupBy === 'store' ? it.store || 'Anywhere' : it.category || 'Other');
     for (const it of onList) {
       const k = key(it);
       if (!m.has(k)) m.set(k, []);
       m.get(k).push(it);
     }
     for (const list of m.values()) list.sort((a, b) => (b.urgent ? 1 : 0) - (a.urgent ? 1 : 0) || a.name.localeCompare(b.name));
-    return [...m.entries()].sort((a, b) => (a[0] === 'Any store' ? 1 : b[0] === 'Any store' ? -1 : a[0].localeCompare(b[0])));
+    return [...m.entries()].sort((a, b) => (a[0] === 'Anywhere' ? 1 : b[0] === 'Anywhere' ? -1 : a[0].localeCompare(b[0])));
   }, [onList, groupBy]);
 
   const setGroup = (g) => { setGroupBy(g); localStorage.setItem(GROUP_KEY, g); };
@@ -94,16 +94,21 @@ export default function ListView() {
         </section>
       )}
 
-      <div className="section-h" style={{ marginTop: 14 }}>
-        <div>
-          <h2>{onList.length ? `${onList.length} item${onList.length === 1 ? '' : 's'} to get` : 'Your list'}</h2>
-          {total > 0 && editor && <div className="small muted">About {fmtMoney(total)} at last prices</div>}
+      {onList.length > 0 && (
+        <div className="section-h" style={{ marginTop: 14 }}>
+          <div>
+            <h2>{`${onList.length} item${onList.length === 1 ? '' : 's'} to get`}</h2>
+            {total > 0 && editor && <div className="small muted">About {fmtMoney(total)} at last prices</div>}
+          </div>
+          <div className="row" style={{ gap: 6 }}>
+            <span className="small muted" id="groupby-l">Group by</span>
+            <div className="seg" role="group" aria-labelledby="groupby-l">
+              <button type="button" aria-pressed={groupBy === 'category'} onClick={() => setGroup('category')}>Type</button>
+              <button type="button" aria-pressed={groupBy === 'store'} onClick={() => setGroup('store')}>Where to buy</button>
+            </div>
+          </div>
         </div>
-        <div className="seg" role="group" aria-label="Group list by">
-          <button type="button" aria-pressed={groupBy === 'category'} onClick={() => setGroup('category')}>Category</button>
-          <button type="button" aria-pressed={groupBy === 'store'} onClick={() => setGroup('store')}>Store</button>
-        </div>
-      </div>
+      )}
 
       {onList.length === 0 && ordered.length === 0 && (
         <div className="card empty">
@@ -129,7 +134,7 @@ export default function ListView() {
 
       {ordered.length > 0 && (
         <section aria-labelledby="ord-h">
-          <div className="section-h"><h2 id="ord-h">On order</h2><span className="small muted">mark arrived in Trips</span></div>
+          <div className="section-h"><h2 id="ord-h">On order</h2></div>
           <div className="list">
             {ordered.map((it) => <ItemRow key={it.id} item={it} readOnly showHistory last={lastBuy(it, latest[it.id])} onOpen={() => open(it.id)} />)}
           </div>

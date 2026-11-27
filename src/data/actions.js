@@ -203,7 +203,7 @@ export async function saveReceipt(ctx, receipt, lines) {
   }
   ops.push({
     type: 'set', coll: 'receipts', id: rid,
-    data: clean({ store: receipt.store || '', date, total: receipt.total != null ? Number(receipt.total) : null, tax: receipt.tax ?? null, lineCount: lines.filter((l) => !l.skip).length, matched, uploadedBy: user.uid, uploadedByName: user.name, createdAt: Date.now(), hasImage: !!receipt.image }),
+    data: clean({ store: receipt.store || '', date, total: receipt.total != null ? Number(receipt.total) : null, tax: receipt.tax ?? null, lineCount: lines.filter((l) => !l.skip).length, matched, uploadedBy: user.uid, uploadedByName: user.name, createdAt: Date.now(), hasImage: !!receipt.image, qrText: receipt.qrText || null, qrUrl: receipt.qrUrl || null }),
   });
   if (receipt.image) ops.push({ type: 'set', coll: 'receiptImages', id: rid, data: { dataUrl: receipt.image } });
   // Strip undefined ids from item docs.
