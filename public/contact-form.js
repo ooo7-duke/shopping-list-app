@@ -1,6 +1,15 @@
-// Sends the contact and deletion forms to the app's private inbox, so no email address is published.
+// Sends the contact and deletion forms to the app's private inbox.
 // The "website" box is hidden from people; bots that fill it are quietly ignored.
 (function () {
+  // The email is put together here, not written in the page, so address-harvesting bots that read raw HTML miss it.
+  document.querySelectorAll('.mail-alt[data-u]').forEach(function (p) {
+    var addr = p.getAttribute('data-u') + '@' + p.getAttribute('data-d');
+    var a = document.createElement('a');
+    a.href = 'mailto:' + addr;
+    a.textContent = addr;
+    p.appendChild(a);
+    p.appendChild(document.createTextNode('.'));
+  });
   document.querySelectorAll('form[data-kind]').forEach(function (form) {
     var started = Date.now();
     var status = form.querySelector('.form-status');

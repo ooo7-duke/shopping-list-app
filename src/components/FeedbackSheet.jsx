@@ -4,6 +4,8 @@ import Sheet from './Sheet.jsx';
 import { sendFeedback, readInbox, markHandled } from '../lib/feedback.js';
 import { fmtDate } from '../lib/format.js';
 
+const CONTACT_EMAIL = 'Loye10Shopping' + '@gmail.com';
+
 const KIND_LABEL = { feedback: 'Feedback', idea: 'Idea', problem: 'Problem', delete: 'Deletion request' };
 
 export function FeedbackSheet({ onClose }) {
@@ -41,6 +43,7 @@ export function FeedbackSheet({ onClose }) {
         </label>
         {err && <p className="small" style={{ color: 'var(--danger)' }}>{err}</p>}
         <button type="submit" className="btn primary block" disabled={busy || message.trim().length < 5}>{busy ? 'Sending…' : 'Send'}</button>
+        <p className="small muted" style={{ textAlign: 'center' }}>Prefer email? Write to <a href={'mailto:' + CONTACT_EMAIL}>{CONTACT_EMAIL}</a>.</p>
       </form>
     </Sheet>
   );

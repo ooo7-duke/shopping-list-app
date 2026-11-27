@@ -41,7 +41,7 @@ Steps marked **(Sola)** need your accounts, your money or your keys, so only you
    Bubblewrap offers to download the Java and Android tools it needs. On the first build it asks you to create the upload key. **Keep the `.keystore` file and its passwords in a password manager and a backup.** Without them you can't update the app. The `.gitignore` there stops the key from being committed.
 5. **(Sola)** In Play Console, create the app, turn on Play App Signing and upload `app-release-bundle.aab` to an internal test.
 6. Copy the **App signing key certificate SHA-256** from Play Console (Test and release, App integrity) and send it to me. I'll put it in `assetlinks.json`, and a publish puts it live. Until then the Android app shows a browser address bar at the top.
-7. **(Sola)** Google Play shows a developer contact email on the store listing, and it can't be left out. Use a separate alias, such as a new address that forwards to you, so spam never reaches your main inbox and you can change it later.
+7. **(Sola)** Google Play shows a developer contact email on the store listing, and it can't be left out. Use Loye10Shopping@gmail.com, the address made just for this app. It also shows on the contact, deletion and privacy pages and in Send feedback.
 8. **(Sola)** Fill in the store listing: screenshots, a short and full description, the privacy policy link `https://loye10-shopping-list.netlify.app/privacy/`, the deletion link `https://loye10-shopping-list.netlify.app/delete-account/`, the content rating questionnaire and the data safety form (answers below).
 9. **(Sola)** Send it for review.
 
