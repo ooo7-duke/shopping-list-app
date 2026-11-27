@@ -144,7 +144,7 @@ label.field > span { display: block; font-size: 0.85rem; color: var(--muted); ma
 .swipe + .swipe { border-top: 1px solid var(--line-soft); }
 .swipe .under { position: absolute; inset: 0; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; font-weight: 700; }
 .swipe .under.right { background: var(--bb); color: var(--cream); }
-.swipe .under.left { background: var(--gold); color: var(--bb-ink); justify-content: flex-end; }
+.swipe .under.left { background: var(--gold); color: var(--on-gold); justify-content: flex-end; }
 .swipe .under.left.far { background: var(--danger); color: #fff; }
 .item {
   position: relative; display: flex; align-items: center; gap: 12px; padding: 10px 12px 10px 8px; min-height: 60px;
@@ -203,7 +203,7 @@ label.field > span { display: block; font-size: 0.85rem; color: var(--muted); ma
   width: max-content; min-width: min(340px, calc(100% - 24px)); max-width: calc(100% - 24px); box-shadow: 0 6px 20px rgba(20, 28, 64, 0.25); animation: up 0.2s ease;
 }
 .toast span { flex: 1; }
-.toast button { background: none; border: 0; color: var(--gold); font-weight: 700; min-height: 40px; padding: 0 10px; cursor: pointer; }
+.toast button { background: none; border: 0; color: var(--cream); text-decoration: underline; font-weight: 700; min-height: 40px; padding: 0 10px; cursor: pointer; }
 
 /* ---------- trips ---------- */
 .trip-grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); }
@@ -256,7 +256,7 @@ table.data td.num, table.data th.num { text-align: right; }
 .signin .card { max-width: 440px; width: 100%; padding: 28px 24px; text-align: center; }
 .gbtn { display: inline-flex; align-items: center; gap: 12px; background: #fff; border: 1.5px solid #c9cdd8; border-radius: 10px; min-height: 48px; padding: 0 18px; font-weight: 600; cursor: pointer; color: #1f1f1f; }
 .gbtn:hover { background: #f6f8fc; }
-.demo-banner { background: var(--gold); color: var(--bb-ink); text-align: center; font-size: 0.85rem; padding: 4px 10px; font-weight: 600; }
+.demo-banner { background: var(--gold); color: var(--on-gold); text-align: center; font-size: 0.85rem; padding: 4px 10px; font-weight: 600; }
 
 /* Purchase history and price checks */
 .item .history { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; font-size: 0.82rem; color: var(--ink-soft, var(--muted)); margin-top: 4px; }

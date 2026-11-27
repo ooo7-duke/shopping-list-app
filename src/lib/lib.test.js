@@ -430,7 +430,7 @@ describe('color looks', () => {
     expect(LOOKS).toHaveLength(5);
     for (const l of LOOKS) {
       const v = l.vars;
-      const pairs = [['bb-ink', 'cream'], ['bb-ink', 'card'], ['bb', 'cream'], ['bb', 'card'], ['muted', 'cream'], ['muted', 'card'], ['on-gold', 'gold'], ['gold-ink', 'gold-soft'], ['gold-ink', 'card'], ['cream', 'bb'], ['bb', 'bb-soft'], ['bb-ink', 'bb-soft']];
+      const pairs = [['bb-ink', 'cream'], ['bb-ink', 'card'], ['bb', 'cream'], ['bb', 'card'], ['muted', 'cream'], ['muted', 'card'], ['on-gold', 'gold'], ['gold-ink', 'gold-soft'], ['gold-ink', 'card'], ['cream', 'bb'], ['bb', 'bb-soft'], ['bb-ink', 'bb-soft'], ['bb-ink', 'gold-soft'], ['cream', 'bb-ink']];
       for (const [a, b] of pairs) expect(contrast(v[a], v[b]), `${l.id} ${a} on ${b}`).toBeGreaterThanOrEqual(4.5);
     }
   });
