@@ -485,3 +485,34 @@ describe('certified refurbished prices', () => {
     expect(seenPrices(item).best.price).toBe(199.99);
   });
 });
+
+import { forwarderOf, planLines, alreadySaved, isForwardingConfirmation, keyPart } from './inbox.js';
+
+describe('emailed receipts', () => {
+  it('files a receipt under the person who forwarded it', () => {
+    expect(forwarderOf('Sola O <Sola@Example.com>', '')).toBe('sola@example.com');
+    // A Gmail filter keeps the store as From and names the forwarder in X-Forwarded-For.
+    expect(forwarderOf('Amazon <auto-confirm@amazon.com>', 'sola@example.com loye10shopping@gmail.com')).toBe('sola@example.com');
+    expect(isForwardingConfirmation('Gmail Team <forwarding-noreply@google.com>')).toBe(true);
+    expect(keyPart('A/B..c@x.com')).toBe('ab..c@x.com');
+  });
+  it('checks off strong matches and holds weak guesses', () => {
+    const items = [{ id: 'a', name: 'Paper towels' }, { id: 'b', name: 'Sticky notes' }];
+    const res = { items: [
+      { rawText: 'Bounty 12 rolls', name: 'Paper towels', matchName: 'Paper towels', category: 'Cleaning' },
+      { rawText: 'Post-it Super Sticky Notes, 3x3 in, 12 Pads', name: 'Post-it super sticky notes, 12 pads', matchName: '' },
+      { rawText: 'Birthday card', name: 'Birthday card', matchName: '' },
+    ] };
+    const plan = planLines(res, items);
+    expect(plan.lines[0]).toMatchObject({ itemId: 'a', weak: false, category: 'Household' });
+    expect(plan.lines[1]).toMatchObject({ itemId: 'b', weak: true });
+    expect(plan.lines[2]).toMatchObject({ itemId: '', weak: false });
+    expect(plan.weak).toBe(1);
+  });
+  it('spots an order that is already saved', () => {
+    const receipts = [{ store: 'Amazon', orderId: '113-55', emailId: 'x1' }];
+    expect(alreadySaved(receipts, { emailId: 'x1' })).toBe(true);
+    expect(alreadySaved(receipts, { emailId: 'x2', orderId: '113 55', store: 'amazon' })).toBe(true);
+    expect(alreadySaved(receipts, { emailId: 'x2', orderId: '113-56', store: 'Amazon' })).toBe(false);
+  });
+});
