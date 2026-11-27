@@ -332,3 +332,28 @@ describe('theme groups', () => {
     expect(guessCategory('Deli sandwich meat')).toBe('Meat & seafood');
   });
 });
+
+import { matchKind, findDuplicates } from './dupes.js';
+
+describe('duplicate check', () => {
+  it('sees the same item in another spelling or plural', () => {
+    expect(matchKind('Paper towels', 'paper towel')).toBe('same');
+    expect(matchKind('a bag of apples', 'Apples')).toBe('same');
+  });
+  it('flags near matches', () => {
+    expect(matchKind('milk', '2% milk')).toBe('close');
+    expect(matchKind('bananna', 'banana')).toBe('close');
+    expect(matchKind('Christmas lights', 'Christmas lights outdoor')).toBe('close');
+  });
+  it('leaves different items alone', () => {
+    expect(matchKind('milk', 'chocolate chips')).toBe(null);
+    expect(matchKind('eggs', 'eggplant')).toBe(null);
+    expect(matchKind('ink', 'pink')).toBe(null);
+    expect(matchKind('Canon PG-240XL ink', 'Canon CL-241XL ink')).toBe(null);
+  });
+  it('checks the list and the entries themselves', () => {
+    const list = [{ id: '1', name: 'Milk' }];
+    const d = findDuplicates([{ name: 'milk' }, { name: 'bread' }, { name: 'Bread' }], list);
+    expect(d.map((x) => [x.entry.name, x.kind, x.onList])).toEqual([['milk', 'same', true], ['Bread', 'same', false]]);
+  });
+});

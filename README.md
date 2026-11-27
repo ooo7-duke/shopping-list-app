@@ -86,6 +86,7 @@ npm test
 | `src/lib/match.js` | Matching receipt lines to list items |
 | `src/lib/receipts.js` | Image compression and Gemini receipt reading |
 | `src/lib/qr.js` | Reading the QR code on a receipt |
+| `src/lib/dupes.js` | Spotting duplicates before an item is added (same name, plural, near match or typo) |
 | `src/data/actions.js` | Every write the app makes (add, buy, snooze, order, save receipt) |
 | `src/data/firebaseBackend.js` | Firestore and Google sign-in |
 | `src/data/localBackend.js` | Demo mode, stored in the browser |

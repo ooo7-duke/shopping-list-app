@@ -5,6 +5,7 @@ import { addEntries, isOnList } from '../data/actions.js';
 import { fmtMoney, fmtQty } from '../lib/format.js';
 import { MicIcon, PlusIcon } from './Icons.jsx';
 import { saveErrorMessage } from '../lib/errors.js';
+import { findDuplicates } from '../lib/dupes.js';
 
 const SpeechRec = typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition);
 
@@ -13,11 +14,16 @@ export default function QuickAdd() {
   const [text, setText] = useState('');
   const [sel, setSel] = useState(-1);
   const [listening, setListening] = useState(false);
+  const [pending, setPending] = useState(null); // entries held back because some look like duplicates
   const inputRef = useRef();
   const recRef = useRef();
 
   const parsed = useMemo(() => parseQuickAdd(text), [text]);
   const first = parsed[0];
+  const onList = useMemo(() => items.filter(isOnList), [items]);
+  // Shown live while typing, and again (with buttons) if Add is pressed anyway.
+  const liveDupes = useMemo(() => findDuplicates(parsed, onList), [parsed, onList]);
+  const dupes = pending ? pending.dupes : liveDupes;
 
   // Catalog matches for the text after the last comma: re-adding a known item keeps its store, price and history.
   const suggestions = useMemo(() => {
@@ -57,36 +63,62 @@ export default function QuickAdd() {
     showToast(label || `Added ${names.length > 3 ? `${names.slice(0, 3).join(', ')} and ${names.length - 3} more` : names.join(', ')}`, undo);
   }
 
+  // Holds the add when something looks like a duplicate, so the banner can ask first.
+  async function tryAdd(entries) {
+    const found = findDuplicates(entries, onList);
+    if (found.length) { setPending({ entries, dupes: found }); return false; }
+    await submit(entries);
+    return true;
+  }
+
+  async function addAnyway() {
+    const p = pending;
+    setPending(null);
+    setText('');
+    if (p) await submit(p.entries);
+    inputRef.current?.focus();
+  }
+
+  async function skipDupes() {
+    const p = pending;
+    setPending(null);
+    setText('');
+    if (!p) return;
+    const skip = new Set(p.dupes.map((d) => d.entry));
+    const rest = p.entries.filter((e) => !skip.has(e));
+    if (rest.length) await submit(rest);
+    else showToast(p.dupes.length === 1 ? `Left ${p.dupes[0].entry.name} off. It's already on the list.` : 'Left those off. They are already on the list.');
+    inputRef.current?.focus();
+  }
+
   async function onSubmit(e) {
     e?.preventDefault();
     if (sel >= 0 && suggestions[sel]) return pickSuggestion(suggestions[sel]);
     const entries = parsed;
-    setText('');
     setSel(-1);
-    await submit(entries);
+    if (await tryAdd(entries)) setText('');
   }
 
   async function pickSuggestion(it) {
     const head = text.split(/[,\n]/).slice(0, -1).join(',');
     const before = parseQuickAdd(head);
     const lastParsed = parseQuickAdd(text.split(/[,\n]/).pop())[0] || {};
-    setText('');
     setSel(-1);
-    await submit([...before, { ...lastParsed, name: it.name, store: lastParsed.store || '', qty: lastParsed.qty !== 1 ? lastParsed.qty : it.qty || 1 }]);
+    if (await tryAdd([...before, { ...lastParsed, name: it.name, store: lastParsed.store || '', qty: lastParsed.qty !== 1 ? lastParsed.qty : it.qty || 1 }])) setText('');
     inputRef.current?.focus();
   }
 
   function onKeyDown(e) {
     if (e.key === 'ArrowDown' && suggestions.length) { e.preventDefault(); setSel((s) => Math.min(s + 1, suggestions.length - 1)); }
     else if (e.key === 'ArrowUp' && suggestions.length) { e.preventDefault(); setSel((s) => Math.max(s - 1, -1)); }
-    else if (e.key === 'Escape') { setText(''); setSel(-1); }
+    else if (e.key === 'Escape') { setText(''); setSel(-1); setPending(null); }
   }
 
   function onPaste(e) {
     const t = e.clipboardData?.getData('text') || '';
     if (/\n/.test(t.trim())) {
       e.preventDefault();
-      submit(parseQuickAdd(t));
+      tryAdd(parseQuickAdd(t));
     }
   }
 
@@ -113,7 +145,7 @@ export default function QuickAdd() {
       setListening(false);
       if (finalText.trim()) {
         setText('');
-        submit(parseQuickAdd(finalText, { voice: true }));
+        tryAdd(parseQuickAdd(finalText, { voice: true }));
       }
     };
     rec.onerror = () => setListening(false);
@@ -129,7 +161,7 @@ export default function QuickAdd() {
         <input
           id="qa" ref={inputRef} value={text} autoComplete="off" enterKeyHint="done"
           placeholder="Add an item"
-          onChange={(e) => { setText(e.target.value); setSel(-1); }}
+          onChange={(e) => { setText(e.target.value); setSel(-1); setPending(null); }}
           onKeyDown={onKeyDown} onPaste={onPaste}
           aria-autocomplete="list" aria-controls="qa-suggest"
         />
@@ -142,6 +174,22 @@ export default function QuickAdd() {
           </button>
         )}
       </form>
+      {dupes.length > 0 && (
+        <div className="dupe-banner" role="alert">
+          <strong>{dupes.length === 1 ? 'This may be a duplicate.' : `${dupes.length} of these may be duplicates.`}</strong>
+          <ul>
+            {dupes.map((d, i) => (
+              <li key={i}>{dupeLine(d)}</li>
+            ))}
+          </ul>
+          {pending && (
+            <div className="row">
+              <button type="button" className="btn primary" onClick={skipDupes}>{pending.entries.length > pending.dupes.length ? 'Add the rest only' : "Don't add"}</button>
+              <button type="button" className="btn" onClick={addAnyway}>Add anyway</button>
+            </div>
+          )}
+        </div>
+      )}
       {first && (
         <div className="qa-preview" aria-live="polite">
           <span className="chip blue">{first.name}</span>
@@ -165,4 +213,11 @@ export default function QuickAdd() {
       )}
     </div>
   );
+}
+
+function dupeLine({ entry, match, kind, onList }) {
+  if (!onList) return `${entry.name} is in this entry twice.`;
+  const detail = [fmtQty(match.qty, match.unit), match.store].filter((x) => x && x !== '1').join(', ');
+  const where = `${match.name}${detail ? ` (${detail})` : ''}`;
+  return kind === 'same' ? `${where} is already on your list.` : `${entry.name} looks like ${where}, already on your list.`;
 }
