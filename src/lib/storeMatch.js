@@ -22,11 +22,28 @@ function priceOf(r) {
 
 const safeUrl = (u) => (typeof u === 'string' && /^https:\/\//.test(u) ? u : null);
 
-// Returns [{ storeId, storeName, price, title, url }]: the cheapest result at each
-// preferred store, plus the cheapest result anywhere else as storeId 'any'.
-export function pickQuotes(results = []) {
+// Knock-offs undercut the real thing, so they'd always win "cheapest". Skip them unless
+// the item's own name asks for one.
+const KNOCKOFF = /\b(compatible|remanufactured|refurbished|replacement for|refill|generic|for use with|used)\b/i;
+
+// Words with a digit in them, like "240XL" or "12oz", identify the exact product.
+// A result has to contain every one of them.
+function modelTokens(query = '') {
+  return query.toLowerCase().split(/[^a-z0-9]+/).filter((t) => /\d/.test(t) && t.length >= 2);
+}
+
+export function fitsQuery(title = '', query = '') {
+  const t = title.toLowerCase().replace(/[^a-z0-9]+/g, ' ');
+  if (KNOCKOFF.test(title) && !KNOCKOFF.test(query)) return false;
+  return modelTokens(query).every((tok) => t.includes(tok) || t.replace(/ /g, '').includes(tok));
+}
+
+// Returns [{ storeId, storeName, price, title, url }]: the cheapest matching result at each
+// preferred store, plus the cheapest matching result anywhere else as storeId 'any'.
+export function pickQuotes(results = [], query = '') {
   const best = {};
   for (const r of results) {
+    if (!fitsQuery(String(r.title || ''), query)) continue;
     const price = priceOf(r);
     if (price == null || !(price > 0)) continue;
     const storeName = String(r.source || '').slice(0, 60);

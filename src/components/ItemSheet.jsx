@@ -6,7 +6,7 @@ import { storeLinks, seenPrices, hasPriceProvider } from '../lib/prices.js';
 import { lastPurchaseMap, lastBuy } from '../lib/history.js';
 import { fmtMoney, fmtDate, toInputDate, fromInputDate, fmtQty } from '../lib/format.js';
 import { HOUSEHOLD_CATEGORIES } from '../lib/categories.js';
-import { can } from '../lib/config.js';
+import { can, DEMO_MODE } from '../lib/config.js';
 
 // Every field saves as soon as it changes, so there is no Save button to forget.
 export default function ItemSheet({ item, focus, onClose }) {
@@ -28,10 +28,10 @@ export default function ItemSheet({ item, focus, onClose }) {
   const links = storeLinks(item);
   const { best } = seenPrices(item);
   const [looking, setLooking] = useState(false);
-  const elsewhere = item.seenPrices?.any;
+  const real = (seen) => (seen && seen.by !== 'sample' ? seen : null);
+  const elsewhere = real(item.seenPrices?.any);
   const seenLabel = (seen) => {
     if (!seen?.at) return '';
-    if (seen.by === 'sample') return 'sample price';
     if (seen.by === 'auto') return `found ${fmtDate(seen.at)}`;
     return `you saw ${fmtDate(seen.at)}`;
   };
@@ -127,10 +127,11 @@ export default function ItemSheet({ item, focus, onClose }) {
                 {hasPriceProvider() ? 'Prices fill in when you add an item. ' : ''}Tap a store to check it, or type a price you see.
                 {best ? ` Cheapest: ${best.store} at ${fmtMoney(best.price)}.` : ''}
               </p>
+              {DEMO_MODE && <p className="small" style={{ marginBottom: 8 }}>This demo can't look up live prices. On your site they fill in from Google Shopping once the price key is set up.</p>}
               {looking && <p className="small" role="status" style={{ marginBottom: 8 }}>Looking up prices…</p>}
               <div className="price-list">
                 {links.filter((l) => l.id !== 'any').map((l) => {
-                  const seen = item.seenPrices?.[l.id];
+                  const seen = real(item.seenPrices?.[l.id]);
                   return (
                     <div key={l.id} className="price-line">
                       <a className="chip blue" href={l.href} target="_blank" rel="noopener noreferrer">{l.name} ↗</a>
@@ -150,7 +151,7 @@ export default function ItemSheet({ item, focus, onClose }) {
                     {elsewhere.url
                       ? <a className="chip blue" href={elsewhere.url} target="_blank" rel="noopener noreferrer">{elsewhere.storeName || 'Elsewhere'} ↗</a>
                       : <span className="chip">{elsewhere.storeName || 'Elsewhere'}</span>}
-                    <span className="grow tiny muted">{elsewhere.by === 'sample' ? 'sample price' : 'cheapest elsewhere'}</span>
+                    <span className="grow tiny muted">cheapest elsewhere</span>
                     <strong className="price-input" style={{ display: 'inline-block' }}>{fmtMoney(elsewhere.price)}</strong>
                   </div>
                 )}

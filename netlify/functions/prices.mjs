@@ -34,7 +34,7 @@ export default async (req) => {
     if (!r.ok) return json({ configured: true, quotes: [], error: `Price search failed (${r.status})` }, 502);
     const data = await r.json();
     const results = [...(data.shopping_results || []), ...(data.inline_shopping_results || [])];
-    return json({ configured: true, quotes: pickQuotes(results) });
+    return json({ configured: true, quotes: pickQuotes(results, q) });
   } catch {
     return json({ configured: true, quotes: [], error: 'Price search failed' }, 502);
   }

@@ -46,7 +46,7 @@ export default function ItemRow({ item, pred, done, last, showHistory = false, o
         {showHistory && (
           <div className="history">
             {last ? <span>Last bought {lastParts.join(' · ')}</span> : <span className="muted">Not bought yet</span>}
-            {best && <span className={`chip${best.stale ? '' : ' gold'}`}>Cheapest: {best.store} {fmtMoney(best.price)}{best.stale ? ' (old)' : best.by === 'sample' ? ' (sample)' : ''}</span>}
+            {best && <span className={`chip${best.stale ? '' : ' gold'}`}>Cheapest: {best.store} {fmtMoney(best.price)}{best.stale ? ' (old)' : ''}</span>}
             {onPrices && (
               <button type="button" className="chip blue" onClick={(e) => { e.stopPropagation(); onPrices(); }} aria-label={`See prices for ${item.name}`}>{best ? 'All prices' : 'Find prices'}</button>
             )}

@@ -122,7 +122,7 @@ describe('price checks', () => {
   });
 });
 
-import { pickQuotes, storeIdFor } from './storeMatch.js';
+import { pickQuotes, storeIdFor, fitsQuery } from './storeMatch.js';
 import { mergeQuotes } from './prices.js';
 import { describePrediction as describe2 } from './predict.js';
 
@@ -148,6 +148,22 @@ describe('automatic price lookup', () => {
     expect(by.samsclub.price).toBe(22.98);
     expect(by.any.storeName).toBe('Evil');
     expect(by.any.url).toBe(null);
+  });
+  it('skips knock-offs and other models', () => {
+    const q = pickQuotes([
+      { source: 'Amazon.com', title: 'Compatible PG-240XL ink cartridge for Canon', extracted_price: 12.99 },
+      { source: 'Walmart', title: 'Canon PG-243 Black Ink', extracted_price: 15.99 },
+      { source: 'Walmart', title: 'Canon PG-240XL Black Ink Cartridge', extracted_price: 34.99 },
+      { source: 'Amazon.com', title: 'Canon PG 240 XL Black', extracted_price: 36.49 },
+    ], 'Canon cartridge 240XL');
+    const by = Object.fromEntries(q.map((x) => [x.storeId, x]));
+    expect(by.walmart.price).toBe(34.99);
+    expect(by.amazon.price).toBe(36.49);
+    expect(fitsQuery('Compatible ink', 'compatible ink')).toBe(true);
+  });
+  it('ignores prices the old demo made up', () => {
+    const { rows } = seenPrices({ seenPrices: { amazon: { price: 9, at: Date.now(), by: 'sample' } } });
+    expect(rows.length).toBe(0);
   });
   it('does not overwrite a price someone typed today', () => {
     const now = 10 * 86400e3;

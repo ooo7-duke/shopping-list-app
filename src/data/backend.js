@@ -3,8 +3,9 @@ import { DEMO_MODE } from '../lib/config.js';
 import * as fb from './firebaseBackend.js';
 import * as local from './localBackend.js';
 
-import { registerPriceProvider, samplePriceProvider, serverPriceProvider } from '../lib/prices.js';
+import { registerPriceProvider, serverPriceProvider } from '../lib/prices.js';
 
 const backend = DEMO_MODE ? local : fb;
-registerPriceProvider(DEMO_MODE ? samplePriceProvider : serverPriceProvider(fb.idToken));
+// The demo has no price lookup, so it never shows a made-up price.
+if (!DEMO_MODE) registerPriceProvider(serverPriceProvider(fb.idToken));
 export default backend;

@@ -4,7 +4,7 @@
 // public price feed. So prices come from two places:
 // 1. Automatic: when an item is added, a provider looks it up. With Firebase, that's the
 //    server function netlify/functions/prices.mjs (Google Shopping through SerpApi).
-//    In the demo, a sample provider makes up clearly labeled prices.
+//    The demo has no provider: it never makes up a price.
 // 2. By hand: a search link per store, and the person types the price they see.
 
 // Preferred order. Stores after the first three are extras, not a limit.
@@ -31,7 +31,8 @@ export function storeLinks(item) {
 // Returns them in preferred-store order, cheapest flagged.
 export function seenPrices(item, now = Date.now(), maxAgeDays = 30) {
   const seen = item.seenPrices || {};
-  const rows = PRICE_STORES.filter((s) => seen[s.id]?.price != null).map((s) => ({
+  // Prices the old demo made up (by 'sample') are ignored.
+  const rows = PRICE_STORES.filter((s) => seen[s.id]?.price != null && seen[s.id].by !== 'sample').map((s) => ({
     store: seen[s.id].storeName || s.name, storeId: s.id, price: Number(seen[s.id].price), at: seen[s.id].at,
     by: seen[s.id].by || '', url: seen[s.id].url || null,
     stale: now - (seen[s.id].at || 0) > maxAgeDays * 86400e3,
@@ -42,7 +43,7 @@ export function seenPrices(item, now = Date.now(), maxAgeDays = 30) {
 }
 
 // Provider registry. A provider is { id, by, quote(item) => Promise<[{ storeId, storeName, price, title, url }]> }.
-// by is how the price is labeled: 'auto' for a real lookup, 'sample' for the demo's made-up ones.
+// by is how the price is labeled: 'auto' for a looked-up price, a person's name for a typed one.
 const providers = [];
 export function registerPriceProvider(p) { providers.push(p); }
 export const hasPriceProvider = () => providers.length > 0;
@@ -63,29 +64,12 @@ export function mergeQuotes(seen = {}, quotes = [], now = Date.now()) {
   for (const q of quotes) {
     if (!PRICE_STORES.some((s) => s.id === q.storeId)) continue;
     const cur = out[q.storeId];
-    const typedRecently = cur && cur.by && cur.by !== 'auto' && cur.by !== 'sample' && now - (cur.at || 0) < 86400e3;
+    const typedRecently = cur && cur.by && cur.by !== 'auto' && now - (cur.at || 0) < 86400e3;
     if (typedRecently) continue;
     out[q.storeId] = { price: q.price, at: now, by: q.by || 'auto', ...(q.storeName ? { storeName: q.storeName } : {}), ...(q.title ? { title: q.title } : {}), ...(q.url ? { url: q.url } : {}) };
   }
   return out;
 }
-
-// The demo's provider: steady made-up prices per item, always labeled as samples.
-export const samplePriceProvider = {
-  id: 'sample', by: 'sample',
-  async quote(item) {
-    const seed = [...(item.name || '')].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7);
-    const base = Number(item.lastPrice) > 0 ? Number(item.lastPrice) : 3 + (seed % 1700) / 100;
-    const jig = (k) => Math.round(base * (0.88 + ((seed >> k) % 25) / 100) * 100) / 100;
-    await new Promise((r) => setTimeout(r, 600));
-    return [
-      { storeId: 'samsclub', storeName: "Sam's Club", price: jig(1) },
-      { storeId: 'amazon', storeName: 'Amazon', price: jig(4) },
-      { storeId: 'walmart', storeName: 'Walmart', price: jig(7) },
-      { storeId: 'any', storeName: 'Kroger', price: jig(10) },
-    ];
-  },
-};
 
 // The live provider: asks the app's own server function, which holds the search key.
 export function serverPriceProvider(getToken) {
