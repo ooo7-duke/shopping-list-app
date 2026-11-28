@@ -99,6 +99,13 @@ function inspect(win) {
       if (pos !== 'fixed' || r.width < W) issues.push(['offscreen', `${desc(el)} spans ${Math.round(r.left)} to ${Math.round(r.right)} in ${W}px`]);
     }
     const s = getComputedStyle(el);
+    // A box that scrolls sideways inside (a sheet or a card): name the widest thing in it.
+    if (/(auto|scroll)/.test(s.overflowX) && el.scrollWidth > el.clientWidth + 2 && tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT') {
+      const er = el.getBoundingClientRect();
+      let worst = null, wr = er.right;
+      for (const c of el.querySelectorAll('*')) { if (!vis(c)) continue; const cr = c.getBoundingClientRect(); if (cr.right > wr + 1) { wr = cr.right; worst = c; } }
+      issues.push(['inner-hscroll', `${desc(el)} scrolls sideways (${el.scrollWidth}px in ${el.clientWidth}px)${worst ? '; widest: ' + desc(worst) : ''}`]);
+    }
     // Text cut off without an ellipsis.
     const hasText = [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim());
     if (hasText && el.scrollWidth > el.clientWidth + 2 && /(hidden|clip)/.test(s.overflowX) && s.textOverflow !== 'ellipsis') issues.push(['clipped', desc(el)]);

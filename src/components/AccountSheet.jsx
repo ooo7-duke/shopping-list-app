@@ -54,7 +54,7 @@ export default function AccountSheet({ onClose }) {
         <div className="card" style={{ background: '#fff' }}>
           <h3 style={{ marginBottom: 8 }}>{account.name} · people</h3>
           {members.map(([uid, m]) => (
-            <div key={uid} className="row" style={{ minHeight: 48 }}>
+            <div key={uid} className="row member-row" style={{ minHeight: 48 }}>
               <div className="avatar">{initials(m.name)}</div>
               <div className="grow"><div className="ellipsis">{m.name}{uid === user.uid ? ' (you)' : ''}</div><div className="small muted ellipsis">{m.email}</div></div>
               {owner && uid !== user.uid ? (
