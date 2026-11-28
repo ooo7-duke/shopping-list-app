@@ -256,7 +256,7 @@ function TripDetail({ trip, expenses, onBack, onEdit, onDeleted }) {
         <div className="drop-actions">
           <label className={`btn primary${busy ? ' is-disabled' : ''}`}>Take photo<input ref={cameraRef} type="file" accept="image/*" capture="environment" className="sr-only" onChange={(e) => handle(e.target.files?.[0])} disabled={!!busy} /></label>
           <label className={`btn${busy ? ' is-disabled' : ''}`}>Choose photo<input ref={pickRef} type="file" accept="image/*,.heic,.heif" className="sr-only" onChange={(e) => handle(e.target.files?.[0])} disabled={!!busy} /></label>
-          <button type="button" className="btn ghost" disabled={!!busy} onClick={() => setEditing({ tripId: trip.id, paidWith: 'personal', source: 'manual', category: 'other', date: Math.min(Date.now(), trip.endDate) })}>No receipt</button>
+          <button type="button" className="btn ghost" disabled={!!busy} onClick={() => setEditing({ tripId: trip.id, paidWith: 'personal', source: 'manual', category: 'other', date: Math.min(Date.now(), trip.endDate) })}>Type it in</button>
         </div>
       </div>
       {DEMO_MODE && <p className="tiny muted" style={{ marginTop: 6 }}>Demo mode fills in a sample dinner receipt so you can try the check step.</p>}
@@ -327,7 +327,7 @@ function ExpenseRow({ e, all, trip, onOpen }) {
   const biz = trip.mealsMode === 'perDiem' && isMeal(e.category) ? 0 : businessAmount(e);
   const partial = Math.abs(biz - (Number(e.amount) || 0)) > 0.004;
   return (
-    <div className="item" role="button" tabIndex={0} onClick={onOpen} onKeyDown={(ev) => ev.key === 'Enter' && onOpen()}>
+    <div className="item xrow" role="button" tabIndex={0} onClick={onOpen} onKeyDown={(ev) => ev.key === 'Enter' && onOpen()}>
       <div className="grow" style={{ minWidth: 0 }}>
         <div className="name ellipsis">{e.merchant || categoryLabel(e.category)}</div>
         <div className="meta">

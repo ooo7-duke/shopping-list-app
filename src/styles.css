@@ -173,6 +173,7 @@ label.field > span { display: block; font-size: 0.85rem; color: var(--muted); ma
 @media (hover: hover) and (pointer: fine) {
   .item:hover .hover-actions { display: flex; }
   .item:hover .price { display: none; }
+  .item.xrow:hover .price { display: block; }
 }
 .suggest-strip { display: flex; flex-wrap: wrap; gap: 8px; padding: 2px 2px 8px; }
 .suggest-strip .chip { flex: none; max-width: 100%; white-space: normal; text-align: left; }
