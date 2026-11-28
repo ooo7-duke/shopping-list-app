@@ -75,6 +75,23 @@ function queue(el) {
 
 function refitAll() { mounted.forEach(queue); }
 
+// When the phone's text size changes while the app is open, every fitted box measures again.
+const remListeners = new Set();
+let sentinel = null;
+function watchTextSize() {
+  if (sentinel || typeof document === 'undefined' || typeof ResizeObserver === 'undefined' || !document.body) return;
+  sentinel = document.createElement('div');
+  sentinel.setAttribute('aria-hidden', 'true');
+  sentinel.style.cssText = 'position:absolute;left:0;top:0;width:1rem;height:1rem;overflow:hidden;visibility:hidden;pointer-events:none';
+  document.body.appendChild(sentinel);
+  let last = 0;
+  new ResizeObserver(() => {
+    const w = sentinel.offsetWidth;
+    if (w && w !== last) { if (last) { refitAll(); remListeners.forEach((fn) => fn()); } last = w; }
+  }).observe(sentinel);
+}
+export function onTextSizeChange(fn) { watchTextSize(); remListeners.add(fn); return () => remListeners.delete(fn); }
+
 if (typeof window !== 'undefined') {
   document.fonts?.ready?.then(refitAll);
   window.addEventListener('resize', refitAll);
@@ -92,6 +109,7 @@ export default function FitText({ as: Tag = 'div', className = '', lines = 1, fi
         if (widths.get(e.target) !== w) { widths.set(e.target, w); queue(e.target); }
       }));
     }
+    watchTextSize();
     mounted.add(el);
     ro?.observe(el);
     return () => { mounted.delete(el); ro?.unobserve(el); queued.delete(el); };
@@ -136,7 +154,8 @@ export function FitTable({ min = 0.7, className = '', children }) {
     const again = () => run.current();
     document.fonts?.ready?.then(again);
     window.addEventListener('resize', again);
-    return () => { obs.disconnect(); window.removeEventListener('resize', again); };
+    const off = onTextSizeChange(again);
+    return () => { obs.disconnect(); window.removeEventListener('resize', again); off(); };
   }, []);
   return <div ref={ref} className={`card fit-table ${className}`}>{children}</div>;
 }

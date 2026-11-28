@@ -2,10 +2,12 @@
 // check and trash can would squeeze the name to under about 8 letters' width, the amount moves to its
 // own line under the trash can instead. Nothing shrinks to fit and nothing scrolls sideways.
 import { useLayoutEffect, useRef } from 'react';
+import { onTextSizeChange } from './FitText.jsx';
 
 const MIN_EM = 8;
 const rows = new Set();
 let ro = null;
+let watching = false;
 const px = (v) => parseFloat(v) || 0;
 
 function check(row) {
@@ -52,6 +54,7 @@ export default function useStackPrice() {
         if (widths.get(e.target) !== w) { widths.set(e.target, w); check(e.target); }
       }));
     }
+    if (!watching) { watching = true; onTextSizeChange(checkAll); }
     rows.add(row);
     ro?.observe(row);
     return () => { rows.delete(row); ro?.unobserve(row); };
