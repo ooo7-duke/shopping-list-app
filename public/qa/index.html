@@ -192,12 +192,12 @@ function inspect(win) {
     const room = el.clientWidth - parseFloat(s.paddingLeft) - parseFloat(s.paddingRight) - (el.tagName === 'SELECT' ? 22 : isDate ? 28 : 0);
     if (need > room + 1) issues.push(['field-clipped', `${el.tagName.toLowerCase()} "${text.slice(0, 50)}" needs ${Math.round(need)}px, has ${Math.round(room)}px`]);
   }
-  // Fitted names that should fit their lines: report how they measure.
+  // Fitted names that still need more lines than they show, even at their smallest size.
   for (const el of root.querySelectorAll('[data-fit-lines]')) {
     if (!vis(el)) continue;
     const s = getComputedStyle(el), inner = el.firstElementChild;
     const tops = inner ? new Set([...inner.getClientRects()].map((r) => Math.round(r.top))).size : -1;
-    issues.push(['fit-info', `"${el.textContent.slice(0, 18)}" w${el.clientWidth} fs${s.fontSize} fit${el.dataset.fit || '-'} lines${tops} sh${el.scrollHeight} ch${el.clientHeight} ${s.display} clamp${s.webkitLineClamp}`]);
+    if (tops > (Number(el.dataset.lines) || 1)) issues.push(['fit-cut', `"${el.textContent.slice(0, 24)}" needs ${tops} lines at ${s.fontSize} (${el.textContent.length} letters)`]);
   }
   return [...new Map(issues.map((i) => [i.join('|'), i])).values()];
 }
