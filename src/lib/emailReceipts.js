@@ -6,7 +6,8 @@ import { DEMO_MODE } from './config.js';
 
 const URL_ = '/.netlify/functions/receipts-inbox';
 export async function fetchInbox() {
-  if (DEMO_MODE) return { configured: true, email: 'demo@example.com', items: [] };
+  // The demo has no real inbox. The layout check page may leave sample emails on this device.
+  if (DEMO_MODE) return { configured: true, email: 'demo@example.com', items: demoInbox() };
   const token = await backend.idToken?.();
   if (!token) return { configured: false, items: [] };
   const r = await fetch(URL_, { headers: { authorization: `Bearer ${token}` } });
@@ -16,8 +17,16 @@ export async function fetchInbox() {
   return data;
 }
 
+const DEMO_INBOX = 'sla-demo-inbox';
+function demoInbox() {
+  try { return JSON.parse(localStorage.getItem(DEMO_INBOX) || '[]'); } catch { return []; }
+}
+
 export async function ackInbox(id) {
-  if (DEMO_MODE) return;
+  if (DEMO_MODE) {
+    try { localStorage.setItem(DEMO_INBOX, JSON.stringify(demoInbox().filter((m) => m.id !== id))); } catch { /* blocked */ }
+    return;
+  }
   const token = await backend.idToken?.();
   await fetch(`${URL_}?id=${encodeURIComponent(id)}`, { method: 'DELETE', headers: { authorization: `Bearer ${token}` } });
 }

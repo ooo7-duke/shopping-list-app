@@ -322,7 +322,7 @@ function EmailedReceipts() {
     let data;
     try { data = await fetchInbox(); } catch (e) { setInbox({ loading: false, error: e.message, items: [] }); return; }
     setInbox({ loading: false, ...data });
-    const out = { receipts: 0, checked: [], skipped: 0, waiting: 0, travel: 0 };
+    const out = { receipts: 0, checked: [], held: 0, waiting: 0, travel: 0 };
     const notTravel = notTravelIds();
     for (const m of data.items || []) {
       if (!notTravel.includes(m.id) && emailTrip(m, latest.current.expenseTrips, latest.current.expenses)) { out.travel++; continue; }
@@ -333,14 +333,15 @@ function EmailedReceipts() {
           res = await extractReceiptText(m, latest.current.items.map((i) => i.name), backend.getApp(), cats);
           cacheRead(m.id, res);
         }
-        if (!res.isReceipt || alreadySaved(latest.current.receipts, { emailId: m.id, orderId: res.orderId, store: res.store })) {
-          await ackInbox(m.id);
-          dropRead(m.id);
-          out.skipped++;
-          setOne(m.id, { status: 'skipped', m });
+        const plan = planLines(res, latest.current.items, cats);
+        // An email that doesn't look like a receipt, or matches one already saved, stays here with
+        // the reason until the person checks or dismisses it. Nothing is set aside out of sight.
+        const dup = res.isReceipt && alreadySaved(latest.current.receipts, { emailId: m.id, orderId: res.orderId, store: res.store });
+        if (!res.isReceipt || dup) {
+          out.held++;
+          setOne(m.id, { status: 'held', why: dup ? 'dup' : 'other', m, res, plan });
           continue;
         }
-        const plan = planLines(res, latest.current.items, cats);
         if (plan.weak) {
           out.waiting++;
           setOne(m.id, { status: 'review', m, res, plan });
@@ -358,7 +359,7 @@ function EmailedReceipts() {
         setOne(m.id, { status: 'error', m, error: aiErrorMessage(e, 'Receipt reading') });
       }
     }
-    if (out.receipts || out.skipped || out.waiting || out.travel) setDone(out);
+    if (out.receipts || out.held || out.waiting || out.travel) setDone(out);
     if (out.receipts) showToast(`Added ${out.receipts} emailed receipt${out.receipts === 1 ? '' : 's'}`);
   }
 
@@ -373,7 +374,7 @@ function EmailedReceipts() {
     setReview(null);
   }
 
-  const waiting = Object.entries(state).filter(([, v]) => ['review', 'reading', 'error'].includes(v.status));
+  const waiting = Object.entries(state).filter(([, v]) => ['review', 'held', 'reading', 'error'].includes(v.status));
   const nothingYet = !inbox.loading && !waiting.length && !done;
 
   return (
@@ -388,20 +389,24 @@ function EmailedReceipts() {
               done.receipts ? `Added ${done.receipts} receipt${done.receipts === 1 ? '' : 's'}${done.checked.length ? ` and checked off ${listNames(done.checked)}` : ''}.` : '',
               done.waiting ? `${done.waiting} ${done.waiting === 1 ? 'needs' : 'need'} your OK below.` : '',
               done.travel ? `${done.travel} look${done.travel === 1 ? 's' : ''} like travel and ${done.travel === 1 ? 'is' : 'are'} waiting on the Expense Report page.` : '',
-              done.skipped ? `Skipped ${done.skipped} email${done.skipped === 1 ? '' : 's'} that ${done.skipped === 1 ? 'wasn\'t a receipt or was' : 'weren\'t receipts or were'} already saved.` : '',
+              done.held ? `${done.held} email${done.held === 1 ? '' : 's'} below ${done.held === 1 ? 'doesn\'t look' : 'don\'t look'} like a new receipt. Check or dismiss ${done.held === 1 ? 'it' : 'them'}.` : '',
             ].filter(Boolean).join(' ')}
           </p>
         )}
         {waiting.map(([id, v]) => (
           <div key={id} className="email-row">
             <div className="grow" style={{ minWidth: 0 }}>
-              <FitText className="name" lines={2}>{v.res?.store || storeFromSubject(v.m?.subject) || 'Emailed receipt'}</FitText>
+              <FitText className="name" lines={2}>{v.res?.store || storeFromSubject(v.m?.subject) || v.m?.subject || 'Emailed receipt'}</FitText>
               <div className="meta">
-                {v.status === 'reading' ? 'Reading…' : v.status === 'error' ? `Couldn't read it. ${v.error}` : `${plural(v.plan.lines.length, 'item')} · ${v.plan.weak} best guess${v.plan.weak === 1 ? '' : 'es'} to check`}
+                {v.status === 'reading' ? 'Reading…'
+                  : v.status === 'error' ? `Couldn't read it. ${v.error}`
+                  : v.status === 'held' ? (v.why === 'dup' ? 'Looks already saved' : 'Doesn\'t look like a receipt')
+                  : `${plural(v.plan.lines.length, 'item')} · ${v.plan.weak} best guess${v.plan.weak === 1 ? '' : 'es'} to check`}
+                {v.m?.date ? ` · emailed ${fmtDate(v.m.date)}` : ''}
               </div>
             </div>
-            {v.status === 'review' && <button type="button" className="btn primary" onClick={() => openReview(id)}>Check</button>}
-            {(v.status === 'review' || v.status === 'error') && <button type="button" className="btn" onClick={() => finish(id, false)}>Dismiss</button>}
+            {(v.status === 'review' || (v.status === 'held' && v.plan?.lines.length > 0)) && <button type="button" className={`btn${v.status === 'review' ? ' primary' : ''}`} onClick={() => openReview(id)}>Check</button>}
+            {['review', 'held', 'error'].includes(v.status) && <button type="button" className="btn" onClick={() => finish(id, false)}>Dismiss</button>}
           </div>
         ))}
         {nothingYet && <p className="small">No emailed receipts waiting.</p>}

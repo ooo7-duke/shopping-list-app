@@ -203,8 +203,24 @@ function inspect(win) {
 }
 const q = new URLSearchParams(location.search);
 const w = +(q.get('w') || 412), h = +(q.get('h') || (w <= 320 ? 640 : w <= 360 ? 760 : w <= 390 ? 844 : 860)), big = q.get('big') === '1', hash = q.get('hash') || 'list';
-if (q.get('seed') === '1') { localStorage.setItem('sla-demo-v3', JSON.stringify(buildSeed())); q.delete('seed'); history.replaceState(null, '', '?' + q); }
-if (q.get('clear') === '1') { localStorage.removeItem('sla-demo-v3'); q.delete('clear'); history.replaceState(null, '', '?' + q); }
+// Two sample emailed receipts: one that isn't a receipt, one with a guess to check. Already "read",
+// so no AI call is made.
+function seedInbox() {
+  const now = Date.now();
+  localStorage.setItem('sla-demo-inbox', JSON.stringify([
+    { id: 'qa-mail-1', from: 'demo@example.com', subject: 'Your Home Depot order has shipped and is on its way to you', date: now - 36e5, text: '' },
+    { id: 'qa-mail-2', from: 'demo@example.com', subject: 'Your Giant Food receipt', date: now - 72e5, text: '' },
+  ]));
+  localStorage.setItem('sla-email-reads', JSON.stringify({
+    'qa-mail-1': { isReceipt: false, store: '', items: [] },
+    'qa-mail-2': { isReceipt: true, store: 'Giant Food', date: now - 72e5, total: 12.47, orderId: 'QA-2', items: [
+      { rawText: 'GV 2% MILK GAL', name: 'Milk', quantity: 1, unitPrice: 3.79, lineTotal: 3.79, category: 'Dairy', matchName: 'Milk' },
+      { rawText: 'BDAY CARD', name: 'Birthday card', quantity: 1, unitPrice: 4.1, lineTotal: 4.1, category: 'Other', matchName: '' },
+      { rawText: 'BREAD WW', name: 'Whole wheat bread', quantity: 1, unitPrice: 4.58, lineTotal: 4.58, category: 'Pantry', matchName: 'Bread' } ] },
+  }));
+}
+if (q.get('seed') === '1') { localStorage.setItem('sla-demo-v3', JSON.stringify(buildSeed())); seedInbox(); q.delete('seed'); history.replaceState(null, '', '?' + q); }
+if (q.get('clear') === '1') { ['sla-demo-v3', 'sla-demo-inbox', 'sla-email-reads'].forEach((k) => localStorage.removeItem(k)); q.delete('clear'); history.replaceState(null, '', '?' + q); }
 const link = (label, patch, on) => { const p = new URLSearchParams(q); for (const [k, v] of Object.entries(patch)) p.set(k, v); return `<a href="?${p}" class="${on ? 'on' : ''}">${label}</a>`; };
 const tabs = ['list', 'trips', 'receipts', 'insights', 'expenses'];
 document.getElementById('bar').innerHTML =
