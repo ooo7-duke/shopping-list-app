@@ -565,3 +565,77 @@ describe('store name only', () => {
     expect(guessStoreType('')).toBe('other');
   });
 });
+
+import { aiErrorMessage, aiErrorDetail } from './errors.js';
+describe('AI error messages', () => {
+  const url = 'https://firebasevertexai.googleapis.com/v1beta/projects/p/models/gemini-2.5-flash:generateContent';
+  const fetchErr = (status, msg, extra = '') => Object.assign(new Error(`AI: Error fetching from ${url}: [${status} ] ${msg}${extra} (AI/fetch-error)`), { code: 'fetch-error', customErrorData: { status } });
+  it('does not blame setup for every error just because of the address', () => {
+    const m = aiErrorMessage(fetchErr(401, 'Firebase App Check token is invalid.'));
+    expect(m).toMatch(/App Check/);
+    expect(m).not.toMatch(/isn't turned on/);
+    expect(m).toMatch(/Details: 401: Firebase App Check token is invalid\./);
+    expect(m).not.toMatch(/googleapis/);
+  });
+  it('says turned off only for the real api-not-enabled error', () => {
+    const e = Object.assign(new Error('AI: The Firebase AI SDK requires ... (AI/api-not-enabled)'), { code: 'api-not-enabled', customErrorData: { status: 403 } });
+    expect(aiErrorMessage(e)).toMatch(/isn't turned on yet/);
+  });
+  it('names limits, permissions and bad photos', () => {
+    expect(aiErrorMessage(fetchErr(429, 'Resource has been exhausted'))).toMatch(/busy/);
+    expect(aiErrorMessage(fetchErr(403, 'Method doesn\'t allow unregistered callers', ' [{"@type":"x"}]'))).toMatch(/refused by Google/);
+    expect(aiErrorMessage(fetchErr(400, 'Unable to process input image'))).toMatch(/couldn't use that photo/);
+    expect(aiErrorDetail(fetchErr(403, 'Denied', ' [{"@type":"x"}]'))).toBe('403: Denied');
+  });
+  it('spots a dropped connection', () => {
+    const e = Object.assign(new Error(`AI: Error fetching from ${url}: Failed to fetch (AI/error)`), { code: 'error' });
+    expect(aiErrorMessage(e)).toMatch(/internet connection/);
+  });
+});
+
+describe('AI retries', async () => {
+  const { withRetry, isRetryable, isModelMissing } = await import('./ai.js');
+  const busy = Object.assign(new Error('AI: Error fetching: [500 ] This model is currently experiencing high demand. (AI/fetch-error)'), { customErrorData: { status: 500 } });
+  const sleep = () => Promise.resolve();
+
+  it('retries a busy model and returns the answer', async () => {
+    let n = 0;
+    const out = await withRetry(async (m) => { n++; if (n < 3) throw busy; return m; }, { models: ['main', 'backup'], sleep });
+    expect(out).toBe('main');
+    expect(n).toBe(3);
+  });
+
+  it('moves to the backup model when the main one stays busy', async () => {
+    const seen = [];
+    const out = await withRetry(async (m) => { seen.push(m); if (m === 'main') throw busy; return 'ok'; }, { models: ['main', 'backup'], sleep });
+    expect(out).toBe('ok');
+    expect(seen).toEqual(['main', 'main', 'main', 'backup']);
+  });
+
+  it('goes straight to the backup model when the main one is retired', async () => {
+    const gone = Object.assign(new Error('models/x is no longer available'), { customErrorData: { status: 404 } });
+    const seen = [];
+    await withRetry(async (m) => { seen.push(m); if (m === 'main') throw gone; return 'ok'; }, { models: ['main', 'backup'], sleep });
+    expect(seen).toEqual(['main', 'backup']);
+  });
+
+  it('does not retry errors a retry cannot fix', async () => {
+    const bad = Object.assign(new Error('bad photo'), { customErrorData: { status: 400 } });
+    let n = 0;
+    await expect(withRetry(async () => { n++; throw bad; }, { models: ['main', 'backup'], sleep })).rejects.toBe(bad);
+    expect(n).toBe(1);
+  });
+
+  it('throws the last error after every try fails', async () => {
+    let n = 0;
+    await expect(withRetry(async () => { n++; throw busy; }, { models: ['main', 'backup'], sleep })).rejects.toBe(busy);
+    expect(n).toBe(5);
+  });
+
+  it('sorts errors', () => {
+    expect(isRetryable(busy)).toBe(true);
+    expect(isRetryable({ customErrorData: { status: 429 } })).toBe(true);
+    expect(isRetryable({ customErrorData: { status: 403 } })).toBe(false);
+    expect(isModelMissing({ customErrorData: { status: 404 } })).toBe(true);
+  });
+});

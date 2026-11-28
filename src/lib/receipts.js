@@ -1,5 +1,6 @@
 // Receipt reading with Gemini through Firebase AI Logic (no server, no API key in the app).
-import { DEMO_MODE, GEMINI_MODEL } from './config.js';
+import { DEMO_MODE } from './config.js';
+import { generateJSON } from './ai.js';
 import { HOUSEHOLD_CATEGORIES } from './categories.js';
 
 const HEIC = /\.(heic|heif)$/i;
@@ -86,8 +87,7 @@ KNOWN ITEMS: ${known.slice(0, 250).join(' | ') || '(none yet)'}`;
 
 export async function extractReceipt(dataUrl, knownNames, app) {
   if (DEMO_MODE) return demoExtract(knownNames);
-  const { getAI, getGenerativeModel, GoogleAIBackend, Schema } = await import('firebase/ai');
-  const ai = getAI(app, { backend: new GoogleAIBackend() });
+  const { Schema } = await import('firebase/ai');
   const schema = Schema.object({
     properties: {
       store: Schema.string(),
@@ -106,13 +106,8 @@ export async function extractReceipt(dataUrl, knownNames, app) {
     },
     optionalProperties: ['store', 'date', 'tax', 'total'],
   });
-  const model = getGenerativeModel(ai, {
-    model: GEMINI_MODEL,
-    generationConfig: { responseMimeType: 'application/json', responseSchema: schema, temperature: 0.1 },
-  });
   const base64 = dataUrl.split(',')[1];
-  const result = await model.generateContent([PROMPT(knownNames), { inlineData: { mimeType: 'image/jpeg', data: base64 } }]);
-  const parsed = JSON.parse(result.response.text());
+  const parsed = await generateJSON(app, { schema, temperature: 0.1 }, [PROMPT(knownNames), { inlineData: { mimeType: 'image/jpeg', data: base64 } }]);
   return normalize(parsed);
 }
 
@@ -134,8 +129,7 @@ KNOWN ITEMS: ${known.slice(0, 250).join(' | ') || '(none yet)'}`;
 
 export async function extractReceiptText({ subject = '', text = '', pdfs = [], id = '' }, knownNames, app, cats = HOUSEHOLD_CATEGORIES) {
   if (DEMO_MODE) return demoExtractEmail(id, knownNames);
-  const { getAI, getGenerativeModel, GoogleAIBackend, Schema } = await import('firebase/ai');
-  const ai = getAI(app, { backend: new GoogleAIBackend() });
+  const { Schema } = await import('firebase/ai');
   const schema = Schema.object({
     properties: {
       isReceipt: Schema.boolean(), store: Schema.string(), orderId: Schema.string(), date: Schema.string(), tax: Schema.number(), total: Schema.number(),
@@ -151,14 +145,9 @@ export async function extractReceiptText({ subject = '', text = '', pdfs = [], i
     },
     optionalProperties: ['store', 'orderId', 'date', 'tax', 'total', 'items'],
   });
-  const model = getGenerativeModel(ai, {
-    model: GEMINI_MODEL,
-    generationConfig: { responseMimeType: 'application/json', responseSchema: schema, temperature: 0.1 },
-  });
   const parts = [EMAIL_PROMPT(knownNames, cats), `EMAIL SUBJECT: ${subject}\n\nEMAIL TEXT:\n${String(text).slice(0, 40000)}`];
   for (const p of pdfs.slice(0, 2)) parts.push({ inlineData: { mimeType: 'application/pdf', data: p.data } });
-  const result = await model.generateContent(parts);
-  const parsed = JSON.parse(result.response.text());
+  const parsed = await generateJSON(app, { schema, temperature: 0.1 }, parts);
   return { ...normalize(parsed), isReceipt: parsed.isReceipt !== false && (parsed.items || []).length > 0, orderId: parsed.orderId || '' };
 }
 
