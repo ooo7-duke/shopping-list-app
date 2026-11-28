@@ -154,20 +154,17 @@ function TripCard({ trip, expenses, onOpen, onHold, onDelete, picking, picked })
       aria-label={`${trip.name}${picking && picked ? ', selected' : ''}`}>
       {picking && <span className={`check pick${picked ? ' on' : ''}`} aria-hidden="true"><span /></span>}
       <div className="grow" style={{ minWidth: 0 }}>
-        <FitText className="xfolder-name" title={trip.name}>{trip.name}</FitText>
+        <div className="row-top">
+          <FitText className="xfolder-name" title={trip.name}>{trip.name}</FitText>
+          {!picking && onDelete && <RowTrash label={`Delete ${trip.name}`} onDelete={onDelete} />}
+        </div>
         <FitText className="small muted">{trip.location} · {fmtRange(trip.startDate, trip.endDate)}</FitText>
+        <div className="xfolder-owed"><span className="price">{fmtMoney(t.owedToYou)}</span><FitText as="span" className="small muted">owed to you</FitText></div>
         <div className="xchips">
           <span className="chip blue">{expenses.length} expense{expenses.length === 1 ? '' : 's'}</span>
           {warn > 0 && <span className="chip warn">{warn} to check</span>}
           {trip.status === 'submitted' && <span className="chip">Submitted</span>}
         </div>
-      </div>
-      <div className="xfolder-side">
-        <div className="price">
-          {fmtMoney(t.owedToYou)}
-          <small>owed to you</small>
-        </div>
-        {!picking && onDelete && <RowTrash label={`Delete ${trip.name}`} onDelete={onDelete} />}
       </div>
     </div>
   );
@@ -439,16 +436,20 @@ function ExpenseRow({ e, all, trip, onOpen, onHold, onToggle, onDelete, picking,
       onKeyDown={(ev) => { if (ev.target === ev.currentTarget && ev.key === 'Enter') onOpen(); }}>
       {picking && <PickBox on={picked} name={name} onToggle={onToggle} />}
       <div className="grow" style={{ minWidth: 0 }}>
-        <FitText className="name" title={name}>{name}</FitText>
-        <FitText className="meta-line">{meta}</FitText>
+        <div className="row-top">
+          <FitText className="name" title={name}>{name}</FitText>
+          {!picking && onDelete && <RowTrash label={`Delete ${name}, ${fmtMoney(e.amount)}`} onDelete={onDelete} />}
+        </div>
+        <div className="row-sub">
+          <FitText className="meta-line">{meta}</FitText>
+          <div className="price">
+            {fmtMoney(e.amount)}
+            {partial && <small>{fmtMoney(biz)} claimed</small>}
+          </div>
+        </div>
         {flags.length > 0 && <div className="meta">{flags.map((f) => <span key={f.code} className={`chip ${f.level === 'warn' ? 'warn' : ''}`}>{f.label}</span>)}</div>}
         {e.notes && <FitText className="tiny muted" style={{ marginTop: 2 }}>{e.notes}</FitText>}
       </div>
-      <div className="price">
-        {fmtMoney(e.amount)}
-        {partial && <small>{fmtMoney(biz)} claimed</small>}
-      </div>
-      {!picking && onDelete && <RowTrash label={`Delete ${name}, ${fmtMoney(e.amount)}`} onDelete={onDelete} />}
     </div>
   );
 }

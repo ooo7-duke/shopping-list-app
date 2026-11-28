@@ -449,7 +449,16 @@ table.data td.num, table.data th.num { text-align: right; }
 .xfolder:hover { border-color: var(--bb); }
 .xfolder-name { font-weight: 700; color: var(--bb); font-size: 1.05rem; }
 .xfolder .price { font-weight: 700; color: var(--bb); white-space: nowrap; text-align: right; }
-.xfolder-side { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; margin-right: -6px; }
+.xfolder-owed { display: flex; align-items: baseline; gap: 6px; margin-top: 2px; min-width: 0; }
+.xfolder-owed .price { flex: none; font-size: 1.05rem; }
+/* Expense rows and trip folders: the name and its trash can share the top line; the amount sits on
+   the line under it, so the name keeps the most room. */
+.row-top, .row-sub { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.row-top > .fit, .row-sub > .fit { flex: 1 1 auto; }
+.row-top > .row-del { margin: -10px -6px -10px 0; }
+.row-sub { align-items: flex-start; }
+.row-sub > .meta-line { margin-top: 3px; }
+.row-sub > .price { flex: none; margin-left: auto; }
 .xfolder .price small { display: block; font-weight: 400; color: var(--muted); font-size: 0.75rem; }
 .xchips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 .xday { margin-top: 10px; }
