@@ -27,7 +27,7 @@ export function SignIn() {
         <button type="button" className="gbtn" style={{ margin: '8px auto 0' }} onClick={() => backend.signIn().catch((e) => setErr(e?.message || 'Sign-in failed. Try again.'))}>
           <GoogleG /> {DEMO_MODE ? 'Try the demo' : 'Continue with Google'}
         </button>
-        {DEMO_MODE && <p className="small muted">Demo mode: sample data stays on this device. Connect Firebase to sign in with Google and share lists.</p>}
+        {DEMO_MODE && <p className="small muted">Demo mode: starts empty and stays on this device. Connect Firebase to sign in with Google and share lists.</p>}
         {err && <p className="small" style={{ color: 'var(--danger)' }}>{err}</p>}
         <p className="small"><a className="link" href="/privacy/" target="_blank" rel="noopener">Privacy policy</a></p>
       </div>

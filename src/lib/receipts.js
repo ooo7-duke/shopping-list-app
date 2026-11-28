@@ -128,7 +128,7 @@ Also return store (the store or website the order was placed with, not the perso
 KNOWN ITEMS: ${known.slice(0, 250).join(' | ') || '(none yet)'}`;
 
 export async function extractReceiptText({ subject = '', text = '', pdfs = [], id = '' }, knownNames, app, cats = HOUSEHOLD_CATEGORIES) {
-  if (DEMO_MODE) return demoExtractEmail(id, knownNames);
+  if (DEMO_MODE) return { store: '', date: null, tax: null, total: null, orderId: '', isReceipt: false, items: [] };
   const { Schema } = await import('firebase/ai');
   const schema = Schema.object({
     properties: {
@@ -183,28 +183,3 @@ function demoExtract(knownNames) {
   );
 }
 
-// Demo emails (see src/lib/emailReceipts.js): one that checks itself off, one with a guess to
-// confirm, and a delivery notice that is skipped.
-function demoExtractEmail(id, knownNames) {
-  const pick = (n) => (knownNames.includes(n) ? n : '');
-  const day = 864e5;
-  const by = {
-    'demo-target': {
-      isReceipt: true, store: 'Target', orderId: '102-4471', date: Date.now() - day, tax: 1.3, total: 33.77,
-      items: [
-        { rawText: 'Bounty Select-A-Size Paper Towels, 12 Double Rolls', name: 'Paper towels', quantity: 1, unitPrice: 24.99, lineTotal: 24.99, category: 'Household', matchName: pick('Paper towels') },
-        { rawText: 'Simply Orange Pulp Free Juice 52 fl oz', name: 'Orange juice', quantity: 1, unitPrice: 4.49, lineTotal: 4.49, category: 'Pantry', matchName: pick('Orange juice') },
-        { rawText: 'Up&Up Ultra Dish Soap 24 oz', name: 'Dish soap', quantity: 1, unitPrice: 2.99, lineTotal: 2.99, category: 'Household', matchName: pick('Dish soap') },
-      ],
-    },
-    'demo-amazon': {
-      isReceipt: true, store: 'Amazon', orderId: '113-5582201-7730645', date: Date.now() - 2 * day, tax: 0.84, total: 22.82,
-      items: [
-        { rawText: 'Post-it Super Sticky Notes, 3x3 in, 12 Pads', name: 'Post-it super sticky notes, 12 pads', quantity: 1, unitPrice: 11.99, lineTotal: 11.99, category: 'Household', matchName: '' },
-        { rawText: 'Crest Pro-Health Toothpaste, 2 Pack', name: 'Toothpaste', quantity: 1, unitPrice: 9.99, lineTotal: 9.99, category: 'Health & personal care', matchName: pick('Toothpaste') },
-      ],
-    },
-  };
-  const r = by[id] || { isReceipt: false, items: [] };
-  return new Promise((res) => setTimeout(() => res({ store: '', date: null, tax: null, total: null, orderId: '', ...r }), 600));
-}

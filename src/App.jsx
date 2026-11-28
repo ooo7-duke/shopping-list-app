@@ -66,7 +66,7 @@ function Shell() {
   return (
     <div className="app">
       <header className="topwrap" ref={headRef}>
-        {DEMO_MODE && <div className="demo-banner">Demo mode · sample data on this device only</div>}
+        {DEMO_MODE && <div className="demo-banner">Demo mode · test data on this device only</div>}
         <div className="topbar">
           <button type="button" className="icon-btn menu-btn" onClick={() => setMenu((m) => !m)} aria-label="Menu" aria-expanded={menu} aria-controls="main-menu">
             <MenuIcon />

@@ -6,7 +6,7 @@ import { compressImage, isImageFile, toReadableImage } from '../lib/receipts.js'
 import {
   EXPENSE_CATEGORIES, categoryLabel, isMeal, tripDays, perDiemDays, businessAmount, expenseFlags, tripTotals,
   sortExpenses, dayKey, fromDayKey, extractExpense, extractExpenseText, emailTrip, notTravelIds, markNotTravel,
-  demoTravelInbox, GSA_MIE, hasReceipt, tripPhotos, autoCaption, expenseWorkbook, expensesCSV,
+  GSA_MIE, hasReceipt, tripPhotos, autoCaption, expenseWorkbook, expensesCSV,
   PAID_WITH, paidWithId, paidWithLabel,
 } from '../lib/expenses.js';
 import { xlsxBytes } from '../lib/xlsx.js';
@@ -32,25 +32,6 @@ export function fmtRange(a, b) {
   }
   if (A.getFullYear() === B.getFullYear()) return `${mo(A)} ${A.getDate()} to ${mo(B)} ${B.getDate()}, ${B.getFullYear()}`;
   return `${fmtDate(a, { withYear: true })} to ${fmtDate(b, { withYear: true })}`;
-}
-
-// Sample trips show what a finished folder looks like. One tap takes them all away.
-function ClearSamples({ trips, expenses }) {
-  const { ctx, showToast } = useApp();
-  const [sure, setSure] = useState(false);
-  return (
-    <div className="card small" style={{ marginTop: 14 }}>
-      <p>{trips.length} of these folders {trips.length === 1 ? 'is a sample' : 'are samples'} with made-up receipts, so you can see how a finished report looks.</p>
-      <button type="button" className="btn" style={{ marginTop: 8 }}
-        onClick={async () => {
-          if (!sure) { setSure(true); return; }
-          for (const t of trips) await deleteExpenseTrip(ctx, t, expenses);
-          showToast('Sample trips cleared');
-        }}>
-        {sure ? 'Tap again to clear the sample trips' : 'Clear sample trips'}
-      </button>
-    </div>
-  );
 }
 
 export default function ExpenseView() {
@@ -133,7 +114,6 @@ export default function ExpenseView() {
               <p className="small muted">You can tap Undo for a few seconds after.</p>
             </ConfirmDelete>
           )}
-          {expenseTrips.some((t) => t.sample) && <ClearSamples trips={expenseTrips.filter((t) => t.sample)} expenses={expenses} />}
         </>
       )}
       {tripForm && <TripForm trip={tripForm} onClose={() => setTripForm(null)} onSaved={(id) => { setTripForm(null); go(id); }} />}
@@ -624,9 +604,7 @@ function TravelInbox({ tripId, onReview }) {
     let live = true;
     fetchInbox().then((d) => {
       if (!live) return;
-      let items = d.items || [];
-      if (DEMO_MODE) items = [...items, ...demoTravelInbox()];
-      setMail(items);
+      setMail(d.items || []);
     }).catch(() => live && setMail([]));
     return () => { live = false; };
   }, []);
