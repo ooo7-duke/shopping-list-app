@@ -237,7 +237,7 @@ function seedInbox() {
   }));
 }
 if (q.get('seed') === '1') { localStorage.setItem('sla-demo-v3', JSON.stringify(buildSeed())); seedInbox(); q.delete('seed'); history.replaceState(null, '', '?' + q); }
-if (q.get('clear') === '1') { ['sla-demo-v3', 'sla-demo-inbox', 'sla-email-reads', 'sla-not-travel'].forEach((k) => localStorage.removeItem(k)); q.delete('clear'); history.replaceState(null, '', '?' + q); }
+if (q.get('clear') === '1') { ['sla-demo-v3', 'sla-demo-inbox', 'sla-email-reads', 'sla-not-travel', 'sla-email-kept'].forEach((k) => localStorage.removeItem(k)); q.delete('clear'); history.replaceState(null, '', '?' + q); }
 const link = (label, patch, on) => { const p = new URLSearchParams(q); for (const [k, v] of Object.entries(patch)) p.set(k, v); return `<a href="?${p}" class="${on ? 'on' : ''}">${label}</a>`; };
 const tabs = ['list', 'trips', 'receipts', 'insights', 'expenses'];
 document.getElementById('bar').innerHTML =
