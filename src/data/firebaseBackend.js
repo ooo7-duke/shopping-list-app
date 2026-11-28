@@ -9,7 +9,7 @@ import {
   collection, doc, addDoc, updateDoc, deleteDoc, getDoc, onSnapshot, query, where,
   orderBy, limit, writeBatch, deleteField, arrayUnion, getDocs,
 } from 'firebase/firestore';
-import { initializeAppCheck, ReCaptchaV3Provider } from 'firebase/app-check';
+import { initializeAppCheck, ReCaptchaEnterpriseProvider } from 'firebase/app-check';
 import { firebaseConfig, RECAPTCHA_SITE_KEY } from '../lib/config.js';
 
 let app;
@@ -21,7 +21,7 @@ export function init() {
   app = initializeApp(firebaseConfig);
   if (RECAPTCHA_SITE_KEY) {
     if (location.hostname === 'localhost') self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
-    initializeAppCheck(app, { provider: new ReCaptchaV3Provider(RECAPTCHA_SITE_KEY), isTokenAutoRefreshEnabled: true });
+    initializeAppCheck(app, { provider: new ReCaptchaEnterpriseProvider(RECAPTCHA_SITE_KEY), isTokenAutoRefreshEnabled: true });
   }
   auth = getAuth(app);
   db = initializeFirestore(app, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) });
