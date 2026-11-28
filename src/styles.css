@@ -529,6 +529,6 @@ body:has(.pick-bar) .to-top { display: none; }
 }
 /* Trip cards with large text: "Shop now" and "Ordered" keep their full words and drop onto two lines when
    both don't fit, and a "Due soon" chip wraps inside the card instead of running past its edge. */
-.trip > .row { flex-wrap: wrap; }
-.trip > .row > .btn { flex: 1 1 auto; min-width: max-content; padding: 0 14px; }
+.trip > .row { flex-wrap: wrap; gap: 8px; }
+.trip > .row > .btn { flex: 1 1 auto; min-width: max-content; padding: 0 12px; }
 .trip .chip { max-width: 100%; white-space: normal; text-align: left; }
