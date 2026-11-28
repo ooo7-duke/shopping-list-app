@@ -261,11 +261,11 @@ async function sweep() {
 document.getElementById('sweep').onclick = async () => {
   document.getElementById('out').textContent = 'Sweeping...';
   const lines = await sweep();
-  document.getElementById('out').textContent = `${w}px${big ? ' large text' : ''} sweep\n` + lines.join('\n') + (errs.length ? '\n\nApp errors:\n' + errs.join('\n') : '');
+  document.getElementById('out').textContent = `build ${f.contentDocument.documentElement.dataset.build || '?'} · ${w}px${big ? ' large text' : ''} sweep\n` + lines.join('\n') + (errs.length ? '\n\nApp errors:\n' + errs.join('\n') : '');
 };
 document.getElementById('chk').onclick = () => {
   const found = inspect(f.contentWindow);
   const keep = found.filter(([k]) => k !== 'small-tap' || q.get('taps') === '1');
-  document.getElementById('out').textContent = `${w}px${big ? ' large text' : ''}, ${keep.length} issues\n` + keep.map(([k, d]) => `${k}: ${d}`).join('\n') + (errs.length ? '\n\nApp errors:\n' + errs.join('\n') : '');
+  document.getElementById('out').textContent = `build ${f.contentDocument.documentElement.dataset.build || '?'} · ${w}px${big ? ' large text' : ''}, ${keep.length} issues\n` + keep.map(([k, d]) => `${k}: ${d}`).join('\n') + (errs.length ? '\n\nApp errors:\n' + errs.join('\n') : '');
 };
 </script></body></html>

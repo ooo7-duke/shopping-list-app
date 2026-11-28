@@ -3,6 +3,9 @@ import App from './App.jsx';
 import './styles.css';
 import { applyLook, savedLookLocal } from './lib/looks.js';
 
+// Which build is running, for checking that a new version is live.
+document.documentElement.dataset.build = typeof __BUILD__ === 'string' ? __BUILD__ : 'dev';
+
 // Paint the last look used on this device right away, before sign-in finishes.
 applyLook(savedLookLocal('last'));
 
