@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useApp } from '../AppContext.jsx';
 import Sheet from './Sheet.jsx';
-import { compressImage, extractReceipt } from '../lib/receipts.js';
+import { compressImage, extractReceipt, isImageFile, toReadableImage } from '../lib/receipts.js';
 import { decodeQr, parseQr, qrHost } from '../lib/qr.js';
 import { bestMatch } from '../lib/match.js';
 import { saveReceipt, deleteReceipt, isOnList } from '../data/actions.js';
@@ -20,7 +20,8 @@ export default function ReceiptsView() {
   const [busy, setBusy] = useState('');
   const [review, setReview] = useState(null);
   const [viewing, setViewing] = useState(null);
-  const fileRef = useRef();
+  const cameraRef = useRef();
+  const pickRef = useRef();
 
   // Paste a screenshot of an emailed or online receipt straight onto the page.
   useEffect(() => {
@@ -34,8 +35,18 @@ export default function ReceiptsView() {
 
   async function handle(file) {
     if (!file) return;
-    if (!file.type.startsWith('image/')) {
+    if (!isImageFile(file)) {
       showToast('Use a photo or screenshot of the receipt (JPG, PNG or HEIC).');
+      return;
+    }
+    try {
+      setBusy('Opening the photo…');
+      file = await toReadableImage(file);
+    } catch (e) {
+      console.error(e);
+      showToast(e?.message || "Couldn't open that photo. Try a JPG or PNG.");
+      setBusy('');
+      clearInputs();
       return;
     }
     setBusy('Looking for a QR code…');
@@ -69,8 +80,13 @@ export default function ReceiptsView() {
       showToast(aiErrorMessage(e, 'Receipt reading'));
     } finally {
       setBusy('');
-      if (fileRef.current) fileRef.current.value = '';
+      clearInputs();
     }
+  }
+
+  function clearInputs() {
+    if (cameraRef.current) cameraRef.current.value = '';
+    if (pickRef.current) pickRef.current.value = '';
   }
 
   return (
@@ -82,7 +98,7 @@ export default function ReceiptsView() {
         </div>
       </div>
 
-      <label
+      <div
         className={`drop${over ? ' over' : ''}`}
         onDragOver={(e) => { e.preventDefault(); setOver(true); }}
         onDragLeave={() => setOver(false)}
@@ -90,10 +106,20 @@ export default function ReceiptsView() {
         aria-busy={!!busy}
       >
         <CameraIcon />
-        <strong style={{ color: 'var(--bb)', fontSize: '1.1rem' }}>{busy || 'Snap or upload a receipt'}</strong>
-        <span className="small muted">{busy ? 'This takes a few seconds.' : 'Take a photo, pick one from your library, drop a file here, or paste a screenshot. A QR code on the receipt is read too.'}</span>
-        <input ref={fileRef} type="file" accept="image/*" capture="environment" className="sr-only" onChange={(e) => handle(e.target.files?.[0])} disabled={!!busy} />
-      </label>
+        <strong style={{ color: 'var(--bb)', fontSize: '1.1rem' }}>{busy || 'Add a receipt'}</strong>
+        <span className="small muted">{busy ? 'This takes a few seconds.' : 'Take a photo, choose one you already have, drop a file here, or paste a screenshot. A QR code on the receipt is read too.'}</span>
+        <div className="drop-actions">
+          {/* Two inputs: "capture" opens the camera straight away on phones but hides the photo library, so choosing a saved photo needs its own input without it. */}
+          <label className={`btn primary${busy ? ' is-disabled' : ''}`}>
+            Take photo
+            <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="sr-only" onChange={(e) => handle(e.target.files?.[0])} disabled={!!busy} />
+          </label>
+          <label className={`btn${busy ? ' is-disabled' : ''}`}>
+            Choose photo
+            <input ref={pickRef} type="file" accept="image/*,.heic,.heif" className="sr-only" onChange={(e) => handle(e.target.files?.[0])} disabled={!!busy} />
+          </label>
+        </div>
+      </div>
       {DEMO_MODE && <p className="tiny muted" style={{ marginTop: 6 }}>Demo mode returns a sample Giant receipt so you can try the review step.</p>}
 
       <EmailedReceipts />

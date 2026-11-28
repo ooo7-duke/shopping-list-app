@@ -2,6 +2,45 @@
 import { DEMO_MODE, GEMINI_MODEL } from './config.js';
 import { HOUSEHOLD_CATEGORIES } from './categories.js';
 
+const HEIC = /\.(heic|heif)$/i;
+const isHeic = (file) => /image\/hei[cf]/i.test(file?.type || '') || HEIC.test(file?.name || '');
+
+// Some phones and computers hand over a photo with no type (often HEIC from an iPhone), so the name counts too.
+export function isImageFile(file) {
+  if (!file) return false;
+  if ((file.type || '').startsWith('image/')) return true;
+  return /\.(jpe?g|png|gif|webp|bmp|heic|heif|avif)$/i.test(file.name || '');
+}
+
+function canDecode(file) {
+  const url = URL.createObjectURL(file);
+  return new Promise((res) => {
+    const i = new Image();
+    i.onload = () => { URL.revokeObjectURL(url); res(true); };
+    i.onerror = () => { URL.revokeObjectURL(url); res(false); };
+    i.src = url;
+  });
+}
+
+// Returns a file the browser can draw. iPhone HEIC photos open in Safari but not in Chrome,
+// Edge or Firefox, so those get converted to JPEG first (the converter only loads when needed).
+export async function toReadableImage(file) {
+  if (await canDecode(file)) return file;
+  if (isHeic(file)) {
+    let blob;
+    try {
+      const { default: heic2any } = await import('heic2any');
+      const out = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.9 });
+      blob = Array.isArray(out) ? out[0] : out;
+    } catch (e) {
+      console.error(e);
+      throw new Error("Couldn't convert that iPhone (HEIC) photo. Take a new photo, or save it as JPG first.");
+    }
+    return new File([blob], (file.name || 'receipt').replace(HEIC, '') + '.jpg', { type: 'image/jpeg' });
+  }
+  throw new Error("Couldn't open that photo. Try a JPG or PNG, or take a new photo.");
+}
+
 export async function compressImage(file, { maxSide = 2000, maxChars = 880_000 } = {}) {
   const url = URL.createObjectURL(file);
   try {

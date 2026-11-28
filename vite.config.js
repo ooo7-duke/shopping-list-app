@@ -22,7 +22,7 @@ export default defineConfig({
           { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
         ],
       },
-      workbox: { navigateFallback: '/index.html', navigateFallbackDenylist: [/^\/\.netlify\//, /^\/\.well-known\//, /^\/privacy/, /^\/delete-account/, /^\/contact/], maximumFileSizeToCacheInBytes: 4 * 1024 * 1024 },
+      workbox: { navigateFallback: '/index.html', navigateFallbackDenylist: [/^\/\.netlify\//, /^\/\.well-known\//, /^\/privacy/, /^\/delete-account/, /^\/contact/], maximumFileSizeToCacheInBytes: 4 * 1024 * 1024, globIgnores: ['**/node_modules/**/*', '**/heic2any-*.js'] },
     }),
   ],
   build: {
