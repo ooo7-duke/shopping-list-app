@@ -395,7 +395,7 @@ function EmailedReceipts() {
             <div className="grow">
               <div className="name">{v.res?.store || storeFromSubject(v.m?.subject) || 'Emailed receipt'}</div>
               <div className="meta">
-                {v.status === 'reading' ? 'Reading…' : v.status === 'error' ? `Couldn't read it. ${v.error}` : `${v.plan.lines.length} items · ${v.plan.weak} best guess${v.plan.weak === 1 ? '' : 'es'} to check`}
+                {v.status === 'reading' ? 'Reading…' : v.status === 'error' ? `Couldn't read it. ${v.error}` : `${plural(v.plan.lines.length, 'item')} · ${v.plan.weak} best guess${v.plan.weak === 1 ? '' : 'es'} to check`}
               </div>
             </div>
             {v.status === 'review' && <button type="button" className="btn primary" onClick={() => openReview(id)}>Check</button>}
@@ -479,7 +479,7 @@ function ReceiptRow({ r, picking, picked, onHold, onOpen, onToggle }) {
       {picking && <PickBox on={picked} name={r.store || 'this receipt'} onToggle={onToggle} />}
       <div className="grow">
         <div className="name">{r.store || 'Receipt'}</div>
-        <div className="meta">{fmtDate(r.date, { withYear: true })} · {r.lineCount} items · {r.matched} matched to your list · {r.source === 'email' ? 'emailed' : r.uploadedByName}</div>
+        <div className="meta">{fmtDate(r.date, { withYear: true })} · {plural(r.lineCount, 'item')} · {r.matched} matched to your list · {r.source === 'email' ? 'emailed' : r.uploadedByName}</div>
       </div>
       <div className="price">{fmtMoney(r.total)}</div>
     </div>

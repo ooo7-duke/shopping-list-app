@@ -227,6 +227,10 @@ label.field > span { display: block; font-size: 0.85rem; color: var(--muted); ma
 /* ---------- trips ---------- */
 .trip-grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); }
 .trip .head { display: flex; align-items: center; gap: 10px; }
+/* A long store name keeps its width; the "needed now" chip drops under it, and the buttons stay on one line. */
+.trip .head { flex-wrap: wrap; row-gap: 6px; }
+.trip .head > .grow { flex: 1 1 200px; min-width: 0; }
+.trip > .row > .btn { white-space: nowrap; }
 .trip ul { list-style: none; padding: 0; margin: 10px 0; }
 .trip li { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 2px 0; border-top: 1px dashed var(--line-soft); }
 .trip li.dragging { opacity: 0.4; }
@@ -482,6 +486,10 @@ table.data td.num, table.data th.num { text-align: right; }
 .card.selected { background: var(--bb-soft); border-color: var(--bb); }
 .xfolder .check.pick { margin: -6px 0 -6px -6px; }
 .clear-row .pick-head { margin-left: auto; }
+/* While picking, the heading keeps its line and the select controls go beside it or below it. */
+.section-h:has(.pick-head) { flex-wrap: wrap; row-gap: 2px; }
+.pick-head { margin-left: auto; flex-wrap: nowrap; }
+.pick-head .btn, .pick-head span { white-space: nowrap; }
 
 /* Insights purchases on a phone: each purchase is a small block (item and cost on top, date and
    quantity under them, store last) so the cost is never pushed off the side. */
