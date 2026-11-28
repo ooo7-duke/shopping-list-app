@@ -6,7 +6,7 @@ import { compressImage, isImageFile, toReadableImage } from '../lib/receipts.js'
 import {
   EXPENSE_CATEGORIES, categoryLabel, isMeal, tripDays, perDiemDays, businessAmount, expenseFlags, tripTotals,
   sortExpenses, dayKey, fromDayKey, extractExpense, extractExpenseText, emailTrip, notTravelIds, markNotTravel,
-  demoTravelInbox, GSA_MIE, hasReceipt, tripPhotos, autoCaption, expenseWorkbook,
+  demoTravelInbox, GSA_MIE, hasReceipt, tripPhotos, autoCaption, expenseWorkbook, expensesCSV,
 } from '../lib/expenses.js';
 import { xlsxBytes } from '../lib/xlsx.js';
 import { buildReportPdf } from '../lib/reportPdf.js';
@@ -761,6 +761,7 @@ function SendReport({ trip, expenses, totals }) {
               {!shareable && <button type="button" className="btn primary" onClick={email}>Email</button>}
               <button type="button" className="btn" onClick={() => saveFile(files.pdf)}><DownloadIcon width="20" height="20" /> PDF</button>
               <button type="button" className="btn" onClick={() => saveFile(files.xlsx)}><DownloadIcon width="20" height="20" /> Excel</button>
+              <button type="button" className="btn ghost" onClick={() => saveFile(new File([expensesCSV(trip, expenses)], files.pdf.name.replace(/\.pdf$/, '.csv'), { type: 'text/csv' }))}>CSV</button>
               {shareable && <button type="button" className="btn ghost" onClick={email}>Email draft</button>}
             </div>
             <p className="tiny muted">
