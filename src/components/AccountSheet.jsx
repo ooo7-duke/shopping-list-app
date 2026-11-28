@@ -127,7 +127,7 @@ export function CreateAccount({ onDone }) {
         <button type="button" aria-pressed={type === 'organization'} onClick={() => setType('organization')}>Organization</button>
       </div>
       <p className="small muted">{type === 'household' ? 'Everyone you invite can edit the list and see spending.' : 'Everyone you invite can add to the list directly, mark items bought and see spending. Only owners manage people.'}</p>
-      <label className="field"><span>Name</span><input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder={type === 'household' ? 'Our household' : 'Main office'} /></label>
+      <label className="field"><span>Name</span><input className="input" value={name} onChange={(e) => setName(e.target.value)} /></label>
       <button type="submit" className="btn primary">Create list</button>
     </form>
   );

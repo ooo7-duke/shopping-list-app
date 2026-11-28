@@ -183,7 +183,7 @@ export default function InsightsView() {
           <label className="field"><span>Store</span>
             <select className="input" value={store} onChange={(e) => setStore(e.target.value)}><option value="">All stores</option>{stores.map((c) => <option key={c}>{c}</option>)}</select>
           </label>
-          <label className="field"><span>Item search</span><input className="input" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Milk" /></label>
+          <label className="field"><span>Item search</span><input className="input" value={q} onChange={(e) => setQ(e.target.value)} /></label>
           <div className="field"><span className="small muted" style={{ display: 'block', marginBottom: 4 }}>Cost per purchase ($)</span>
             <div className="row" style={{ gap: 6 }}><input className="input" inputMode="decimal" aria-label="Minimum cost" placeholder="Min" value={minCost} onChange={(e) => setMinCost(e.target.value)} /><input className="input" inputMode="decimal" aria-label="Maximum cost" placeholder="Max" value={maxCost} onChange={(e) => setMaxCost(e.target.value)} /></div>
           </div>

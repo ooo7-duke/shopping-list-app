@@ -212,18 +212,18 @@ function TripForm({ trip, onClose, onSaved }) {
       <div className="stack">
         <label className="field">
           <span>Event or trip name</span>
-          <input className="input" value={f.name || ''} onChange={(e) => set({ name: e.target.value })} placeholder="CES 2027" autoFocus
+          <input className="input" value={f.name || ''} onChange={(e) => set({ name: e.target.value })} autoFocus
             maxLength={Math.max(TRIP_NAME_MAX, (trip.name || '').length)} aria-describedby="trip-name-count" />
           <span id="trip-name-count" className={`count-note${nameTooLong ? ' over' : ''}`} aria-live="polite">
             {nameTooLong ? `${nameLen} of ${TRIP_NAME_MAX} letters. Shorten the name to save.` : `${nameLen} of ${TRIP_NAME_MAX} letters`}
           </span>
         </label>
-        <label className="field"><span>Location</span><input className="input" value={f.location || ''} onChange={(e) => set({ location: e.target.value })} placeholder="Las Vegas, NV" /></label>
+        <label className="field"><span>Location</span><input className="input" value={f.location || ''} onChange={(e) => set({ location: e.target.value })} /></label>
         <div className="grid2">
           <label className="field"><span>First day of travel</span><input type="date" className="input" value={f.startDate ? toInputDate(f.startDate) : ''} onChange={(e) => { const s = fromInputDate(e.target.value); set({ startDate: s, endDate: f.endDate && f.endDate >= s ? f.endDate : s }); }} /></label>
           <label className="field"><span>Last day of travel</span><input type="date" className="input" value={f.endDate ? toInputDate(f.endDate) : ''} min={f.startDate ? toInputDate(f.startDate) : undefined} onChange={(e) => set({ endDate: fromInputDate(e.target.value) })} /></label>
         </div>
-        <label className="field"><span>Business purpose</span><textarea className="input" rows={2} value={f.purpose || ''} onChange={(e) => set({ purpose: e.target.value })} placeholder="Staff the booth and meet customers at the show" /></label>
+        <label className="field"><span>Business purpose</span><textarea className="input" rows={2} value={f.purpose || ''} onChange={(e) => set({ purpose: e.target.value })} /></label>
         <div className="grid2">
           <label className="field"><span>Employer or client (optional)</span><input className="input" value={f.employer || ''} onChange={(e) => set({ employer: e.target.value })} /></label>
           <label className="field"><span>Project (optional)</span><input className="input" value={f.project || ''} onChange={(e) => set({ project: e.target.value })} /></label>
@@ -237,7 +237,7 @@ function TripForm({ trip, onClose, onSaved }) {
           </div>
           {f.mealsMode === 'perDiem' && (
             <div className="grid2" style={{ marginTop: 10 }}>
-              <label className="field"><span>Daily meals and incidentals rate ($)</span><input className="input" inputMode="decimal" value={f.mieRate ?? ''} onChange={(e) => set({ mieRate: e.target.value })} placeholder="92" /></label>
+              <label className="field"><span>Daily meals and incidentals rate ($)</span><input className="input" inputMode="decimal" value={f.mieRate ?? ''} onChange={(e) => set({ mieRate: e.target.value })} /></label>
               <p className="tiny muted" style={{ alignSelf: 'end' }}>Look up the rate for the city on <a href="https://www.gsa.gov/travel/plan-book/per-diem-rates" target="_blank" rel="noopener noreferrer">GSA's per diem page ↗</a>, or use your employer's. The first and last day get 75%.</p>
             </div>
           )}
@@ -583,7 +583,7 @@ function ExpenseSheet({ initial, trip, all, onClose, onSaved }) {
               {EXPENSE_CATEGORIES.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
             </select>
           </label>
-          <label className="field"><span>Merchant</span><input className="input" value={f.merchant || ''} onChange={(e) => set({ merchant: e.target.value })} placeholder="Delta, Marriott, Staples" maxLength={Math.max(MERCHANT_MAX, (initial.merchant || '').length)} /></label>
+          <label className="field"><span>Merchant</span><input className="input" value={f.merchant || ''} onChange={(e) => set({ merchant: e.target.value })} maxLength={Math.max(MERCHANT_MAX, (initial.merchant || '').length)} /></label>
           <label className="field"><span>Date</span><input type="date" className="input" value={f.date ? toInputDate(f.date) : ''} onChange={(e) => set({ date: fromInputDate(e.target.value) })} /></label>
           <label className="field"><span>Time (optional)</span><input type="time" className="input" value={f.time || ''} onChange={(e) => set({ time: e.target.value })} /></label>
           <label className="field"><span>Amount in US dollars</span><input className="input" inputMode="decimal" value={f.amount ?? ''} onChange={(e) => set({ amount: e.target.value })} placeholder="0.00" /></label>
@@ -636,7 +636,7 @@ function ExpenseSheet({ initial, trip, all, onClose, onSaved }) {
         )}
 
         <label className="field"><span>Notes for the report</span>
-          <textarea className="input" rows={3} value={f.notes || ''} onChange={(e) => set({ notes: e.target.value })} placeholder="Stayed an extra night for personal business, so 4 of 5 nights are claimed." />
+          <textarea className="input" rows={3} value={f.notes || ''} onChange={(e) => set({ notes: e.target.value })} />
         </label>
 
         <div>

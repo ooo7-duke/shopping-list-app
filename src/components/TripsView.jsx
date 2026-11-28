@@ -512,7 +512,7 @@ function StoresSheet({ forItem, onAdded, onClose }) {
             {pickOf(r) && (
               <div className="grid2" style={{ marginTop: 8 }}>
                 <label className="field"><span>Where</span><input className="input" value={r.place || ''} placeholder="Town or street" onChange={(e) => set(i, { place: e.target.value })} /></label>
-                <label className="field"><span>Miles from home</span><input className="input" inputMode="decimal" value={r.miles ?? ''} placeholder="5" onChange={(e) => set(i, { miles: e.target.value.replace(/[^0-9.]/g, '') })} /></label>
+                <label className="field"><span>Miles from home</span><input className="input" inputMode="decimal" value={r.miles ?? ''} onChange={(e) => set(i, { miles: e.target.value.replace(/[^0-9.]/g, '') })} /></label>
               </div>
             )}
             <button type="button" className="chip" style={{ marginTop: 8 }} onClick={() => setRows((x) => x.filter((_, j) => j !== i))}>Remove</button>

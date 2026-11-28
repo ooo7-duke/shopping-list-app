@@ -144,13 +144,13 @@ export default function ItemSheet({ item, focus, onClose }) {
                 </div>
               </div>
               <label className="field"><span>Unit</span>
-                <input className="input" defaultValue={item.unit || ''} placeholder="gal, pack, box" onBlur={(e) => save({ unit: e.target.value.trim() })} />
+                <input className="input" defaultValue={item.unit || ''} onBlur={(e) => save({ unit: e.target.value.trim() })} />
               </label>
             </div>
             {/* Type and Note get the full width: category names and notes are too long for half a phone screen. */}
             <div className="grid2">
               <label className="field"><span>Where to buy</span>
-                <input className="input" list="stores" defaultValue={item.store || ''} placeholder="Costco" onBlur={(e) => save({ store: e.target.value.trim() })} />
+                <input className="input" list="stores" defaultValue={item.store || ''} onBlur={(e) => save({ store: e.target.value.trim() })} />
                 <datalist id="stores">{stores.map((s) => <option key={s} value={s} />)}</datalist>
               </label>
               <label className="field"><span>Last price paid (each)</span>
@@ -163,7 +163,7 @@ export default function ItemSheet({ item, focus, onClose }) {
               </select>
             </label>
             <label className="field"><span>Note</span>
-              <input className="input" defaultValue={item.note || ''} placeholder="Brand, size, aisle" onBlur={(e) => e.target.value.trim() !== (item.note || '') && save({ note: e.target.value.trim(), pricesCheckedAt: null })} />
+              <input className="input" defaultValue={item.note || ''} onBlur={(e) => e.target.value.trim() !== (item.note || '') && save({ note: e.target.value.trim(), pricesCheckedAt: null })} />
             </label>
             <div className="field photo-field">
               {item.photo && <div className="photo-box"><img src={item.photo} alt={`The ${item.name} to buy`} /></div>}
