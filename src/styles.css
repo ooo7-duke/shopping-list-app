@@ -452,10 +452,10 @@ table.data td.num, table.data th.num { text-align: right; }
 .xtable td { white-space: normal; }
 /* Trip tables have three columns of money; on a phone they pack tighter so they fit without scrolling sideways, even with large text. */
 @media (max-width: 480px) {
-  table.data.xtable { font-size: 0.82rem; }
+  table.data.xtable { font-size: 0.8rem; }
   table.data.xtable th, table.data.xtable td { padding: 8px 4px; }
-  table.data.xtable th:first-child, table.data.xtable td:first-child { padding-left: 10px; }
-  table.data.xtable th:last-child, table.data.xtable td:last-child { padding-right: 10px; }
+  table.data.xtable th:first-child, table.data.xtable td:first-child { padding-left: 8px; }
+  table.data.xtable th:last-child, table.data.xtable td:last-child { padding-right: 8px; }
 }
 .xnight { gap: 8px; padding: 4px 0; border-bottom: 1px solid var(--line-soft); }
 .xthumbs { display: flex; flex-wrap: wrap; gap: 8px; }
