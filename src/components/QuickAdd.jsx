@@ -4,7 +4,7 @@ import { parseQuickAdd, normalizeName } from '../lib/parse.js';
 import { addEntries, isOnList } from '../data/actions.js';
 import { fmtMoney, fmtQty } from '../lib/format.js';
 import { MicIcon, PlusIcon, CameraIcon, CloseIcon } from './Icons.jsx';
-import { compressImage } from '../lib/receipts.js';
+import { compressImage, isImageFile, toReadableImage } from '../lib/receipts.js';
 import { saveErrorMessage, aiErrorMessage } from '../lib/errors.js';
 import { findDuplicates, listMatches } from '../lib/dupes.js';
 import { guessCategory, HOUSEHOLD_CATEGORIES } from '../lib/categories.js';
@@ -22,6 +22,8 @@ export default function QuickAdd({ onJump }) {
   const inputRef = useRef();
   const recRef = useRef();
   const photoRef = useRef();
+  const cameraRef = useRef();
+  const [photoMenu, setPhotoMenu] = useState(false);
   const [photo, setPhoto] = useState(null); // a product photo waiting to go on the next item added
   const [photoBusy, setPhotoBusy] = useState(false);
 
@@ -213,10 +215,12 @@ export default function QuickAdd({ onJump }) {
   // Add from a photo: the photo is shrunk to fit on the item, the AI names the product and its
   // section, and the name lands in the box to check before pressing Add.
   async function addPhoto(file) {
+    setPhotoMenu(false);
     if (!file) return;
-    if (!/^image\//.test(file.type) && !/\.(heic|heif)$/i.test(file.name)) { showToast('Pick a photo (JPG, PNG or HEIC).'); return; }
+    if (!isImageFile(file)) { showToast('Pick a photo (JPG, PNG or HEIC).'); return; }
     setPhotoBusy(true);
     try {
+      try { file = await toReadableImage(file); } catch (e) { showToast(e.message); return; }
       const img = await compressImage(file, { maxSide: 900, maxChars: 150_000 });
       setPhoto(img);
       try {
@@ -236,6 +240,7 @@ export default function QuickAdd({ onJump }) {
     } finally {
       setPhotoBusy(false);
       if (photoRef.current) photoRef.current.value = '';
+      if (cameraRef.current) cameraRef.current.value = '';
     }
   }
 
@@ -287,10 +292,9 @@ export default function QuickAdd({ onJump }) {
           onKeyDown={onKeyDown} onPaste={onPaste}
           aria-autocomplete="list" aria-controls="qa-suggest"
         />
-        <button type="button" className={`icon-btn${photoBusy ? ' listening' : ''}`} onClick={() => photoRef.current?.click()} disabled={photoBusy} aria-label="Add from a photo of the product" title="Add from a photo">
+        <button type="button" className={`icon-btn${photoBusy ? ' listening' : ''}`} onClick={() => setPhotoMenu((v) => !v)} disabled={photoBusy} aria-label="Add from a photo of the product" aria-expanded={photoMenu} title="Add from a photo">
           <CameraIcon />
         </button>
-        <input ref={photoRef} type="file" accept="image/*" hidden onChange={(e) => addPhoto(e.target.files?.[0])} />
         <button type="button" className={`icon-btn${listening ? ' listening' : ''}`} onClick={toggleVoice} aria-label={listening ? 'Stop listening' : 'Add by voice'} title="Add by voice">
           <MicIcon />
         </button>
@@ -300,6 +304,18 @@ export default function QuickAdd({ onJump }) {
           </button>
         )}
       </form>
+      {photoMenu && (
+        // Two inputs: "capture" opens the camera straight away on phones but hides saved photos.
+        <div className="photo-choices" role="group" aria-label="Add from a photo">
+          <label className="chip blue">Take photo
+            <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="sr-only" onChange={(e) => addPhoto(e.target.files?.[0])} />
+          </label>
+          <label className="chip blue">Choose photo
+            <input ref={photoRef} type="file" accept="image/*,.heic,.heif" className="sr-only" onChange={(e) => addPhoto(e.target.files?.[0])} />
+          </label>
+          <button type="button" className="chip" onClick={() => setPhotoMenu(false)}>Cancel</button>
+        </div>
+      )}
       {(photo || photoBusy) && (
         <div className="qa-photo" aria-live="polite">
           {photo && <img src={photo} alt="Product photo to add" />}

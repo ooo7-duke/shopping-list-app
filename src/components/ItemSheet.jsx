@@ -10,7 +10,7 @@ import { lastPurchaseMap, lastBuy } from '../lib/history.js';
 import { fmtMoney, fmtDate, toInputDate, fromInputDate, fmtQty } from '../lib/format.js';
 import { HOUSEHOLD_CATEGORIES } from '../lib/categories.js';
 import { can, DEMO_MODE } from '../lib/config.js';
-import { compressImage } from '../lib/receipts.js';
+import { compressImage, isImageFile, toReadableImage } from '../lib/receipts.js';
 
 // Every field saves as soon as it changes, so there is no Save button to forget.
 export default function ItemSheet({ item, focus, onClose }) {
@@ -64,14 +64,16 @@ export default function ItemSheet({ item, focus, onClose }) {
 
   const save = (patch) => backend.update(ctx.accountId, 'items', item.id, patch);
   const photoInput = useRef();
+  const cameraInput = useRef();
   const [photoBusy, setPhotoBusy] = useState(false);
 
   // A photo of the exact product, kept small so it fits on the item itself (about 100 KB).
   async function addPhoto(file) {
     if (!file) return;
-    if (!/^image\//.test(file.type) && !/\.(heic|heif)$/i.test(file.name)) { showToast('Pick a photo (JPG, PNG or HEIC).'); return; }
+    if (!isImageFile(file)) { showToast('Pick a photo (JPG, PNG or HEIC).'); return; }
     setPhotoBusy(true);
     try {
+      try { file = await toReadableImage(file); } catch (e) { showToast(e.message); return; }
       const photo = await compressImage(file, { maxSide: 900, maxChars: 150_000 });
       const before = item.photo || null;
       await save({ photo, photoAt: Date.now() });
@@ -82,6 +84,7 @@ export default function ItemSheet({ item, focus, onClose }) {
     } finally {
       setPhotoBusy(false);
       if (photoInput.current) photoInput.current.value = '';
+      if (cameraInput.current) cameraInput.current.value = '';
     }
   }
   async function removePhoto() {
@@ -165,20 +168,18 @@ export default function ItemSheet({ item, focus, onClose }) {
             </div>
             <div className="field photo-field">
               <span className="small muted" style={{ display: 'block', marginBottom: 4 }}>Photo of the right item</span>
-              {item.photo ? (
-                <div className="photo-box">
-                  <img src={item.photo} alt={`The ${item.name} to buy`} />
-                  <div className="row">
-                    <button type="button" className="btn" disabled={photoBusy} onClick={() => photoInput.current?.click()}>{photoBusy ? 'Saving…' : 'Replace photo'}</button>
-                    <button type="button" className="btn ghost" onClick={removePhoto}>Remove photo</button>
-                  </div>
-                </div>
-              ) : (
-                <button type="button" className="btn block" disabled={photoBusy} onClick={() => photoInput.current?.click()}>
-                  {photoBusy ? 'Saving the photo…' : 'Add a photo so the wrong one isn\'t bought'}
-                </button>
-              )}
-              <input ref={photoInput} type="file" accept="image/*" hidden onChange={(e) => addPhoto(e.target.files?.[0])} />
+              {item.photo && <div className="photo-box"><img src={item.photo} alt={`The ${item.name} to buy`} /></div>}
+              {!item.photo && <p className="small muted" style={{ margin: '0 0 6px' }}>{photoBusy ? 'Saving the photo…' : 'Add a photo so the wrong one isn\'t bought.'}</p>}
+              {/* Two inputs: "capture" opens the camera straight away on phones but hides saved photos. */}
+              <div className="row" style={{ flexWrap: 'wrap', gap: 8 }}>
+                <label className={`btn${photoBusy ? ' is-disabled' : ''}`}>{item.photo ? 'Retake photo' : 'Take photo'}
+                  <input ref={cameraInput} type="file" accept="image/*" capture="environment" className="sr-only" disabled={photoBusy} onChange={(e) => addPhoto(e.target.files?.[0])} />
+                </label>
+                <label className={`btn${photoBusy ? ' is-disabled' : ''}`}>{item.photo ? 'Choose another' : 'Choose photo'}
+                  <input ref={photoInput} type="file" accept="image/*,.heic,.heif" className="sr-only" disabled={photoBusy} onChange={(e) => addPhoto(e.target.files?.[0])} />
+                </label>
+                {item.photo && <button type="button" className="btn ghost" onClick={removePhoto}>Remove photo</button>}
+              </div>
             </div>
             <label className="row small" style={{ minHeight: 44 }}>
               <input type="checkbox" checked={!!item.urgent} onChange={(e) => save({ urgent: e.target.checked, needBy: e.target.checked ? Date.now() : null })} style={{ width: 22, height: 22 }} />
