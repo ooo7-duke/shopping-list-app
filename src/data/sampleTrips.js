@@ -76,7 +76,7 @@ export function buildSampleTrips(nowMs = Date.now()) {
     category: 'lodging', merchant: 'Westgate Las Vegas Resort', date: at(2027, 1, 10, 9, 41), time: '09:41', amount: 1071.85, summary: 'Hotel folio, 5 nights',
     notes: 'Stayed one extra night (Jan 9) for personal business, so 4 of 5 nights are claimed. Folio is dated at checkout on Jan 10.',
     nights: [5, 6, 7, 8, 9].map((d) => ({ date: at(2027, 1, d), amount: 214.37, personal: d === 9 })),
-  }, { lines: [['Room 5 nights x 189.00', 945], ['Resort fee 5 x 25.00', 125], ['Room tax', 1.85]], ref: 'Folio 000SAMPLE312', footer: 'GUEST FOLIO, CHECKOUT 01/10/2027' });
+  }, { lines: [['Room 5 nights x 175.00', 875], ['Resort fee 5 x 25.00', 125], ['Room tax 7.185%', 71.85]], ref: 'Folio 000SAMPLE312', footer: 'GUEST FOLIO, CHECKOUT 01/10/2027' });
   add(ces, { category: 'car_rental', merchant: 'Hertz', date: at(2027, 1, 9, 19, 55), time: '19:55', amount: 261.48, paidWith: 'corporate', summary: 'Midsize, 5 days',
     notes: 'Picked up at LAS Jan 5, returned Jan 9. Took the hotel shuttle to the airport on Jan 10.' },
   { lines: [['Midsize 5 days x 39.99', 199.95], ['Airport concession fee', 22.4], ['Taxes', 39.13]], ref: 'Agreement 000SAMPLE88', footer: 'HERTZ LAS VEGAS AIRPORT' });
