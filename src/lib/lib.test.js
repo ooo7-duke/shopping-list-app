@@ -742,3 +742,32 @@ describe('expense reports', () => {
     expect(colName(27)).toBe('AB');
   });
 });
+
+import { isRecentlyBought, takeOffList, markBought } from '../data/actions.js';
+describe('Clear all and Remove from list log nothing as bought', () => {
+  const now = Date.UTC(2026, 10, 28, 7, 0);
+  it('a real purchase in the last day shows crossed off', () => {
+    expect(isRecentlyBought({ status: 'stocked', lastPurchasedAt: now - 3600e3 }, now)).toBe(true);
+  });
+  it('an item bought earlier, put back, then removed does not show as bought', () => {
+    expect(isRecentlyBought({ status: 'stocked', lastPurchasedAt: now - 3600e3, removedAt: now - 60e3 }, now)).toBe(false);
+  });
+  it('a purchase after a removal shows again', () => {
+    expect(isRecentlyBought({ status: 'stocked', lastPurchasedAt: now - 60e3, removedAt: now - 3600e3 }, now)).toBe(true);
+  });
+  it('takeOffList writes no purchase, markBought writes one', async () => {
+    const writes = [];
+    const backend = {
+      update: async (a, coll, id, data) => writes.push({ coll, id, data }),
+      commit: async (a, ops) => ops.forEach((o) => writes.push(o)),
+      newId: () => 'p1',
+    };
+    const ctx = { backend, accountId: 'a', user: { uid: 'u', name: 'Sola' } };
+    await takeOffList(ctx, { id: 'i1', status: 'needed', lastPurchasedAt: now - 3600e3 });
+    expect(writes.some((w) => w.coll === 'purchases')).toBe(false);
+    expect(writes[0].data.status).toBe('stocked');
+    expect(typeof writes[0].data.removedAt).toBe('number');
+    await markBought(ctx, { id: 'i1', name: 'Milk', status: 'needed' });
+    expect(writes.some((w) => w.coll === 'purchases')).toBe(true);
+  });
+});
