@@ -206,7 +206,7 @@ async function sweep() {
   await step('accounts sheet', async () => { await go('list'); return click('button', /Accounts and people/); });
   await step('trips page', async () => { await go('trips'); });
   await step('stores sheet', async () => { await go('trips'); return click('button', /Add your stores|Edit stores/); });
-  await step('stores sheet new store', async () => { const sel = doc().querySelector('[role=dialog] select'); if (!sel) return false; const o = [...sel.options].find((x) => /new store/i.test(x.text)); if (!o) return false; const set = Object.getOwnPropertyDescriptor(win.HTMLSelectElement.prototype, 'value').set; set.call(sel, o.value); sel.dispatchEvent(new win.Event('change', { bubbles: true })); await sleep(600); });
+  await step('stores sheet new store', async () => { await click('[role=dialog] button', /\+ Add a store/); const sel = [...doc().querySelectorAll('[role=dialog] select')].find((x) => [...x.options].some((o) => /new store/i.test(o.text))); if (!sel) return false; const o = [...sel.options].find((x) => /new store/i.test(x.text)); const set = Object.getOwnPropertyDescriptor(win.HTMLSelectElement.prototype, 'value').set; set.call(sel, o.value); sel.dispatchEvent(new win.Event('change', { bubbles: true })); await sleep(600); });
   await step('move sheet', async () => { await go('trips'); return click('.trip button', /^\s*Milk/); });
   await step('receipts page', async () => { await go('receipts'); });
   await step('receipt review', async () => {
@@ -219,8 +219,8 @@ async function sweep() {
   });
   await step('insights page', async () => { await go('insights'); await sleep(800); });
   await step('expenses page', async () => { await go('expenses'); await sleep(1200); });
-  await step('trip form', async () => { await go('expenses'); await sleep(800); return click('button', /New trip folder/); });
-  await step('trip folder', async () => { await go('expenses'); await sleep(800); return click('[role=button], button, .card, article', /Annual International/); });
+  await step('trip form', async () => { await go('expenses'); await sleep(800); const back = byText('button', /All trips/); if (back) { back.click(); await sleep(600); } return click('button', /New trip folder/); });
+  await step('trip folder', async () => { await go('expenses'); await sleep(800); const back = byText('button', /All trips/); if (back) { back.click(); await sleep(600); } return click('[role=button], button, .card, article', /Annual International/); });
   await step('expense sheet', async () => click('[role=button], button, .item, .card', /Lufthansa/));
   await closeAll();
   return out;

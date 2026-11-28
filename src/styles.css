@@ -125,7 +125,8 @@ label.field > span { display: block; font-size: 0.85rem; color: var(--muted); ma
   width: 100%; min-height: var(--tap); padding: 8px 12px; border-radius: 10px; border: 1.5px solid var(--line); background: #fff;
 }
 .input:focus { outline: none; border-color: var(--bb); box-shadow: 0 0 0 3px color-mix(in srgb, var(--gold) 55%, transparent); }
-.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
+/* Two fields side by side only when each gets about 160px (more with large text); on a phone they stack. */
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr)); gap: 12px; }
 /* Grid cells may shrink below their content, so a wide table or picture can't spill into the next cell. */
 .grid2 > * { min-width: 0; }
 
@@ -266,10 +267,17 @@ label.btn.is-disabled { opacity: 0.55; cursor: progress; pointer-events: none; }
 .rline { display: grid; grid-template-columns: 1fr auto; gap: 6px 10px; padding: 12px 0; border-top: 1px solid var(--line-soft); }
 .rline.skip { opacity: 0.5; }
 .rhead { display: grid; grid-template-columns: 1fr 76px 96px; gap: 8px; font-size: 0.8rem; color: var(--muted); margin-top: 12px; }
-@media (max-width: 420px) { .rhead { grid-template-columns: 1fr 64px 84px; } }
 .rline .raw { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 0.8rem; color: var(--muted); }
 .rline .controls { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 76px 96px; gap: 8px; }
-@media (max-width: 420px) { .rline .controls { grid-template-columns: 1fr 64px 84px; } }
+.rline .controls .ctl { display: block; min-width: 0; }
+.rline .controls .ctl-label { display: none; }
+/* On a phone the match picker gets its own full-width line, with Qty and Line total under it. */
+@media (max-width: 520px) {
+  .rhead { display: none; }
+  .rline .controls { grid-template-columns: 1fr 1fr; }
+  .rline .controls > select { grid-column: 1 / -1; }
+  .rline .controls .ctl-label { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 4px; }
+}
 
 /* ---------- insights ---------- */
 .filters { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }

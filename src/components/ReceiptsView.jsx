@@ -224,8 +224,8 @@ function ReceiptReview({ data, onClose, onSaved }) {
                   <option value="">New item: {ln.newName}</option>
                   {sorted.map((it) => <option key={it.id} value={it.id}>{it.name}</option>)}
                 </select>
-                <input className="input" inputMode="decimal" aria-label="Quantity" value={ln.quantity} onChange={(e) => set(i, { quantity: e.target.value })} />
-                <input className="input" inputMode="decimal" aria-label="Line total" value={ln.lineTotal ?? ''} onChange={(e) => set(i, { lineTotal: e.target.value === '' ? null : Number(e.target.value), unitPrice: null })} />
+                <label className="ctl"><span className="ctl-label">Qty</span><input className="input" inputMode="decimal" aria-label="Quantity" value={ln.quantity} onChange={(e) => set(i, { quantity: e.target.value })} /></label>
+                <label className="ctl"><span className="ctl-label">Line total $</span><input className="input" inputMode="decimal" aria-label="Line total" value={ln.lineTotal ?? ''} onChange={(e) => set(i, { lineTotal: e.target.value === '' ? null : Number(e.target.value), unitPrice: null })} /></label>
               </div>
             )}
           </div>

@@ -147,25 +147,24 @@ export default function ItemSheet({ item, focus, onClose }) {
                 <input className="input" defaultValue={item.unit || ''} placeholder="gal, pack, box" onBlur={(e) => save({ unit: e.target.value.trim() })} />
               </label>
             </div>
+            {/* Type and Note get the full width: category names and notes are too long for half a phone screen. */}
             <div className="grid2">
               <label className="field"><span>Where to buy</span>
                 <input className="input" list="stores" defaultValue={item.store || ''} placeholder="Costco" onBlur={(e) => save({ store: e.target.value.trim() })} />
                 <datalist id="stores">{stores.map((s) => <option key={s} value={s} />)}</datalist>
               </label>
-              <label className="field"><span>Type</span>
-                <select className="input" value={item.category || 'Other'} onChange={(e) => save({ category: e.target.value, categoryByHand: true })}>
-                  {[...new Set([...cats, item.category || 'Other'])].map((c) => <option key={c}>{c}</option>)}
-                </select>
-              </label>
-            </div>
-            <div className="grid2">
               <label className="field"><span>Last price paid (each)</span>
                 <input className="input" inputMode="decimal" defaultValue={item.lastPrice ?? ''} placeholder="0.00" onBlur={(e) => save({ lastPrice: num(e.target.value) })} />
               </label>
-              <label className="field"><span>Note</span>
-                <input className="input" defaultValue={item.note || ''} placeholder="Brand, size, aisle" onBlur={(e) => e.target.value.trim() !== (item.note || '') && save({ note: e.target.value.trim(), pricesCheckedAt: null })} />
-              </label>
             </div>
+            <label className="field"><span>Type</span>
+              <select className="input" value={item.category || 'Other'} onChange={(e) => save({ category: e.target.value, categoryByHand: true })}>
+                {[...new Set([...cats, item.category || 'Other'])].map((c) => <option key={c}>{c}</option>)}
+              </select>
+            </label>
+            <label className="field"><span>Note</span>
+              <input className="input" defaultValue={item.note || ''} placeholder="Brand, size, aisle" onBlur={(e) => e.target.value.trim() !== (item.note || '') && save({ note: e.target.value.trim(), pricesCheckedAt: null })} />
+            </label>
             <div className="field photo-field">
               {item.photo && <div className="photo-box"><img src={item.photo} alt={`The ${item.name} to buy`} /></div>}
               {photoBusy && <p className="small muted" style={{ margin: '0 0 6px' }}>Saving the photo…</p>}
