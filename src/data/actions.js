@@ -236,7 +236,7 @@ export async function deleteReceipt(ctx, receipt, purchases) {
 // ---- Travel expense reports (private to the signed-in person, under users/{uid}) ----
 
 const TRIP_FIELDS = ['name', 'location', 'startDate', 'endDate', 'purpose', 'employer', 'project', 'chargeCode', 'mealsMode', 'mieRate', 'mealsProvided', 'status', 'notes'];
-const EXPENSE_FIELDS = ['tripId', 'category', 'merchant', 'date', 'time', 'amount', 'originalAmount', 'originalCurrency', 'paidWith', 'business', 'nights', 'notes', 'imageIds', 'source', 'emailId'];
+const EXPENSE_FIELDS = ['tripId', 'category', 'merchant', 'date', 'time', 'amount', 'originalAmount', 'originalCurrency', 'paidWith', 'business', 'nights', 'notes', 'summary', 'captions', 'imageIds', 'source', 'emailId'];
 const pick = (o, keys) => clean(Object.fromEntries(keys.map((k) => [k, o[k] === undefined ? undefined : o[k]])));
 const num = (v) => (v === '' || v == null || Number.isNaN(Number(v)) ? null : Math.round(Number(v) * 100) / 100);
 
@@ -280,6 +280,7 @@ export async function saveExpense(ctx, expense, { newImages = [], removedImageId
   const data = pick({
     ...expense, amount: num(expense.amount), originalAmount: num(expense.originalAmount), business: expense.business === '' || expense.business == null ? null : num(expense.business),
     nights, paidWith: expense.paidWith || 'personal', imageIds: [...kept, ...added], currency: 'USD',
+    captions: Object.fromEntries(Object.entries(expense.captions || {}).filter(([k, v]) => kept.includes(k) && v)),
   }, EXPENSE_FIELDS);
   const ops = [expense.id
     ? { type: 'update', coll: 'expenses', id, data: { ...data, updatedAt: Date.now() } }
@@ -287,6 +288,15 @@ export async function saveExpense(ctx, expense, { newImages = [], removedImageId
   for (const r of removedImageIds) ops.push({ type: 'remove', coll: 'expenseImages', id: r });
   await backend.commitMine(user.uid, ops);
   return id;
+}
+
+// Sets or clears the caption the person typed for one receipt photo. A blank caption goes
+// back to the automatic one.
+export async function setPhotoCaption(ctx, expense, imageId, text) {
+  const captions = { ...(expense.captions || {}) };
+  const t = String(text || '').trim().slice(0, 140);
+  if (t) captions[imageId] = t; else delete captions[imageId];
+  await ctx.backend.commitMine(ctx.user.uid, [{ type: 'update', coll: 'expenses', id: expense.id, data: { captions, updatedAt: Date.now() } }]);
 }
 
 // Deletes an expense and its photos, and hands back an undo that puts them all back.

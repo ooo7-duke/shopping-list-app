@@ -640,7 +640,8 @@ describe('AI retries', async () => {
   });
 });
 
-import { tripDays, perDiemDays, businessAmount, expenseFlags, tripTotals, expensesCSV, emailTrip, normalizeRead, fromDayKey } from './expenses.js';
+import { tripDays, perDiemDays, businessAmount, expenseFlags, tripTotals, expensesCSV, emailTrip, normalizeRead, fromDayKey, autoCaption, captionFor, expenseWorkbook } from './expenses.js';
+import { xlsxBytes, colName } from './xlsx.js';
 describe('expense reports', () => {
   const d = (s) => fromDayKey(s);
   const trip = { id: 't1', name: 'CES 2027', location: 'Las Vegas, NV', startDate: d('2027-01-05'), endDate: d('2027-01-09'), mealsMode: 'actual' };
@@ -707,5 +708,31 @@ describe('expense reports', () => {
     const r = normalizeRead({ merchant: 'Tim Hortons', category: 'breakfast', total: 12.5, currency: 'cad', date: '2027-01-06', time: '7:45' });
     expect(r).toMatchObject({ amount: null, originalAmount: 12.5, originalCurrency: 'CAD', time: '07:45', category: 'breakfast' });
     expect(normalizeRead({ category: 'nonsense' }).category).toBe('other');
+  });
+  it('captions a receipt photo from what was read off it, and keeps a typed caption', () => {
+    const hotel = { merchant: 'Hilton Long Beach', category: 'lodging', amount: 812.4, imageIds: ['a'],
+      nights: [1, 2, 3, 4].map((i) => ({ date: d(`2027-09-1${i}`), amount: 203.1, personal: i === 4 })) };
+    expect(autoCaption(hotel)).toBe('Hilton Long Beach, 4 nights (3 claimed), $812.40');
+    expect(autoCaption({ merchant: 'Staples', category: 'supplies', summary: 'brochures', amount: 46.18 })).toBe('Staples, brochures, $46.18');
+    expect(autoCaption({ merchant: 'Egg Works', category: 'breakfast', amount: 21.37 }, 1, 2)).toBe('Egg Works, Breakfast, $21.37, page 2 of 2');
+    expect(captionFor({ ...hotel, captions: { a: 'Folio, night 4 was personal' } }, 'a')).toBe('Folio, night 4 was personal');
+  });
+
+  it('builds an Excel workbook whose totals match the trip', () => {
+    const list = [
+      { id: '1', category: 'airfare', merchant: 'Delta', date: d('2026-12-01'), amount: 450, paidWith: 'personal', imageIds: ['x'] },
+      { id: '2', category: 'dinner', merchant: 'Bacchanal', date: d('2027-01-06'), amount: 80.5, business: 60, paidWith: 'personal' },
+    ];
+    const [summary, sheet] = expenseWorkbook(trip, list);
+    expect(sheet.rows[0][0].v).toBe('Date');
+    expect(sheet.rows[1][4].v).toBe('Delta, Airfare, $450.00');
+    const total = sheet.rows[sheet.rows.length - 1];
+    expect(total[5]).toMatchObject({ f: 'SUM(F2:F3)', v: 530.5 });
+    expect(total[6]).toMatchObject({ f: 'SUM(G2:G3)', v: 510 });
+    expect(summary.rows.at(-1)[2].v).toBe(510);
+    const bytes = xlsxBytes([summary, sheet]);
+    expect([...bytes.slice(0, 4)]).toEqual([0x50, 0x4b, 0x03, 0x04]);
+    expect(colName(0)).toBe('A');
+    expect(colName(27)).toBe('AB');
   });
 });

@@ -7,11 +7,12 @@ import { compressImage, isImageFile, toReadableImage } from '../lib/receipts.js'
 import {
   EXPENSE_CATEGORIES, categoryLabel, isMeal, tripDays, perDiemDays, businessAmount, expenseFlags, tripTotals,
   sortExpenses, expensesCSV, dayKey, fromDayKey, extractExpense, extractExpenseText, emailTrip, notTravelIds, markNotTravel,
-  demoTravelInbox, GSA_MIE, hasReceipt,
+  demoTravelInbox, GSA_MIE, hasReceipt, tripPhotos, captionFor, autoCaption, expenseWorkbook,
 } from '../lib/expenses.js';
+import { xlsxBytes } from '../lib/xlsx.js';
 import { fetchInbox, ackInbox } from '../lib/emailReceipts.js';
 import {
-  saveExpenseTrip, updateExpenseTrip, deleteExpenseTrip, saveExpense, deleteExpense, getExpenseImage,
+  saveExpenseTrip, updateExpenseTrip, deleteExpenseTrip, saveExpense, deleteExpense, getExpenseImage, setPhotoCaption,
 } from '../data/actions.js';
 import { fmtMoney, fmtDate, toInputDate, fromInputDate } from '../lib/format.js';
 import { aiErrorMessage, saveErrorMessage } from '../lib/errors.js';
@@ -207,11 +208,14 @@ function TripDetail({ trip, expenses, onBack, onEdit, onDeleted }) {
   }
   function clear() { if (cameraRef.current) cameraRef.current.value = ''; if (pickRef.current) pickRef.current.value = ''; }
 
-  function downloadCSV() {
-    const blob = new Blob([`﻿${expensesCSV(trip, expenses)}`], { type: 'text/csv;charset=utf-8' });
+  function download(kind) {
+    const base = trip.name.replace(/[^\w -]+/g, '').trim() || 'trip';
+    const blob = kind === 'csv'
+      ? new Blob([`﻿${expensesCSV(trip, expenses)}`], { type: 'text/csv;charset=utf-8' })
+      : new Blob([xlsxBytes(expenseWorkbook(trip, expenses))], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `${trip.name.replace(/[^\w -]+/g, '').trim() || 'trip'} expenses.csv`;
+    a.download = `${base} expense report.${kind}`;
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 2000);
   }
@@ -297,12 +301,15 @@ function TripDetail({ trip, expenses, onBack, onEdit, onDeleted }) {
         </>
       )}
 
+      <ReceiptGallery expenses={list} onOpenExpense={(e) => setEditing(e)} />
+
       <div className="section-h"><h2>Send it in</h2></div>
       <div className="card stack">
-        <p className="small">The PDF has the summary, every expense, your notes and a copy of each receipt. On a phone, tap Share or Print, then save it as a PDF.</p>
+        <p className="small">The PDF has the summary, every expense, your notes and each receipt photo with its caption. On a phone, tap Share or Print, then save it as a PDF. The Excel file has the same expenses with totals that add up as you edit.</p>
         <div className="drop-actions" style={{ justifyContent: 'flex-start' }}>
           <button type="button" className="btn primary" onClick={() => setPrinting((n) => n + 1)} disabled={!list.length}>PDF with receipts</button>
-          <button type="button" className="btn" onClick={downloadCSV} disabled={!list.length}><DownloadIcon width="20" height="20" /> Spreadsheet (CSV)</button>
+          <button type="button" className="btn" onClick={() => download('xlsx')} disabled={!list.length}><DownloadIcon width="20" height="20" /> Excel</button>
+          <button type="button" className="btn ghost" onClick={() => download('csv')} disabled={!list.length}>CSV</button>
         </div>
         <label className="row small" style={{ gap: 8 }}>
           <input type="checkbox" checked={trip.status === 'submitted'} style={{ width: 22, height: 22 }}
@@ -612,9 +619,9 @@ function PrintReport({ trip, expenses }) {
     let live = true;
     (async () => {
       const out = [];
-      for (const e of expenses) for (const id of e.imageIds || []) {
-        const d = await getExpenseImage(ctx, id).catch(() => null);
-        if (d?.dataUrl) out.push({ e, src: d.dataUrl });
+      for (const p of tripPhotos(expenses)) {
+        const d = await getExpenseImage(ctx, p.id).catch(() => null);
+        if (d?.dataUrl) out.push({ ...p, src: d.dataUrl });
       }
       if (live) setImgs(out);
     })();
@@ -670,13 +677,93 @@ function PrintReport({ trip, expenses }) {
         </tbody>
       </table>
       <div className="p-sign"><span>Employee signature</span><span>Date</span><span>Approver</span><span>Date</span></div>
-      {imgs.map(({ e, src }, i) => (
+      {imgs.map(({ e, src, caption }, i) => (
         <div key={i} className="p-receipt">
-          <h3>Receipt {i + 1}: {e.merchant || categoryLabel(e.category)}, {e.date ? fmtDate(e.date, { withYear: true }) : ''}, {fmtMoney(e.amount)}</h3>
-          <img src={src} alt={`Receipt from ${e.merchant}`} />
+          <h3>Receipt {i + 1}: {caption}</h3>
+          <p className="p-sub">{e.date ? fmtDate(e.date, { withYear: true }) : ''}{e.time ? ` at ${fmtTime(e.time)}` : ''} · {categoryLabel(e.category)}</p>
+          <img src={src} alt={caption} />
         </div>
       ))}
     </div>,
     document.body,
+  );
+}
+
+// Receipt photos load one by one and are kept for the session, so going back and forth
+// between trips doesn't download them again.
+const photoCache = new Map();
+function usePhoto(id) {
+  const { ctx } = useApp();
+  const [src, setSrc] = useState(() => photoCache.get(id) || null);
+  useEffect(() => {
+    if (photoCache.has(id)) { setSrc(photoCache.get(id)); return undefined; }
+    let live = true;
+    getExpenseImage(ctx, id).then((d) => { if (d?.dataUrl) { photoCache.set(id, d.dataUrl); if (live) setSrc(d.dataUrl); } }).catch(() => {});
+    return () => { live = false; };
+  }, [id]);
+  return src;
+}
+
+function ReceiptGallery({ expenses, onOpenExpense }) {
+  const photos = tripPhotos(expenses);
+  const emailed = expenses.filter((e) => e.emailId && !(e.imageIds || []).length).length;
+  const [open, setOpen] = useState(null);
+  if (!photos.length && !emailed) return null;
+  const current = open && photos.find((p) => p.id === open);
+  return (
+    <>
+      <div className="section-h"><h2>Receipt photos</h2><span className="small muted">{photos.length}</span></div>
+      {photos.length > 0 && (
+        <div className="xgallery">
+          {photos.map((p) => <GalleryTile key={p.id} p={p} onOpen={() => setOpen(p.id)} />)}
+        </div>
+      )}
+      {emailed > 0 && <p className="tiny muted" style={{ marginTop: 6 }}>{emailed} emailed receipt{emailed === 1 ? ' is' : 's are'} listed in the report without a photo.</p>}
+      {current && <PhotoViewer p={current} onClose={() => setOpen(null)} onOpenExpense={() => { setOpen(null); onOpenExpense(current.e); }} />}
+    </>
+  );
+}
+
+function GalleryTile({ p, onOpen }) {
+  const src = usePhoto(p.id);
+  return (
+    <button type="button" className="xtile" onClick={onOpen} aria-label={`Open receipt: ${p.caption}`}>
+      <span className="xtile-img">{src ? <img src={src} alt="" loading="lazy" /> : <span className="tiny muted">Loading…</span>}</span>
+      <span className="xtile-cap">{p.caption}</span>
+      <span className="tiny muted">{p.e.date ? fmtDate(p.e.date) : ''}</span>
+    </button>
+  );
+}
+
+function PhotoViewer({ p, onClose, onOpenExpense }) {
+  const { ctx, showToast } = useApp();
+  const src = usePhoto(p.id);
+  const typed = p.e.captions?.[p.id] || '';
+  const auto = autoCaption(p.e, (p.e.imageIds || []).indexOf(p.id), (p.e.imageIds || []).length);
+  const [text, setText] = useState(typed || auto);
+  const [saving, setSaving] = useState(false);
+  async function save(value) {
+    setSaving(true);
+    try {
+      await setPhotoCaption(ctx, p.e, p.id, value === auto ? '' : value);
+      showToast('Caption saved');
+    } catch (e) { console.error(e); showToast(saveErrorMessage(e)); }
+    setSaving(false);
+  }
+  return (
+    <Sheet title="Receipt" onClose={onClose} wide>
+      <div className="xviewer">{src ? <img src={src} alt={text} /> : <p className="muted">Loading the photo…</p>}</div>
+      <label className="field" style={{ marginTop: 12 }}>
+        <span>Caption</span>
+        <input className="input" value={text} maxLength={140} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && save(text)} />
+      </label>
+      <p className="tiny muted" style={{ marginTop: 4 }}>{typed ? 'You wrote this caption.' : 'Written from what the receipt says. It changes if you edit the expense, until you type your own.'}</p>
+      <div className="drop-actions" style={{ justifyContent: 'flex-start', marginTop: 10 }}>
+        <button type="button" className="btn primary" disabled={saving || text.trim() === (typed || auto)} onClick={() => save(text)}>Save caption</button>
+        {typed && <button type="button" className="btn ghost" disabled={saving} onClick={() => { setText(auto); save(''); }}>Use the automatic caption</button>}
+        <button type="button" className="btn" onClick={onOpenExpense}>Open the expense</button>
+        {src && <a className="btn ghost" href={src} download={`${text.replace(/[^\w ,.$-]+/g, '').slice(0, 60) || 'receipt'}.${(src.match(/^data:image\/(\w+)/) || [])[1]?.replace('jpeg', 'jpg').replace('svg+xml', 'svg') || 'jpg'}`}>Save photo</a>}
+      </div>
+    </Sheet>
   );
 }

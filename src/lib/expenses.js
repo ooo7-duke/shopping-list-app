@@ -3,6 +3,7 @@
 // so the page stays thin and the tests can check the arithmetic.
 import { DEMO_MODE } from './config.js';
 import { generateJSON } from './ai.js';
+import { fmtMoney } from './format.js';
 
 export const EXPENSE_CATEGORIES = [
   { id: 'airfare', label: 'Airfare', group: 'Travel' },
@@ -274,6 +275,7 @@ export function normalizeRead(r = {}) {
     originalAmount: foreign && r.total != null ? round2(r.total) : null,
     originalCurrency: foreign ? currency : '',
     nights: r.category === 'lodging' ? nights : [],
+    summary: String(r.summary || '').trim().slice(0, 80),
     notes: [r.summary, r.tip ? `Tip ${round2(r.tip).toFixed(2)}` : '', r.last4 ? `Card ending ${String(r.last4).slice(-4)}` : ''].filter(Boolean).join('. '),
   };
 }
@@ -300,4 +302,84 @@ export function demoTravelInbox() {
     { id: 'demo-hotel', from: 'Wynn Las Vegas <folio@wynnlasvegas.com>', subject: 'Your folio from Wynn Las Vegas', date: now - DAY, text: '(sample hotel folio)', pdfs: [] },
     { id: 'demo-uber', from: 'Uber Receipts <noreply@uber.com>', subject: 'Your afternoon trip with Uber', date: now - 6 * DAY, text: '(sample ride receipt)', pdfs: [] },
   ].filter((m) => !done.includes(m.id));
+}
+
+// A caption for a receipt photo, built from what was read off it: who, what, how much.
+// "Wynn Las Vegas, 5 nights (4 claimed), $1,146.40". A caption the person typed wins.
+export function autoCaption(e, index = 0, count = 1) {
+  const who = e.merchant || categoryLabel(e.category);
+  let what = '';
+  const nights = (e.nights || []).length;
+  if (nights) {
+    const claimed = e.nights.filter((n) => !n.personal).length;
+    what = `${nights} night${nights === 1 ? '' : 's'}${claimed < nights ? ` (${claimed} claimed)` : ''}`;
+  } else {
+    const firstNote = String(e.notes || '').split(/[.;]\s/)[0].trim();
+    what = e.summary || (firstNote && firstNote.length <= 48 ? firstNote : '') || categoryLabel(e.category);
+  }
+  if (what.toLowerCase() === who.toLowerCase()) what = '';
+  const parts = [who, what, e.amount != null && e.amount !== '' ? fmtMoney(e.amount) : ''];
+  if (count > 1) parts.push(`page ${index + 1} of ${count}`);
+  return parts.filter(Boolean).join(', ');
+}
+
+export const captionFor = (e, id) => {
+  const ids = e.imageIds || [];
+  return (e.captions && e.captions[id]) || autoCaption(e, Math.max(0, ids.indexOf(id)), ids.length);
+};
+
+// Every receipt photo in a trip, oldest first, for the gallery and the PDF.
+export function tripPhotos(expenses) {
+  return sortExpenses(expenses).flatMap((e) => (e.imageIds || []).map((id) => ({ id, e, caption: captionFor(e, id) })));
+}
+
+// The sheets of the Excel workbook: a summary, the expenses with live totals, and the per diem.
+export function expenseWorkbook(trip, expenses) {
+  const t = tripTotals(trip, expenses);
+  const list = sortExpenses(expenses);
+  const S = (v) => ({ v: v ?? '' });
+  const B = (v) => ({ v, s: 'bold' });
+  const M = (v, s = 'money') => ({ v: round2(v), s });
+  const D = (ms) => (ms ? { v: new Date(ms), s: 'date' } : S(''));
+  const rows = [];
+  const first = 2; const last = list.length + 1;
+  rows.push(['Date', 'Time', 'Category', 'Merchant', 'Receipt caption', 'Amount (USD)', 'Claimed', 'Personal', 'Paid with', 'Receipt', 'Flags', 'Notes'].map(B));
+  for (const e of list) {
+    const biz = trip.mealsMode === 'perDiem' && isMeal(e.category) ? 0 : businessAmount(e);
+    const amt = round2(e.amount);
+    const photos = (e.imageIds || []).length;
+    rows.push([
+      D(e.date), S(e.time || ''), S(categoryLabel(e.category)), S(e.merchant || ''),
+      S(photos ? captionFor(e, e.imageIds[0]) : ''), M(amt), M(biz), M(amt - biz),
+      S(e.paidWith === 'corporate' ? 'Company card' : 'Personal'), S(photos ? 'Photo' : e.emailId ? 'Emailed' : 'Missing'),
+      S(expenseFlags(e, expenses, trip).filter((f) => f.code !== 'perdiem').map((f) => f.label).join('; ')), S(e.notes || ''),
+    ]);
+  }
+  const sum = (col, v) => ({ f: list.length ? `SUM(${col}${first}:${col}${last})` : '0', v: round2(v), s: 'moneyBold' });
+  rows.push([B('Total'), S(''), S(''), S(''), S(''), sum('F', t.spent), sum('G', t.business), sum('H', t.personal)]);
+
+  const summary = [
+    [{ v: `Expense report: ${trip.name}`, s: 'title' }], [],
+    [B('Location'), S(trip.location)], [B('Start'), D(trip.startDate)], [B('End'), D(trip.endDate)],
+    [B('Purpose'), S(trip.purpose)], [B('Employer'), S(trip.employer)], [B('Project'), S(trip.project)], [B('Charge code'), S(trip.chargeCode)],
+    [B('Meals'), S(trip.mealsMode === 'perDiem' ? `Per diem, $${trip.mieRate || 0} a day` : 'Actual cost, with receipts')], [],
+    ['Category', 'Spent', 'Claimed'].map(B),
+    ...t.byCategory.map((c) => [S(c.label), M(c.spent), M(c.business)]),
+  ];
+  if (t.perDiem > 0) summary.push([S('Meals per diem'), S(''), M(t.perDiem)]);
+  summary.push([B('Total'), M(t.spent, 'moneyBold'), M(t.business + t.perDiem, 'moneyBold')], [],
+    [S('Personal, not claimed'), S(''), M(t.personal)], [S('Paid on a company card'), S(''), M(t.companyCard)],
+    [B('Owed to you'), S(''), M(t.owedToYou, 'moneyBold')]);
+
+  const sheets = [
+    { name: 'Summary', rows: summary, widths: [26, 16, 16] },
+    { name: 'Expenses', rows, widths: [12, 9, 20, 24, 40, 14, 12, 12, 14, 10, 30, 50], filter: true, freeze: true },
+  ];
+  if (t.perDiemDays.length) {
+    sheets.push({ name: 'Per diem', widths: [14, 12, 24, 12], rows: [
+      ['Day', 'Rate', 'Meals provided', 'Amount'].map(B),
+      ...t.perDiemDays.map((d) => [D(fromDayKey(d.day)), M(d.base), S(d.provided.join(', ')), M(d.amount)]),
+    ] });
+  }
+  return sheets;
 }
