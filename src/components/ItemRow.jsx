@@ -47,7 +47,7 @@ export default function ItemRow({ item, pred, done, last, showHistory = false, o
         </button>
       )}
       <div className="grow" style={{ minWidth: 0 }}>
-        <FitText className="name">{item.name}{qty && <span className="muted" style={{ fontWeight: 400 }}> · {qty}</span>}</FitText>
+        <FitText className="name" lines={2}>{qty ? `${item.name} · ${qty}` : item.name}</FitText>
         <div className="meta">
           {item.urgent && !done && <span className="chip warn">Needed now</span>}
           {item.status === 'ordered' && <span className="chip blue">Ordered</span>}

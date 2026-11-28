@@ -218,7 +218,7 @@ export default function TripsView() {
           <div className="list">
             {done.map((b) => (
               <div key={b.id} className="item" style={{ cursor: 'default' }}>
-                <div className="grow" style={{ minWidth: 0 }}><FitText className="name">{b.name}</FitText><FitText className="meta-line">{b.itemIds?.length || 0} items · arrived {fmtDate(b.arrivedAt, { withYear: true })}</FitText></div>
+                <div className="grow" style={{ minWidth: 0 }}><FitText className="name" lines={2}>{b.name}</FitText><FitText className="meta-line">{b.itemIds?.length || 0} items · arrived {fmtDate(b.arrivedAt, { withYear: true })}</FitText></div>
                 {b.estTotal ? <div className="price">{fmtMoney(b.estTotal)}</div> : null}
               </div>
             ))}

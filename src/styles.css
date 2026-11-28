@@ -20,6 +20,10 @@
 
 * { box-sizing: border-box; }
 html { font-size: 17px; -webkit-text-size-adjust: 100%; }
+/* A word is never split across two lines anywhere in the app; whole words wrap. Text too long for
+   its box is shortened with an ellipsis instead, and nothing pushes the page sideways. */
+*, *::before, *::after { overflow-wrap: normal; word-break: normal; hyphens: none; }
+html, body { overflow-x: clip; }
 body {
   margin: 0; font-family: var(--font); font-size: 1rem; line-height: 1.5;
   color: var(--bb-ink); background: var(--cream);
@@ -174,9 +178,12 @@ label.field > span { display: block; font-size: 0.85rem; color: var(--muted); ma
    A price never splits inside the number: when a big one can't fit beside the name, it moves to
    its own line under it, on the right. */
 .item { flex-wrap: nowrap; }
-.item > .grow { flex: 1 1 0%; min-width: 0; overflow-wrap: anywhere; }
+.item > .grow { flex: 1 1 0%; min-width: 0; }
 /* Each line of a row stays on one line at the largest size that fits (see FitText.jsx). */
 .fit { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; max-width: 100%; }
+.fit-lines { white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; }
+.count-note { display: block; margin-top: 4px; font-size: 0.8rem; color: var(--muted); }
+.count-note.over { color: var(--danger); font-weight: 600; }
 .item .meta-line { font-size: 0.85rem; color: var(--muted); margin-top: 2px; }
 .item .meta-line + .meta { margin-top: 4px; }
 @media (max-width: 480px) { .item { gap: 8px; } }
@@ -305,7 +312,6 @@ table.data td.num, table.data th.num { text-align: right; }
   /* Text cells wrap at spaces. Only the later text columns (item, store) may also break inside a
      long word; letting the first column do that squeezed dates to one letter a line. */
   table.data th:first-child, table.data td:not(.num), table.data td.num { white-space: normal; }
-  table.data td:not(.num):not(:first-child) { overflow-wrap: anywhere; }
 }
 
 /* ---------- sign in ---------- */
@@ -369,7 +375,7 @@ table.data td.num, table.data th.num { text-align: right; }
 .photo-view { position: fixed; inset: 0; z-index: 1000; background: rgba(12, 18, 40, 0.92); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 16px; cursor: zoom-out; }
 .photo-view img { max-width: 100%; max-height: 78vh; border-radius: 12px; background: #fff; }
 /* Receipt sheet: names wrap so every price stays in view; the photo sits below, small, and opens full screen. */
-.receipt-lines td:first-child { white-space: normal; overflow-wrap: anywhere; }
+.receipt-lines td:first-child { white-space: normal; }
 .receipt-thumb { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin-top: 12px; padding: 0; border: 0; background: none; color: var(--bb); font: inherit; cursor: zoom-in; text-decoration: underline; }
 .receipt-thumb img { display: block; max-width: min(100%, 220px); max-height: 240px; object-fit: contain; border-radius: 10px; border: 1px solid var(--line); background: #fff; }
 .photo-cap { color: #fffbee; text-align: center; font-weight: 600; }
@@ -384,7 +390,7 @@ table.data td.num, table.data th.num { text-align: right; }
 .link { font-weight: 600; }
 .inbox-msg { background: #fff; }
 .inbox-msg.handled { opacity: 0.7; }
-.inbox-text { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0 0 10px; }
+.inbox-text { white-space: pre-wrap; overflow: hidden; text-overflow: ellipsis; margin: 0 0 10px; }
 .delete-plan { margin: 0; padding-left: 20px; }
 .delete-plan li { margin-bottom: 4px; }
 
@@ -538,7 +544,7 @@ table.data.xtable th, table.data.xtable td { white-space: nowrap; }
   table.data.purchases-table th { position: static; border: 0; padding: 6px 8px; }
   .purchases-table th:nth-child(3), .purchases-table td:nth-child(3) { display: none; }
   .purchases-table tbody tr { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 12px; row-gap: 2px; padding: 9px 4px; border-bottom: 1px solid var(--line-soft); }
-  table.data.purchases-table td { border: 0; padding: 0; white-space: normal; overflow-wrap: anywhere; }
+  table.data.purchases-table td { border: 0; padding: 0; white-space: normal; overflow: hidden; text-overflow: ellipsis; }
   .purchases-table td:nth-child(2) { grid-area: 1 / 1; font-weight: 600; }
   .purchases-table td:nth-child(6) { grid-area: 1 / 2; }
   .purchases-table td:nth-child(1) { grid-area: 2 / 1; color: var(--muted); font-size: 0.85rem; }
@@ -563,7 +569,7 @@ body:has(.pick-bar) .to-top { display: none; }
 /* A long item name gets two lines before it's cut, so "Everyday item..." shows enough to tell items apart. */
 .item .name.ellipsis, .clamp2 {
   white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2;
-  overflow: hidden; overflow-wrap: anywhere;
+  overflow: hidden; text-overflow: ellipsis;
 }
 /* Trip cards with large text: "Shop now" and "Ordered" keep their full words and drop onto two lines when
    both don't fit, and a "Due soon" chip wraps inside the card instead of running past its edge. */

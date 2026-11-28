@@ -394,7 +394,7 @@ function EmailedReceipts() {
         {waiting.map(([id, v]) => (
           <div key={id} className="email-row">
             <div className="grow" style={{ minWidth: 0 }}>
-              <FitText className="name">{v.res?.store || storeFromSubject(v.m?.subject) || 'Emailed receipt'}</FitText>
+              <FitText className="name" lines={2}>{v.res?.store || storeFromSubject(v.m?.subject) || 'Emailed receipt'}</FitText>
               <div className="meta">
                 {v.status === 'reading' ? 'Reading…' : v.status === 'error' ? `Couldn't read it. ${v.error}` : `${plural(v.plan.lines.length, 'item')} · ${v.plan.weak} best guess${v.plan.weak === 1 ? '' : 'es'} to check`}
               </div>
@@ -479,7 +479,7 @@ function ReceiptRow({ r, picking, picked, onHold, onOpen, onToggle }) {
       aria-label={`${r.store || 'Receipt'}${picked ? ', selected' : ''}`}>
       {picking && <PickBox on={picked} name={r.store || 'this receipt'} onToggle={onToggle} />}
       <div className="grow" style={{ minWidth: 0 }}>
-        <FitText className="name">{r.store || 'Receipt'}</FitText>
+        <FitText className="name" lines={2}>{r.store || 'Receipt'}</FitText>
         <FitText className="meta-line">{fmtDate(r.date, { withYear: true })} · {plural(r.lineCount, 'item')} · {r.matched} matched to your list · {r.source === 'email' ? 'emailed' : r.uploadedByName}</FitText>
       </div>
       <div className="price">{fmtMoney(r.total)}</div>

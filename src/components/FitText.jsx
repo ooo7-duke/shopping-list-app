@@ -1,34 +1,70 @@
-// One line of text at the largest size that fits. A line that is too long shrinks a little (down
-// to `min` of its normal size, 80% unless set), and only past that ends in "…". It never wraps and
-// never pushes the page sideways.
+// Text at the largest size that fits, without ever splitting a word across two lines.
+//   lines={1}: one line. Too long, it shrinks a little (to `min` of its size, 80% unless set), then ends in "…".
+//   lines={2} (or more): whole words wrap onto up to that many lines. A single word too wide for the
+//   line shrinks the text a little; past `min` that word alone is shortened with "…". With
+//   `fitLines`, the text also shrinks so the whole thing fits in those lines before "…" is used.
+// The page never scrolls sideways because of it.
 import { useEffect, useLayoutEffect, useRef } from 'react';
 
 const queued = new Set();
 const mounted = new Set();
 let frame = 0;
 let ro = null;
+let ctx2d = null;
 
-// Read every queued line first, then write, so a long list costs one layout pass.
+function measurer(cs, size) {
+  if (!ctx2d) ctx2d = document.createElement('canvas').getContext('2d');
+  ctx2d.font = `${cs.fontStyle} ${cs.fontWeight} ${size}px ${cs.fontFamily}`;
+  return (t) => ctx2d.measureText(t).width;
+}
+
+// Shortens any word wider than `room` to the most letters that fit with "…" after them.
+function shortenWords(text, room, width) {
+  return text.split(/(\s+)/).map((w) => {
+    if (!w.trim() || width(w) <= room) return w;
+    let n = w.length - 1;
+    while (n > 1 && width(`${w.slice(0, n)}…`) > room) n -= 1;
+    return `${w.slice(0, n)}…`;
+  }).join('');
+}
+
+function fit(el) {
+  const inner = el.firstElementChild;
+  if (!inner || !el.isConnected) return false;
+  const room = el.clientWidth - 1;
+  if (room <= 0) return false;
+  const lines = Number(el.dataset.lines) || 1;
+  const min = Number(el.dataset.min) || 0.8;
+  const cur = Number(el.dataset.fit) || 1;
+  const cs = getComputedStyle(el);
+  const base = parseFloat(cs.fontSize) / cur;
+  const full = el.dataset.full ?? null;
+  const text = full ?? inner.textContent;
+  const width = measurer(cs, base);
+  // The widest thing that may not break: the whole line, or the longest word.
+  const need = lines === 1 ? width(text) : Math.max(0, ...text.split(/\s+/).map(width));
+  let s = need <= room ? 1 : Math.max(min, Math.floor((room / need) * 100) / 100);
+  const apply = (v) => { el.dataset.fit = String(v); el.style.fontSize = v === 1 ? '' : `${(base * v).toFixed(2)}px`; };
+  if (s !== cur) apply(s);
+  if (el.dataset.fitLines && lines > 1) {
+    const lh = () => parseFloat(getComputedStyle(el).lineHeight) || base * s * 1.5;
+    while (s > min && el.scrollHeight > lines * lh() + 2) { s = Math.max(min, Math.round((s - 0.03) * 100) / 100); apply(s); }
+  }
+  // Past the smallest size, a word that still can't fit is shortened, never split.
+  if (lines > 1 && full != null) {
+    const shown = need * s > room ? shortenWords(full, room, measurer(cs, base * s)) : full;
+    const node = inner.firstChild;
+    if (node && node.nodeType === 3 && node.nodeValue !== shown) node.nodeValue = shown;
+  }
+  return s !== cur;
+}
+
 function flush() {
   frame = 0;
   const els = [...queued];
   queued.clear();
-  const reads = els.map((el) => {
-    const inner = el.firstElementChild;
-    if (!inner || !el.isConnected) return null;
-    const cur = Number(inner.dataset.fit) || 1;
-    return { el, inner, cur, room: el.clientWidth, width: inner.getBoundingClientRect().width, min: Number(el.dataset.min) || 0.8 };
-  });
-  for (const r of reads) {
-    if (!r || !r.room) continue;
-    const natural = r.width / r.cur;
-    const s = natural <= r.room ? 1 : Math.max(r.min, Math.floor(((r.room - 1) / natural) * 100) / 100);
-    if (s !== r.cur) {
-      r.inner.dataset.fit = String(s);
-      r.inner.style.fontSize = s === 1 ? '' : `${s}em`;
-      queue(r.el); // check once more: text does not always scale exactly with its size
-    }
-  }
+  for (const el of els) if (fit(el)) queued.add(el); // check once more after a change
+  if (queued.size && !frame) frame = requestAnimationFrame(flush);
 }
 
 function queue(el) {
@@ -43,30 +79,38 @@ if (typeof window !== 'undefined') {
   window.addEventListener('resize', refitAll);
 }
 
-export default function FitText({ as: Tag = 'div', className = '', min, children, ...rest }) {
+export default function FitText({ as: Tag = 'div', className = '', lines = 1, fitLines = false, min, children, style, ...rest }) {
   const ref = useRef(null);
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return undefined;
-    if (!ro && typeof ResizeObserver !== 'undefined') ro = new ResizeObserver((entries) => entries.forEach((e) => queue(e.target)));
+    if (!ro && typeof ResizeObserver !== 'undefined') {
+      let widths = new WeakMap();
+      ro = new ResizeObserver((entries) => entries.forEach((e) => {
+        const w = Math.round(e.contentRect.width);
+        if (widths.get(e.target) !== w) { widths.set(e.target, w); queue(e.target); }
+      }));
+    }
     mounted.add(el);
     ro?.observe(el);
     return () => { mounted.delete(el); ro?.unobserve(el); queued.delete(el); };
   }, []);
   useLayoutEffect(() => { if (ref.current) queue(ref.current); });
+  const plain = typeof children === 'string';
   return (
-    <Tag ref={ref} className={`fit ${className}`} data-min={min} {...rest}>
+    <Tag ref={ref} className={`fit${lines > 1 ? ' fit-lines' : ''} ${className}`} data-lines={lines} data-min={min} data-fit-lines={fitLines || undefined}
+      data-full={plain && lines > 1 ? children : undefined} style={lines > 1 ? { ...style, WebkitLineClamp: lines } : style} {...rest}>
       <span className="fit-in">{children}</span>
     </Tag>
   );
 }
 
-// A table at the largest text size that fits the card. When even the smallest size is too wide,
-// the first column may wrap, so the table still never scrolls sideways.
+// A table at the largest text size that fits the card, so it never scrolls sideways. When even the
+// smallest size is too wide, the first column may move whole words to a second line.
 export function FitTable({ min = 0.7, className = '', children }) {
   const ref = useRef(null);
-  const fit = useRef(null);
-  fit.current = () => {
+  const run = useRef(null);
+  run.current = () => {
     const box = ref.current;
     const t = box?.querySelector('table');
     if (!t) return;
@@ -81,14 +125,14 @@ export function FitTable({ min = 0.7, className = '', children }) {
     for (let i = 0; i < 7; i += 1) { const mid = (lo + hi) / 2; if (at(mid)) lo = mid; else hi = mid; }
     at(lo);
   };
-  useLayoutEffect(() => { fit.current(); });
+  useLayoutEffect(() => { run.current(); });
   useEffect(() => {
     const box = ref.current;
     if (!box || typeof ResizeObserver === 'undefined') return undefined;
     let w = box.clientWidth;
-    const obs = new ResizeObserver(() => { if (box.clientWidth !== w) { w = box.clientWidth; fit.current(); } });
+    const obs = new ResizeObserver(() => { if (box.clientWidth !== w) { w = box.clientWidth; run.current(); } });
     obs.observe(box);
-    const again = () => fit.current();
+    const again = () => run.current();
     document.fonts?.ready?.then(again);
     window.addEventListener('resize', again);
     return () => { obs.disconnect(); window.removeEventListener('resize', again); };

@@ -22,6 +22,11 @@ import { DEMO_MODE } from '../lib/config.js';
 import FitText, { FitTable } from './FitText.jsx';
 
 const OPEN_KEY = 'sla-open-trip';
+// The longest trip name you can type. At this length a name still fits in two lines of its folder
+// on a 360px phone with large text, without splitting a word. Older, longer names are kept as
+// they are and shortened with "…" on screen; the limit applies when a name is edited.
+export const TRIP_NAME_MAX = 40;
+export const MERCHANT_MAX = 40;
 const dayName = (ms) => new Date(ms).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 
 export function fmtRange(a, b) {
@@ -155,7 +160,7 @@ function TripCard({ trip, expenses, onOpen, onHold, onDelete, picking, picked })
       {picking && <span className={`check pick${picked ? ' on' : ''}`} aria-hidden="true"><span /></span>}
       <div className="grow" style={{ minWidth: 0 }}>
         <div className="row-top">
-          <FitText className="xfolder-name" title={trip.name}>{trip.name}</FitText>
+          <FitText className="xfolder-name" lines={2} fitLines title={trip.name}>{trip.name}</FitText>
           {!picking && onDelete && <RowTrash label={`Delete ${trip.name}`} onDelete={onDelete} />}
         </div>
         <FitText className="small muted">{trip.location} · {fmtRange(trip.startDate, trip.endDate)}</FitText>
@@ -186,7 +191,9 @@ function TripForm({ trip, onClose, onSaved }) {
   const [f, setF] = useState(() => ({ mealsMode: 'actual', ...trip }));
   const [saving, setSaving] = useState(false);
   const set = (patch) => setF((x) => ({ ...x, ...patch }));
-  const ok = f.name?.trim() && f.location?.trim() && f.startDate && f.endDate && f.endDate >= f.startDate;
+  const nameLen = (f.name || '').trim().length;
+  const nameTooLong = nameLen > TRIP_NAME_MAX && (f.name || '') !== (trip.name || '');
+  const ok = f.name?.trim() && !nameTooLong && f.location?.trim() && f.startDate && f.endDate && f.endDate >= f.startDate;
 
   async function save() {
     setSaving(true);
@@ -203,7 +210,14 @@ function TripForm({ trip, onClose, onSaved }) {
   return (
     <Sheet title={trip.id ? 'Trip details' : 'New trip folder'} onClose={onClose} wide>
       <div className="stack">
-        <label className="field"><span>Event or trip name</span><input className="input" value={f.name || ''} onChange={(e) => set({ name: e.target.value })} placeholder="CES 2027" autoFocus /></label>
+        <label className="field">
+          <span>Event or trip name</span>
+          <input className="input" value={f.name || ''} onChange={(e) => set({ name: e.target.value })} placeholder="CES 2027" autoFocus
+            maxLength={Math.max(TRIP_NAME_MAX, (trip.name || '').length)} aria-describedby="trip-name-count" />
+          <span id="trip-name-count" className={`count-note${nameTooLong ? ' over' : ''}`} aria-live="polite">
+            {nameTooLong ? `${nameLen} of ${TRIP_NAME_MAX} letters. Shorten the name to save.` : `${nameLen} of ${TRIP_NAME_MAX} letters`}
+          </span>
+        </label>
         <label className="field"><span>Location</span><input className="input" value={f.location || ''} onChange={(e) => set({ location: e.target.value })} placeholder="Las Vegas, NV" /></label>
         <div className="grid2">
           <label className="field"><span>First day of travel</span><input type="date" className="input" value={f.startDate ? toInputDate(f.startDate) : ''} onChange={(e) => { const s = fromInputDate(e.target.value); set({ startDate: s, endDate: f.endDate && f.endDate >= s ? f.endDate : s }); }} /></label>
@@ -317,7 +331,7 @@ function TripDetail({ trip, expenses, onBack, onEdit, onDeleted }) {
       <div className="card" style={{ marginTop: 4 }}>
         <div className="row" style={{ alignItems: 'flex-start' }}>
           <div className="grow" style={{ minWidth: 0 }}>
-            <h1>{trip.name}</h1>
+            <FitText as="h1" lines={4}>{trip.name}</FitText>
             <p className="small muted">{trip.location} · {fmtRange(trip.startDate, trip.endDate)} · {tripDays(trip).length} days</p>
             {trip.purpose && <p className="small" style={{ marginTop: 4 }}>{trip.purpose}</p>}
             {(trip.employer || trip.project || trip.chargeCode) && <p className="tiny muted" style={{ marginTop: 4 }}>{[trip.employer, trip.project, trip.chargeCode && `Code ${trip.chargeCode}`].filter(Boolean).join(' · ')}</p>}
@@ -437,7 +451,7 @@ function ExpenseRow({ e, all, trip, onOpen, onHold, onToggle, onDelete, picking,
       {picking && <PickBox on={picked} name={name} onToggle={onToggle} />}
       <div className="grow" style={{ minWidth: 0 }}>
         <div className="row-top">
-          <FitText className="name" title={name}>{name}</FitText>
+          <FitText className="name" lines={2} title={name}>{name}</FitText>
           {!picking && onDelete && <RowTrash label={`Delete ${name}, ${fmtMoney(e.amount)}`} onDelete={onDelete} />}
         </div>
         <div className="row-sub">
@@ -569,7 +583,7 @@ function ExpenseSheet({ initial, trip, all, onClose, onSaved }) {
               {EXPENSE_CATEGORIES.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
             </select>
           </label>
-          <label className="field"><span>Merchant</span><input className="input" value={f.merchant || ''} onChange={(e) => set({ merchant: e.target.value })} placeholder="Delta, Marriott, Staples" /></label>
+          <label className="field"><span>Merchant</span><input className="input" value={f.merchant || ''} onChange={(e) => set({ merchant: e.target.value })} placeholder="Delta, Marriott, Staples" maxLength={Math.max(MERCHANT_MAX, (initial.merchant || '').length)} /></label>
           <label className="field"><span>Date</span><input type="date" className="input" value={f.date ? toInputDate(f.date) : ''} onChange={(e) => set({ date: fromInputDate(e.target.value) })} /></label>
           <label className="field"><span>Time (optional)</span><input type="time" className="input" value={f.time || ''} onChange={(e) => set({ time: e.target.value })} /></label>
           <label className="field"><span>Amount in US dollars</span><input className="input" inputMode="decimal" value={f.amount ?? ''} onChange={(e) => set({ amount: e.target.value })} placeholder="0.00" /></label>
@@ -693,7 +707,7 @@ function TravelInbox({ tripId, onReview }) {
         {matches.map(({ m, trip }) => (
           <div key={m.id} className="item">
             <div className="grow" style={{ minWidth: 0 }}>
-              <FitText className="name">{m.subject || '(no subject)'}</FitText>
+              <FitText className="name" lines={2}>{m.subject || '(no subject)'}</FitText>
               <div className="meta"><span>{String(m.from || '').replace(/<.*>/, '').trim()}</span>{m.date && <span>{fmtDate(m.date, { withYear: true })}</span>}{!tripId && <span className="chip blue">{trip.name}</span>}</div>
             </div>
             <div className="row" style={{ gap: 6, flex: 'none' }}>

@@ -68,6 +68,8 @@ function buildSeed() {
   expenses.x1.amount = 12345.67;
   const t2 = 'trip2';
   trips[t2] = { id: t2, name: 'Short trip', location: 'DC', startDate: now - 2 * DAY, endDate: now - DAY, mealsMode: 'perDiem', status: 'submitted', createdAt: now - 2 * DAY };
+  trips.t3 = { id: 't3', name: 'MWC World Mobile Meeting, Warsaw Midwest', location: 'Warsaw, Poland', startDate: now + 20 * DAY, endDate: now + 24 * DAY, createdAt: now };
+  trips.t4 = { id: 't4', name: 'Weltwirtschaftsforumjahrestagungsvorbereitung', location: 'Davos', startDate: now + 40 * DAY, endDate: now + 42 * DAY, createdAt: now };
   return {
     signedIn: true,
     accounts: { [acc]: { id: acc, name: 'The Olaode Family Household Shopping List', type: 'household', categories: ['Produce', 'Meat, dairy & eggs', 'Frozen', 'Pantry', 'Household', 'Health & personal care', 'Pets', 'Electronics', 'Other'], members: { 'demo-user': { role: 'owner', name: 'Demo user', email: 'demo@example.com' }, 'demo-2': { role: 'editor', name: 'A family member with a long name', email: 'a.very.long.email.address.for.testing@example-household-domain.com' } }, memberUids: ['demo-user', 'demo-2'], settings: { lookaheadDays: 10 }, createdAt: now - 130 * DAY } },
@@ -88,17 +90,24 @@ function inspect(win) {
   const desc = (el) => { const t = (el.getAttribute('aria-label') || el.innerText || el.alt || el.tagName).trim().replace(/\s+/g, ' ').slice(0, 60); return `${el.tagName.toLowerCase()}${el.className && typeof el.className === 'string' ? '.' + el.className.trim().split(/\s+/).slice(0, 2).join('.') : ''} "${t}"`; };
   const pageW = Math.max(document.documentElement.scrollWidth, document.body.scrollWidth);
   if (pageW > W + 1) issues.push(['hscroll', `page scrolls sideways: ${pageW}px wide in ${W}px`]);
-  // A line of a list row, a trip folder or a trip table that wraps onto a second line.
+  // A word split across two lines anywhere on screen (whole words moving down are fine).
   const rng = document.createRange();
-  for (const box of root.querySelectorAll('.item, .xfolder, .xday-h, table.xtable')) {
-    if (!vis(box)) continue;
-    const tw = document.createTreeWalker(box, 4);
-    for (let n = tw.nextNode(); n; n = tw.nextNode()) {
-      if (!n.textContent.trim() || !vis(n.parentElement)) continue;
-      if (box.matches('table.xtable') && n.parentElement.closest('.fit-wrap td:first-child')) continue;
-      rng.selectNodeContents(n);
-      const tops = new Set([...rng.getClientRects()].filter((b) => b.width > 0).map((b) => Math.round(b.top)));
-      if (tops.size > 1) issues.push(['wrapped', `"${n.textContent.trim().slice(0, 50)}" in ${desc(box).slice(0, 40)} takes ${tops.size} lines`]);
+  const tw = document.createTreeWalker(root, 4);
+  for (let n = tw.nextNode(); n; n = tw.nextNode()) {
+    const t = n.textContent;
+    if (!t.trim() || !n.parentElement || !vis(n.parentElement) || n.parentElement.closest('textarea, input, select, script, style')) continue;
+    rng.selectNodeContents(n);
+    const rects = [...rng.getClientRects()].filter((b) => b.width > 0);
+    if (new Set(rects.map((b) => Math.round(b.top))).size < 2) continue;
+    let prevTop = null;
+    for (let i = 0; i < t.length; i++) {
+      if (/\s/.test(t[i])) { prevTop = null; continue; }
+      rng.setStart(n, i); rng.setEnd(n, i + 1);
+      const r = rng.getClientRects()[0];
+      if (!r) continue;
+      const top = Math.round(r.top);
+      if (prevTop !== null && top > prevTop + 2 && !/[-\u2010-\u2014\/]/.test(t[i - 1])) { issues.push(['midword', `"${t.slice(Math.max(0, i - 12), i)}|${t.slice(i, i + 12)}" splits in ${desc(n.parentElement).slice(0, 50)}`]); break; }
+      prevTop = top;
     }
   }
   const clippers = (el) => { for (let a = el.parentElement; a && a !== document.body; a = a.parentElement) { const s = getComputedStyle(a); if (/(auto|scroll|hidden|clip)/.test(s.overflowX)) return a; } return null; };
