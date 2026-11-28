@@ -32,6 +32,25 @@ export function fmtRange(a, b) {
   return `${fmtDate(a, { withYear: true })} to ${fmtDate(b, { withYear: true })}`;
 }
 
+// Sample trips show what a finished folder looks like. One tap takes them all away.
+function ClearSamples({ trips, expenses }) {
+  const { ctx, showToast } = useApp();
+  const [sure, setSure] = useState(false);
+  return (
+    <div className="card small" style={{ marginTop: 14 }}>
+      <p>{trips.length} of these folders {trips.length === 1 ? 'is a sample' : 'are samples'} with made-up receipts, so you can see how a finished report looks.</p>
+      <button type="button" className="btn" style={{ marginTop: 8 }}
+        onClick={async () => {
+          if (!sure) { setSure(true); return; }
+          for (const t of trips) await deleteExpenseTrip(ctx, t, expenses);
+          showToast('Sample trips cleared');
+        }}>
+        {sure ? 'Tap again to clear the sample trips' : 'Clear sample trips'}
+      </button>
+    </div>
+  );
+}
+
 export default function ExpenseView() {
   const { expenseTrips, expenses, expenseError } = useApp();
   const [openId, setOpenId] = useState(() => { try { return sessionStorage.getItem(OPEN_KEY); } catch { return null; } });
@@ -79,6 +98,7 @@ export default function ExpenseView() {
               {sorted.map((t) => <TripCard key={t.id} trip={t} expenses={expenses.filter((e) => e.tripId === t.id)} onOpen={() => go(t.id)} />)}
             </div>
           )}
+          {expenseTrips.some((t) => t.sample) && <ClearSamples trips={expenseTrips.filter((t) => t.sample)} expenses={expenses} />}
         </>
       )}
       {tripForm && <TripForm trip={tripForm} onClose={() => setTripForm(null)} onSaved={(id) => { setTripForm(null); go(id); }} />}

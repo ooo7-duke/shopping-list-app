@@ -4,6 +4,7 @@
 import { DEMO_MODE } from './config.js';
 import { generateJSON } from './ai.js';
 import { fmtMoney } from './format.js';
+import { sampleSiteVisitFolio } from '../data/sampleTrips.js';
 
 export const EXPENSE_CATEGORIES = [
   { id: 'airfare', label: 'Airfare', group: 'Travel' },
@@ -284,11 +285,7 @@ function demoRead(kind) {
   const now = Date.now();
   const samples = {
     photo: { isReceipt: true, merchant: 'Lotus of Siam', category: 'dinner', date: dayKey(now), time: '19:42', total: 64.18, currency: 'USD', tip: 10.7, summary: 'Dinner with the booth team' },
-    'demo-hotel': {
-      isReceipt: true, merchant: 'Wynn Las Vegas', category: 'lodging', date: dayKey(now - DAY), time: '11:05', total: 1146.4, currency: 'USD', summary: 'Hotel folio, 5 nights',
-      nights: [0, 1, 2, 3, 4].map((i) => ({ date: dayKey(now - (6 - i) * DAY), amount: 229.28 })),
-    },
-    'demo-uber': { isReceipt: true, merchant: 'Uber', category: 'ground', date: dayKey(now - 6 * DAY), time: '14:20', total: 31.62, currency: 'USD', summary: 'Airport to hotel' },
+    'demo-hampton': sampleSiteVisitFolio(now).read,
   };
   return new Promise((res) => setTimeout(() => res(normalizeRead(samples[kind] || samples.photo)), 700));
 }
@@ -298,10 +295,7 @@ export function demoTravelInbox() {
   const now = Date.now();
   let done = [];
   try { done = JSON.parse(localStorage.getItem('sla-demo-inbox-done') || '[]'); } catch { /* storage blocked */ }
-  return [
-    { id: 'demo-hotel', from: 'Wynn Las Vegas <folio@wynnlasvegas.com>', subject: 'Your folio from Wynn Las Vegas', date: now - DAY, text: '(sample hotel folio)', pdfs: [] },
-    { id: 'demo-uber', from: 'Uber Receipts <noreply@uber.com>', subject: 'Your afternoon trip with Uber', date: now - 6 * DAY, text: '(sample ride receipt)', pdfs: [] },
-  ].filter((m) => !done.includes(m.id));
+  return [sampleSiteVisitFolio(now).email].filter((m) => !done.includes(m.id));
 }
 
 // A caption for a receipt photo, built from what was read off it: who, what, how much.

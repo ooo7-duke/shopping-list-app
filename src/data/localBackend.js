@@ -1,6 +1,7 @@
 // Demo backend: same interface as firebaseBackend, stored in this browser only.
 import { HOUSEHOLD_CATEGORIES } from '../lib/categories.js';
 import { DAY } from '../lib/predict.js';
+import { buildSampleTrips } from './sampleTrips.js';
 
 const KEY = 'sla-demo-v2';
 const listeners = new Set();
@@ -38,45 +39,28 @@ function save() {
 }
 function uid() { return Math.random().toString(36).slice(2, 11); }
 
+const SAMPLE_TRIPS = 2;
 const DEMO_USER = { uid: 'demo-user', name: 'Demo user', email: 'demo@example.com', photo: '' };
 state.invites ||= {};
 addSampleInvite();
 addSampleTrips();
 
-// Demo only: two trade-show folders, one just finished with a few expenses and one ahead,
-// so the Expense Report page has something to show.
+// Three sample business trips for the Expense Report page. Bumping SAMPLE_TRIPS swaps
+// in new samples on devices that already have demo data, leaving trips the person made.
 function addSampleTrips() {
   state.mine ||= {};
-  if (state.mine[DEMO_USER.uid]?.expenseTrips) return;
-  const day = 864e5;
-  const noon = (t) => { const d = new Date(t); d.setHours(12, 0, 0, 0); return d.getTime(); };
-  const now = noon(Date.now());
-  const vegas = 'demo-trip-vegas';
-  const lb = 'demo-trip-longbeach';
-  const trips = {
-    [vegas]: { id: vegas, name: 'Customer visits, Las Vegas', location: 'Las Vegas, NV', startDate: now - 6 * day, endDate: now - day, purpose: 'Meet three customers and demo the new product line', mealsMode: 'actual', status: 'open', createdAt: now - 30 * day },
-    [lb]: { id: lb, name: 'EWNA Show, September 2027', location: 'Long Beach, CA', startDate: new Date(2027, 8, 14, 12).getTime(), endDate: new Date(2027, 8, 17, 12).getTime(), purpose: 'Staff the booth at the show', mealsMode: 'actual', status: 'open', createdAt: now - 2 * day },
-  };
-  const e = (id, x) => [id, { id, tripId: vegas, currency: 'USD', paidWith: 'personal', imageIds: [], nights: [], createdAt: now, ...x }];
-  const expenses = Object.fromEntries([
-    e('demo-x1', { category: 'airfare', merchant: 'Southwest Airlines', date: now - 28 * day, time: '09:12', amount: 412.96, notes: 'Round trip, booked four weeks out', imageIds: ['demo-img1'] }),
-    e('demo-x2', { category: 'supplies', merchant: 'Staples', date: now - 9 * day, time: '16:40', amount: 86.4, notes: 'Brochures and sell sheets for the customer meetings' }),
-    e('demo-x3', { category: 'breakfast', merchant: 'Egg Works', date: now - 5 * day, time: '08:05', amount: 21.37, imageIds: ['demo-img2'] }),
-    e('demo-x4', { category: 'lunch', merchant: 'Earl of Sandwich', date: now - 5 * day, time: '12:30', amount: 15.62, imageIds: ['demo-img3'] }),
-    e('demo-x5', { category: 'dinner', merchant: 'Hash House A Go Go', date: now - 4 * day, time: '19:15', amount: 48.9, imageIds: ['demo-img4'] }),
-    e('demo-x6', { category: 'dinner', merchant: 'Hash House A Go Go', date: now - 4 * day, time: '19:15', amount: 48.9, notes: 'Second photo of the same check' }),
-    e('demo-x7', { category: 'car_rental', merchant: 'Enterprise', date: now - day, time: '15:02', amount: 238.11, paidWith: 'corporate', imageIds: ['demo-img5'] }),
-  ]);
-  const receipt = (label) => {
-    const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='300' height='420'><rect width='300' height='420' fill='#fff'/><text x='24' y='48' font-family='monospace' font-size='18'>${label}</text><text x='24' y='90' font-family='monospace' font-size='14'>SAMPLE RECEIPT</text><text x='24' y='380' font-family='monospace' font-size='16'>THANK YOU</text></svg>`;
-    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
-  };
-  const images = {
-    'demo-img1': { dataUrl: receipt('SOUTHWEST'), expenseId: 'demo-x1' }, 'demo-img2': { dataUrl: receipt('EGG WORKS'), expenseId: 'demo-x3' },
-    'demo-img3': { dataUrl: receipt('EARL OF SANDWICH'), expenseId: 'demo-x4' }, 'demo-img4': { dataUrl: receipt('HASH HOUSE'), expenseId: 'demo-x5' },
-    'demo-img5': { dataUrl: receipt('ENTERPRISE'), expenseId: 'demo-x7' },
-  };
-  state.mine[DEMO_USER.uid] = { expenseTrips: trips, expenses, expenseImages: images };
+  const mine = (state.mine[DEMO_USER.uid] ||= { expenseTrips: {}, expenses: {}, expenseImages: {} });
+  if (state.sampleTrips === SAMPLE_TRIPS) return;
+  const isSample = (id, x) => x?.sample || String(id).startsWith('demo-');
+  for (const coll of ['expenseTrips', 'expenses', 'expenseImages']) {
+    mine[coll] = Object.fromEntries(Object.entries(mine[coll] || {}).filter(([id, x]) => !isSample(id, x)));
+  }
+  const { trips, expenses, images } = buildSampleTrips();
+  Object.assign(mine.expenseTrips, trips);
+  Object.assign(mine.expenses, expenses);
+  Object.assign(mine.expenseImages, images);
+  state.sampleTrips = SAMPLE_TRIPS;
+  save();
 }
 
 function seed() {
@@ -192,7 +176,10 @@ export async function deleteMyAccount(user, accounts) {
   save();
 }
 export const idToken = async () => null;
-export function resetDemo() { state = seed(); state.signedIn = true; addSampleTrips(); save(); }
+export function resetDemo() {
+  state = seed(); state.signedIn = true; addSampleTrips(); save();
+  try { localStorage.removeItem('sla-demo-inbox-done'); } catch { /* storage blocked */ }
+}
 
 function watch(get, cb) {
   const fire = () => cb(get());
