@@ -11,6 +11,8 @@ export const firebaseConfig = {
 
 export const RECAPTCHA_SITE_KEY = env.VITE_RECAPTCHA_SITE_KEY || '';
 export const GEMINI_MODEL = env.VITE_GEMINI_MODEL || 'gemini-3.8-flash';
+// Tried when the main model stays busy or is retired.
+export const GEMINI_FALLBACK_MODEL = env.VITE_GEMINI_FALLBACK_MODEL || 'gemini-3.5-flash-lite';
 export const APP_NAME = env.VITE_APP_NAME || 'Shopping List';
 
 // With no Firebase keys (or ?demo in the URL) the app runs on this device only,
