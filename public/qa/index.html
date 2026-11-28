@@ -207,7 +207,9 @@ document.getElementById('bar').innerHTML =
 const f = document.getElementById('f');
 f.width = w; f.height = h; f.style.width = w + 'px'; f.style.height = h + 'px';
 const errs = [];
+const live = q.get('site') === 'live';
 f.addEventListener('load', () => {
+  if (live) return;
   const cw = f.contentWindow;
   const keep = (kind) => (...a) => errs.push(`${kind}: ${a.map((x) => (x && x.stack) || (x && x.message) || String(x)).join(' ').slice(0, 400)}`);
   const oe = cw.console.error.bind(cw.console), ow = cw.console.warn.bind(cw.console);
@@ -216,8 +218,8 @@ f.addEventListener('load', () => {
   cw.addEventListener('error', (e) => keep('uncaught')(e.error || e.message));
   cw.addEventListener('unhandledrejection', (e) => keep('rejection')(e.reason));
 });
-f.addEventListener('load', () => { if (big) { const s = f.contentDocument.createElement('style'); s.textContent = 'html{font-size:22px !important}'; f.contentDocument.head.appendChild(s); } });
-f.src = `/?demo#/${hash}`;
+f.addEventListener('load', () => { if (big && !live) { const s = f.contentDocument.createElement('style'); s.textContent = 'html{font-size:22px !important}'; f.contentDocument.head.appendChild(s); } });
+f.src = `${live ? 'https://loye10-shopping-list.netlify.app' : ''}/?demo#/${hash}`;
 // Sweep: open each screen and sheet that has text boxes or pickers, check it, close it.
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function sweep() {
