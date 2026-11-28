@@ -194,7 +194,7 @@ async function sweep() {
   const win = f.contentWindow;
   const doc = () => f.contentDocument;
   const waitFor = async (fn, ms = 5000) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { const v = fn(); if (v) return v; await sleep(150); } return null; };
-  const byText = (sel, re) => [...doc().querySelectorAll(sel)].find((e) => re.test((e.getAttribute('aria-label') || '') + ' ' + e.textContent));
+  const byText = (sel, re) => [...doc().querySelectorAll(sel)].filter((e) => re.test((e.getAttribute('aria-label') || '') + ' ' + e.textContent)).sort((a, b) => a.textContent.length - b.textContent.length)[0];
   const click = async (sel, re) => { const el = await waitFor(() => byText(sel, re)); if (!el) return false; el.click(); await sleep(700); return true; };
   const closeAll = async () => { for (let i = 0; i < 4; i++) { const sheets = doc().querySelectorAll('[role=dialog] button[aria-label=Close], .sheet button[aria-label=Close]'); if (!sheets.length) break; sheets[sheets.length - 1].click(); await sleep(400); } };
   const go = async (h) => { await closeAll(); win.location.hash = '#/' + h; await sleep(900); };
@@ -202,7 +202,7 @@ async function sweep() {
   const step = async (name, fn) => { try { const ok = await fn(); if (ok === false) out.push(`${name}: could not open`); else check(name); } catch (e) { out.push(`${name}: error ${e.message}`); } };
   await step('list page', async () => { await go('list'); });
   await step('item sheet', async () => { await go('list'); return click('.item .name, .item [class*=name]', /Milk/); });
-  await step('snooze picker', async () => click('button', /^\s*Snooze/));
+  await step('snooze picker', async () => click('summary', /Snooze/));
   await step('accounts sheet', async () => { await go('list'); return click('button', /Accounts and people/); });
   await step('trips page', async () => { await go('trips'); });
   await step('stores sheet', async () => { await go('trips'); return click('button', /Add your stores|Edit stores/); });
