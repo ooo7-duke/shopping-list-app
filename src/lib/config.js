@@ -10,7 +10,7 @@ export const firebaseConfig = {
 };
 
 export const RECAPTCHA_SITE_KEY = env.VITE_RECAPTCHA_SITE_KEY || '';
-export const GEMINI_MODEL = env.VITE_GEMINI_MODEL || 'gemini-2.5-flash';
+export const GEMINI_MODEL = env.VITE_GEMINI_MODEL || 'gemini-3.8-flash';
 export const APP_NAME = env.VITE_APP_NAME || 'Shopping List';
 
 // With no Firebase keys (or ?demo in the URL) the app runs on this device only,
