@@ -809,3 +809,43 @@ describe('Got it today: delete selected purchases', () => {
     expect(ops[0].data).toEqual({ status: 'needed', lastPurchasedAt: now - 7200e3 });
   });
 });
+
+import { deleteReceipts, deleteExpenseTrips } from '../data/actions.js';
+describe('Batch delete with Undo', () => {
+  const store = () => {
+    const db = {};
+    const apply = (ops) => { for (const o of ops) { const c = (db[o.coll] ||= {}); if (o.type === 'remove') delete c[o.id]; else c[o.id] = { ...(o.type === 'update' ? c[o.id] : {}), ...o.data }; } };
+    return { db, backend: { commit: async (_a, ops) => apply(ops), commitMine: async (_u, ops) => apply(ops), getDocData: async (_a, coll, id) => db[coll]?.[id] || null, getMine: async (_u, coll, id) => db[coll]?.[id] || null } };
+  };
+  it('deletes receipts with their photos and purchases, and Undo brings them back', async () => {
+    const { db, backend } = store();
+    db.receipts = { r1: { store: 'Giant' }, r2: { store: 'Target' }, r3: { store: 'Keep' } };
+    db.receiptImages = { r1: { dataUrl: 'x' } };
+    db.purchases = { p1: { receiptId: 'r1' }, p2: { receiptId: 'r2' }, p3: { receiptId: 'r3' } };
+    const purchases = Object.entries(db.purchases).map(([id, v]) => ({ id, ...v }));
+    const undo = await deleteReceipts({ backend, accountId: 'a' }, [{ id: 'r1', store: 'Giant' }, { id: 'r2', store: 'Target' }], purchases);
+    expect(Object.keys(db.receipts)).toEqual(['r3']);
+    expect(Object.keys(db.purchases)).toEqual(['p3']);
+    expect(db.receiptImages.r1).toBeUndefined();
+    await undo();
+    expect(Object.keys(db.receipts).sort()).toEqual(['r1', 'r2', 'r3']);
+    expect(Object.keys(db.purchases).sort()).toEqual(['p1', 'p2', 'p3']);
+    expect(db.receiptImages.r1.dataUrl).toBe('x');
+  });
+  it('deletes trip folders with every expense and photo in them', async () => {
+    const { db, backend } = store();
+    db.expenseImages = { i1: { dataUrl: 'y' } };
+    const trips = [{ id: 't1', name: 'CES' }];
+    const expenses = [{ id: 'e1', tripId: 't1', imageIds: ['i1'] }, { id: 'e2', tripId: 't2' }];
+    db.expenseTrips = { t1: { name: 'CES' }, t2: { name: 'Other' } };
+    db.expenses = { e1: { tripId: 't1', imageIds: ['i1'] }, e2: { tripId: 't2' } };
+    const undo = await deleteExpenseTrips({ backend, user: { uid: 'u' } }, trips, expenses);
+    expect(Object.keys(db.expenseTrips)).toEqual(['t2']);
+    expect(Object.keys(db.expenses)).toEqual(['e2']);
+    expect(db.expenseImages.i1).toBeUndefined();
+    await undo();
+    expect(db.expenses.e1.imageIds).toEqual(['i1']);
+    expect(db.expenseImages.i1.dataUrl).toBe('y');
+    expect(db.expenseTrips.t1.name).toBe('CES');
+  });
+});

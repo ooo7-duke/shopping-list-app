@@ -4,7 +4,8 @@ import Sheet from './Sheet.jsx';
 import { compressImage, extractReceipt, isImageFile, toReadableImage } from '../lib/receipts.js';
 import { decodeQr, parseQr, qrHost } from '../lib/qr.js';
 import { bestMatch } from '../lib/match.js';
-import { saveReceipt, deleteReceipt, isOnList } from '../data/actions.js';
+import { saveReceipt, deleteReceipt, deleteReceipts, isOnList } from '../data/actions.js';
+import { useHold, usePick, PickHeader, PickBar, PickBox, ConfirmDelete, plural } from './Pick.jsx';
 import { fmtMoney, fmtDate, toInputDate, fromInputDate } from '../lib/format.js';
 import { DEMO_MODE } from '../lib/config.js';
 import { aiErrorMessage } from '../lib/errors.js';
@@ -17,6 +18,21 @@ import { emailTrip, notTravelIds } from '../lib/expenses.js';
 
 export default function ReceiptsView() {
   const { ctx, items, receipts, purchases, backend, showToast } = useApp();
+  // Press and hold a receipt to pick several, then delete them together, with Undo.
+  const rPick = usePick(receipts.map((r) => r.id));
+  const [delAsk, setDelAsk] = useState(false);
+  async function deletePicked() {
+    const list = receipts.filter((r) => rPick.has(r.id));
+    setDelAsk(false);
+    if (!list.length) return;
+    try {
+      const undo = await deleteReceipts(ctx, list, purchases);
+      rPick.stop();
+      showToast(`Deleted ${plural(list.length, 'receipt')} and ${list.length === 1 ? 'its' : 'their'} purchases`, undo, 12000);
+    } catch (e) {
+      showToast("Couldn't delete those receipts. Check your connection and try again.");
+    }
+  }
   const [over, setOver] = useState(false);
   const [busy, setBusy] = useState('');
   const [review, setReview] = useState(null);
@@ -125,21 +141,26 @@ export default function ReceiptsView() {
 
       <EmailedReceipts />
 
-      <div className="section-h"><h2>Past receipts</h2><span className="small muted">{receipts.length}</span></div>
+      <div className="section-h">
+        <h2>Past receipts</h2>
+        {rPick.on ? <PickHeader pick={rPick} /> : <span className="small muted">{receipts.length}{receipts.length > 1 ? ' · press and hold to select' : ''}</span>}
+      </div>
       {receipts.length === 0 ? (
         <div className="card empty"><p>No receipts yet. Older receipts work too: the purchase date comes from the receipt.</p></div>
       ) : (
         <div className="list">
           {receipts.map((r) => (
-            <div key={r.id} className="item" onClick={() => setViewing(r)} tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && setViewing(r)}>
-              <div className="grow">
-                <div className="name">{r.store || 'Receipt'}</div>
-                <div className="meta">{fmtDate(r.date, { withYear: true })} · {r.lineCount} items · {r.matched} matched to your list · {r.source === 'email' ? 'emailed' : r.uploadedByName}</div>
-              </div>
-              <div className="price">{fmtMoney(r.total)}</div>
-            </div>
+            <ReceiptRow key={r.id} r={r} picking={rPick.on} picked={rPick.has(r.id)}
+              onHold={() => rPick.start(r.id)} onOpen={() => (rPick.on ? rPick.toggle(r.id) : setViewing(r))} onToggle={() => rPick.toggle(r.id)} />
           ))}
         </div>
+      )}
+      <PickBar pick={rPick} label="Selected receipts" onDelete={() => setDelAsk(true)} />
+      {delAsk && rPick.count > 0 && (
+        <ConfirmDelete title={`Delete ${plural(rPick.count, 'receipt')}?`} count={rPick.count} onCancel={() => setDelAsk(false)} onConfirm={deletePicked}>
+          <p>This deletes {rPick.count === 1 ? 'the receipt' : `these ${rPick.count} receipts`}, {rPick.count === 1 ? 'its photo and the purchases it logged' : 'their photos and the purchases they logged'}, for everyone who shares the list.</p>
+          <p className="small muted">Items stay on or off your list as they are now. You can tap Undo for a few seconds after.</p>
+        </ConfirmDelete>
       )}
 
       <Inventory purchases={purchases} />
@@ -432,5 +453,21 @@ function Inventory({ purchases }) {
         ))}
       </div>
     </>
+  );
+}
+
+function ReceiptRow({ r, picking, picked, onHold, onOpen, onToggle }) {
+  const hold = useHold(onHold);
+  return (
+    <div className={`item holdable${picked ? ' selected' : ''}`} onClick={onOpen} {...hold} tabIndex={0}
+      onKeyDown={(e) => { if (e.key === 'Enter') onOpen(); else if (e.key === ' ' && picking) { e.preventDefault(); onToggle(); } }}
+      aria-label={`${r.store || 'Receipt'}${picked ? ', selected' : ''}`}>
+      {picking && <PickBox on={picked} name={r.store || 'this receipt'} onToggle={onToggle} />}
+      <div className="grow">
+        <div className="name">{r.store || 'Receipt'}</div>
+        <div className="meta">{fmtDate(r.date, { withYear: true })} · {r.lineCount} items · {r.matched} matched to your list · {r.source === 'email' ? 'emailed' : r.uploadedByName}</div>
+      </div>
+      <div className="price">{fmtMoney(r.total)}</div>
+    </div>
   );
 }

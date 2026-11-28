@@ -1,4 +1,5 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
+import { useHold } from './Pick.jsx';
 import { createPortal } from 'react-dom';
 import { describePrediction } from '../lib/predict.js';
 import { fmtMoney, fmtQty, fmtDate } from '../lib/format.js';
@@ -8,25 +9,7 @@ import { ClockIcon, TrashIcon } from './Icons.jsx';
 
 export default function ItemRow({ item, pred, done, last, showHistory = false, onPrices, showStore = true, showCategory = false, onToggle, onOpen, onSnooze, onRemove, onDelete, readOnly, extra, onLongPress, selecting = false, selected = false }) {
   const [viewing, setViewing] = useState(false);
-  // Press and hold (or right-click) starts picking rows. The tap that ends the hold is swallowed,
-  // so it doesn't also open the item or untick it.
-  const press = useRef({ timer: null, fired: false, x: 0, y: 0 });
-  const stopPress = () => { clearTimeout(press.current.timer); press.current.timer = null; };
-  const hold = onLongPress ? {
-    onPointerDown: (e) => {
-      press.current.fired = false;
-      if (e.button > 0) return;
-      stopPress();
-      press.current.x = e.clientX; press.current.y = e.clientY;
-      press.current.timer = setTimeout(() => { press.current.fired = true; navigator.vibrate?.(15); onLongPress(); }, 500);
-    },
-    onPointerMove: (e) => { if (Math.abs(e.clientX - press.current.x) + Math.abs(e.clientY - press.current.y) > 10) stopPress(); },
-    onPointerUp: stopPress,
-    onPointerCancel: stopPress,
-    onPointerLeave: stopPress,
-    onContextMenu: (e) => { e.preventDefault(); stopPress(); if (!press.current.fired) { press.current.fired = true; onLongPress(); } },
-    onClickCapture: (e) => { if (press.current.fired) { press.current.fired = false; e.stopPropagation(); e.preventDefault(); } },
-  } : {};
+  const hold = useHold(onLongPress); // press and hold starts picking rows
   const qty = fmtQty(item.qty, item.unit);
   const predText = pred && pred.basis !== 'off' && pred.basis !== 'learning' ? describePrediction(pred) : '';
   const overdue = pred?.daysLeft != null && pred.daysLeft < 1;
@@ -83,7 +66,7 @@ export default function ItemRow({ item, pred, done, last, showHistory = false, o
           </div>
         )}
       </div>
-      {!readOnly && (onSnooze || onRemove) && (
+      {!readOnly && !selecting && (onSnooze || onRemove) && (
         <div className="hover-actions">
           {onSnooze && <button type="button" className="icon-btn" title="Snooze (S)" aria-label={`Snooze ${item.name}`} onClick={(e) => { e.stopPropagation(); onSnooze(); }}><ClockIcon /></button>}
           {onRemove && <button type="button" className="icon-btn" title="Take off list" aria-label={`Take ${item.name} off the list`} onClick={(e) => { e.stopPropagation(); onRemove(); }}><TrashIcon /></button>}
@@ -102,7 +85,7 @@ export default function ItemRow({ item, pred, done, last, showHistory = false, o
           {total != null && <small>{fmtMoney(price)} ea</small>}
         </div>
       )}
-      {!readOnly && onDelete && (
+      {!readOnly && !selecting && onDelete && (
         <button type="button" className="icon-btn row-del" title="Delete from list" aria-label={`Delete ${item.name} from the list`} onClick={(e) => { e.stopPropagation(); onDelete(); }}><TrashIcon /></button>
       )}
     </div>

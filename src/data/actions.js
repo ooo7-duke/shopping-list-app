@@ -262,6 +262,31 @@ export async function deleteReceipt(ctx, receipt, purchases) {
   await ctx.backend.commit(ctx.accountId, ops);
 }
 
+// Delete several receipts at once, the same as deleting each one: the receipt, its photo and its
+// purchases. Returns an undo that puts all of it back (photos one at a time, since each can be
+// close to Firestore's 1 MB limit).
+export async function deleteReceipts(ctx, receipts, purchases) {
+  const { backend, accountId } = ctx;
+  const ids = new Set(receipts.map((r) => r.id));
+  const photos = [];
+  for (const r of receipts) {
+    const d = backend.getDocData ? await backend.getDocData(accountId, 'receiptImages', r.id).catch(() => null) : null;
+    if (d) photos.push({ id: r.id, data: { ...d } });
+  }
+  const lines = purchases.filter((p) => ids.has(p.receiptId));
+  const ops = [];
+  for (const r of receipts) ops.push({ type: 'remove', coll: 'receipts', id: r.id }, { type: 'remove', coll: 'receiptImages', id: r.id });
+  for (const p of lines) ops.push({ type: 'remove', coll: 'purchases', id: p.id });
+  await backend.commit(accountId, ops);
+  return async () => {
+    for (const ph of photos) await backend.commit(accountId, [{ type: 'set', coll: 'receiptImages', id: ph.id, data: ph.data }]);
+    await backend.commit(accountId, [
+      ...receipts.map(({ id, ...rest }) => ({ type: 'set', coll: 'receipts', id, data: clean(rest) })),
+      ...lines.map(({ id, ...rest }) => ({ type: 'set', coll: 'purchases', id, data: clean(rest) })),
+    ]);
+  };
+}
+
 // ---- Travel expense reports (private to the signed-in person, under users/{uid}) ----
 
 const TRIP_FIELDS = ['name', 'location', 'startDate', 'endDate', 'purpose', 'employer', 'project', 'chargeCode', 'mealsMode', 'mieRate', 'mealsProvided', 'status', 'notes'];
@@ -345,3 +370,30 @@ export async function deleteExpense(ctx, expense) {
 }
 
 export const getExpenseImage = (ctx, id) => ctx.backend.getMine(ctx.user.uid, 'expenseImages', id);
+
+// Delete several expenses, or several trip folders with every expense in them, in one go.
+// Returns an undo that restores the photos first, then the folders and expenses.
+async function deleteMine(ctx, trips, expenses) {
+  const { backend, user } = ctx;
+  const photos = [];
+  for (const e of expenses) {
+    for (const img of e.imageIds || []) {
+      const d = await backend.getMine(user.uid, 'expenseImages', img).catch(() => null);
+      if (d) photos.push({ id: img, data: { ...d } });
+    }
+  }
+  await backend.commitMine(user.uid, [
+    ...trips.map((t) => ({ type: 'remove', coll: 'expenseTrips', id: t.id })),
+    ...expenses.map((e) => ({ type: 'remove', coll: 'expenses', id: e.id })),
+    ...expenses.flatMap((e) => (e.imageIds || []).map((img) => ({ type: 'remove', coll: 'expenseImages', id: img }))),
+  ]);
+  return async () => {
+    for (const ph of photos) await backend.commitMine(user.uid, [{ type: 'set', coll: 'expenseImages', id: ph.id, data: ph.data }]);
+    await backend.commitMine(user.uid, [
+      ...trips.map(({ id, ...rest }) => ({ type: 'set', coll: 'expenseTrips', id, data: clean(rest) })),
+      ...expenses.map(({ id, ...rest }) => ({ type: 'set', coll: 'expenses', id, data: clean(rest) })),
+    ]);
+  };
+}
+export const deleteExpenseTrips = (ctx, trips, expenses) => deleteMine(ctx, trips, expenses.filter((e) => trips.some((t) => t.id === e.tripId)));
+export const deleteExpenses = (ctx, list) => deleteMine(ctx, [], list);

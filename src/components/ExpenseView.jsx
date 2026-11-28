@@ -13,10 +13,11 @@ import { xlsxBytes } from '../lib/xlsx.js';
 import { buildReportPdf } from '../lib/reportPdf.js';
 import { fetchInbox, ackInbox } from '../lib/emailReceipts.js';
 import {
-  saveExpenseTrip, updateExpenseTrip, deleteExpenseTrip, saveExpense, deleteExpense, getExpenseImage, setPhotoCaption,
+  saveExpenseTrip, updateExpenseTrip, deleteExpenseTrip, deleteExpenseTrips, saveExpense, deleteExpense, deleteExpenses, getExpenseImage, setPhotoCaption,
 } from '../data/actions.js';
 import { fmtMoney, fmtDate, toInputDate, fromInputDate } from '../lib/format.js';
 import { aiErrorMessage, saveErrorMessage } from '../lib/errors.js';
+import { useHold, usePick, PickHeader, PickBar, PickBox, ConfirmDelete, plural } from './Pick.jsx';
 import { DEMO_MODE } from '../lib/config.js';
 
 const OPEN_KEY = 'sla-open-trip';
@@ -53,7 +54,7 @@ function ClearSamples({ trips, expenses }) {
 }
 
 export default function ExpenseView() {
-  const { expenseTrips, expenses, expenseError } = useApp();
+  const { ctx, expenseTrips, expenses, expenseError, showToast } = useApp();
   const [openId, setOpenId] = useState(() => { try { return sessionStorage.getItem(OPEN_KEY); } catch { return null; } });
   const [tripForm, setTripForm] = useState(null);
   const open = expenseTrips.find((t) => t.id === openId);
@@ -68,6 +69,23 @@ export default function ExpenseView() {
     const current = (t) => t.status !== 'submitted' && t.endDate >= now - 14 * 864e5;
     return [...expenseTrips].sort((a, b) => (current(b) - current(a)) || (current(a) ? a.startDate - b.startDate : b.startDate - a.startDate));
   }, [expenseTrips]);
+  // Press and hold a folder to pick several, then delete them with every expense in them, with Undo.
+  const tPick = usePick(open ? [] : sorted.map((t) => t.id));
+  const [delAsk, setDelAsk] = useState(false);
+  const pickedTrips = sorted.filter((t) => tPick.has(t.id));
+  const pickedCount = expenses.filter((e) => tPick.has(e.tripId)).length;
+  async function deletePicked() {
+    const list = pickedTrips;
+    setDelAsk(false);
+    if (!list.length) return;
+    try {
+      const undo = await deleteExpenseTrips(ctx, list, expenses);
+      tPick.stop();
+      showToast(`Deleted ${plural(list.length, 'trip folder')}`, undo, 12000);
+    } catch (e) {
+      showToast(saveErrorMessage(e, 'delete those folders'));
+    }
+  }
 
   return (
     <>
@@ -95,9 +113,25 @@ export default function ExpenseView() {
               <p>Start a folder for your next trip, like CES in Las Vegas. Then add receipts as you go: a photo, a saved picture, or a forwarded email.</p>
             </div>
           ) : (
-            <div className="xfolders">
-              {sorted.map((t) => <TripCard key={t.id} trip={t} expenses={expenses.filter((e) => e.tripId === t.id)} onOpen={() => go(t.id)} />)}
-            </div>
+            <>
+              <div className="section-h" style={{ marginTop: 14, marginBottom: -6 }}>
+                <span className="small muted">{tPick.on ? '' : sorted.length > 1 ? 'Press and hold a folder to select several' : ''}</span>
+                {tPick.on && <PickHeader pick={tPick} />}
+              </div>
+              <div className="xfolders">
+                {sorted.map((t) => (
+                  <TripCard key={t.id} trip={t} expenses={expenses.filter((e) => e.tripId === t.id)} picking={tPick.on} picked={tPick.has(t.id)}
+                    onHold={() => tPick.start(t.id)} onOpen={() => (tPick.on ? tPick.toggle(t.id) : go(t.id))} />
+                ))}
+              </div>
+              <PickBar pick={tPick} label="Selected trip folders" onDelete={() => setDelAsk(true)} />
+            </>
+          )}
+          {delAsk && pickedTrips.length > 0 && (
+            <ConfirmDelete title={`Delete ${plural(pickedTrips.length, 'trip folder')}?`} count={pickedTrips.length} onCancel={() => setDelAsk(false)} onConfirm={deletePicked}>
+              <p>This deletes {pickedTrips.length === 1 ? pickedTrips[0].name : `these ${pickedTrips.length} folders`} and the {plural(pickedCount, 'expense')} and receipt photos in {pickedTrips.length === 1 ? 'it' : 'them'}.</p>
+              <p className="small muted">You can tap Undo for a few seconds after.</p>
+            </ConfirmDelete>
           )}
           {expenseTrips.some((t) => t.sample) && <ClearSamples trips={expenseTrips.filter((t) => t.sample)} expenses={expenses} />}
         </>
@@ -107,11 +141,13 @@ export default function ExpenseView() {
   );
 }
 
-function TripCard({ trip, expenses, onOpen }) {
+function TripCard({ trip, expenses, onOpen, onHold, picking, picked }) {
   const t = tripTotals(trip, expenses);
   const warn = expenses.reduce((n, e) => n + expenseFlags(e, expenses, trip).filter((f) => f.level === 'warn').length, 0);
+  const hold = useHold(onHold);
   return (
-    <button type="button" className="card xfolder" onClick={onOpen}>
+    <button type="button" className={`card xfolder holdable${picked ? ' selected' : ''}`} onClick={onOpen} {...hold} aria-pressed={picking ? picked : undefined}>
+      {picking && <span className={`check pick${picked ? ' on' : ''}`} aria-hidden="true"><span /></span>}
       <div className="grow" style={{ minWidth: 0 }}>
         <div className="xfolder-name">{trip.name}</div>
         <div className="small muted">{trip.location} · {fmtRange(trip.startDate, trip.endDate)}</div>
@@ -193,6 +229,22 @@ function TripDetail({ trip, expenses, onBack, onEdit, onDeleted }) {
   const list = sortExpenses(expenses);
   const totals = tripTotals(trip, expenses);
   const allFlags = list.flatMap((e) => expenseFlags(e, expenses, trip).filter((f) => f.level === 'warn'));
+  // Press and hold an expense to pick several, then delete them together, with Undo.
+  const ePick = usePick(list.map((e) => e.id));
+  const [delAsk, setDelAsk] = useState(false);
+  const pickedExp = list.filter((e) => ePick.has(e.id));
+  async function deletePicked() {
+    const picked = pickedExp;
+    setDelAsk(false);
+    if (!picked.length) return;
+    try {
+      const undo = await deleteExpenses(ctx, picked);
+      ePick.stop();
+      showToast(`Deleted ${plural(picked.length, 'expense')}`, undo, 12000);
+    } catch (e) {
+      showToast(saveErrorMessage(e, 'delete those expenses'));
+    }
+  }
 
   useEffect(() => {
     const onPaste = (e) => {
@@ -277,17 +329,31 @@ function TripDetail({ trip, expenses, onBack, onEdit, onDeleted }) {
         <p className="small" style={{ marginTop: 14, color: 'var(--gold-ink)', fontWeight: 600 }}>{allFlags.length} thing{allFlags.length === 1 ? '' : 's'} to check before you submit. They're marked below.</p>
       )}
 
-      <div className="section-h"><h2>Expenses</h2><span className="small muted">{list.length} · {fmtMoney(totals.spent)} spent</span></div>
+      <div className="section-h">
+        <h2>Expenses</h2>
+        {ePick.on ? <PickHeader pick={ePick} /> : <span className="small muted">{list.length} · {fmtMoney(totals.spent)} spent</span>}
+      </div>
+      {!ePick.on && list.length > 1 && <p className="tiny muted" style={{ margin: '-4px 0 6px' }}>Press and hold an expense to select several.</p>}
       {list.length === 0 ? (
         <div className="card empty"><p>No expenses yet. Airfare, registration and supplies bought before the trip belong here too.</p></div>
       ) : byDay.map((g) => (
         <div key={g.k} className="xday">
           <div className="xday-h"><span>{g.k === 'none' ? 'No date' : dayName(fromDayKey(g.k))}</span><span>{fmtMoney(g.items.reduce((s, e) => s + (Number(e.amount) || 0), 0))}</span></div>
           <div className="list">
-            {g.items.map((e) => <ExpenseRow key={e.id} e={e} all={expenses} trip={trip} onOpen={() => setEditing(e)} />)}
+            {g.items.map((e) => (
+              <ExpenseRow key={e.id} e={e} all={expenses} trip={trip} picking={ePick.on} picked={ePick.has(e.id)}
+                onHold={() => ePick.start(e.id)} onToggle={() => ePick.toggle(e.id)} onOpen={() => (ePick.on ? ePick.toggle(e.id) : setEditing(e))} />
+            ))}
           </div>
         </div>
       ))}
+      <PickBar pick={ePick} label="Selected expenses" onDelete={() => setDelAsk(true)} />
+      {delAsk && pickedExp.length > 0 && (
+        <ConfirmDelete title={`Delete ${plural(pickedExp.length, 'expense')}?`} count={pickedExp.length} onCancel={() => setDelAsk(false)} onConfirm={deletePicked}>
+          <p>This deletes {pickedExp.length === 1 ? (pickedExp[0].merchant || 'this expense') : `these ${pickedExp.length} expenses`} and {pickedExp.length === 1 ? 'its' : 'their'} receipt photos from {trip.name}.</p>
+          <p className="small muted">You can tap Undo for a few seconds after.</p>
+        </ConfirmDelete>
+      )}
 
       {trip.mealsMode === 'perDiem' && <PerDiem trip={trip} days={totals.perDiemDays} />}
 
@@ -321,12 +387,15 @@ function TripDetail({ trip, expenses, onBack, onEdit, onDeleted }) {
   );
 }
 
-function ExpenseRow({ e, all, trip, onOpen }) {
+function ExpenseRow({ e, all, trip, onOpen, onHold, onToggle, picking, picked }) {
   const flags = expenseFlags(e, all, trip);
   const biz = trip.mealsMode === 'perDiem' && isMeal(e.category) ? 0 : businessAmount(e);
   const partial = Math.abs(biz - (Number(e.amount) || 0)) > 0.004;
+  const hold = useHold(onHold);
   return (
-    <div className="item xrow" role="button" tabIndex={0} onClick={onOpen} onKeyDown={(ev) => ev.key === 'Enter' && onOpen()}>
+    <div className={`item xrow holdable${picked ? ' selected' : ''}`} role="button" tabIndex={0} onClick={onOpen} {...hold}
+      aria-pressed={picking ? picked : undefined} onKeyDown={(ev) => ev.key === 'Enter' && onOpen()}>
+      {picking && <PickBox on={picked} name={e.merchant || categoryLabel(e.category)} onToggle={onToggle} />}
       <div className="grow" style={{ minWidth: 0 }}>
         <div className="name ellipsis">{e.merchant || categoryLabel(e.category)}</div>
         <div className="meta">
