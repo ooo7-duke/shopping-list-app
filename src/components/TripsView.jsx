@@ -146,7 +146,7 @@ export default function TripsView() {
               {g.list.map((it) => (
                 <li key={it.id} className={drag.item?.id === it.id ? 'dragging' : ''}>
                   <button type="button" className="grip" aria-label={`Drag ${it.name} to another store`} title="Drag to another store" onPointerDown={(e) => drag.start(e, it, g.key)} onContextMenu={(e) => e.preventDefault()}><GripIcon /></button>
-                  <button type="button" className="trip-name grow ellipsis" onClick={() => { if (!drag.tookClick()) setMoving(it); }} onPointerDown={(e) => { if (e.pointerType === 'touch') drag.start(e, it, g.key); }} onContextMenu={(e) => e.preventDefault()} title="Move to another store">{it.name}{fmtQty(it.qty, it.unit) ? <span className="muted"> · {fmtQty(it.qty, it.unit)}</span> : null}</button>
+                  <button type="button" className="trip-name grow" onClick={() => { if (!drag.tookClick()) setMoving(it); }} onPointerDown={(e) => { if (e.pointerType === 'touch') drag.start(e, it, g.key); }} onContextMenu={(e) => e.preventDefault()} title="Move to another store"><span className="clamp2">{it.name}{fmtQty(it.qty, it.unit) ? <span className="muted"> · {fmtQty(it.qty, it.unit)}</span> : null}</span></button>
                   <span>{it.lastPrice != null ? fmtMoney(it.lastPrice * (Number(it.qty) || 1)) : ''}</span>
                 </li>
               ))}
