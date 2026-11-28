@@ -57,7 +57,8 @@ a { color: var(--bb); }
 .topbar .acct { background: none; border: 0; padding: 6px 4px; display: flex; align-items: center; gap: 6px; min-height: var(--tap); cursor: pointer; text-align: left; min-width: 0; }
 .topbar .acct h1 { font-size: 1.2rem; }
 .avatar {
-  width: 36px; height: 36px; border-radius: 50%; background: var(--bb); color: var(--cream);
+  /* Grows with large text so the initials never get cut off. */
+  width: max(36px, 2.2rem); height: max(36px, 2.2rem); padding: 0; border-radius: 50%; background: var(--bb); color: var(--cream);
   display: grid; place-items: center; font-size: 0.85rem; font-weight: 700; border: 0; flex: none; overflow: hidden;
 }
 .avatar img { width: 100%; height: 100%; object-fit: cover; }
@@ -431,7 +432,9 @@ table.data td.num, table.data th.num { text-align: right; }
 /* Snooze choices */
 .snooze-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; }
 .snooze-opt { flex-direction: column; align-items: flex-start; gap: 2px; min-height: 56px; padding: 8px 12px; text-align: left; }
-.snooze-date { margin-top: 12px; align-items: flex-end; gap: 8px; }
+.snooze-date { margin-top: 12px; align-items: flex-end; gap: 8px; flex-wrap: wrap; }
+/* The date box keeps room for the whole date; the Snooze button drops below it when space runs out. */
+.snooze-date .field { min-width: min(100%, 11rem); }
 .snooze-card summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; gap: 8px; list-style: none; }
 .snooze-card summary::-webkit-details-marker { display: none; }
 
@@ -447,6 +450,13 @@ table.data td.num, table.data th.num { text-align: right; }
 .xday-h { display: flex; justify-content: space-between; font-size: 0.85rem; font-weight: 700; color: var(--muted); padding: 4px 4px; }
 .item .meta .chip { font-size: 0.75rem; padding: 0 8px; }
 .xtable td { white-space: normal; }
+/* Trip tables have three columns of money; on a phone they pack tighter so they fit without scrolling sideways, even with large text. */
+@media (max-width: 480px) {
+  table.data.xtable { font-size: 0.82rem; }
+  table.data.xtable th, table.data.xtable td { padding: 8px 4px; }
+  table.data.xtable th:first-child, table.data.xtable td:first-child { padding-left: 10px; }
+  table.data.xtable th:last-child, table.data.xtable td:last-child { padding-right: 10px; }
+}
 .xnight { gap: 8px; padding: 4px 0; border-bottom: 1px solid var(--line-soft); }
 .xthumbs { display: flex; flex-wrap: wrap; gap: 8px; }
 .xthumb { position: relative; width: 92px; height: 120px; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--card); display: grid; place-items: center; }

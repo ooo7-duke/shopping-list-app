@@ -506,7 +506,7 @@ function StoresSheet({ forItem, onAdded, onClose }) {
               </select>
             </label>
             {pickOf(r) === NEW_STORE && (
-              <input className="input" style={{ marginTop: 8 }} value={r.name || ''} maxLength={30} placeholder="Store name, like H-Mart" aria-label="New store name" autoFocus={!r.name} onChange={(e) => set(i, { name: e.target.value })} />
+              <input className="input" style={{ marginTop: 8 }} value={r.name || ''} maxLength={30} placeholder="Store name" aria-label="New store name" autoFocus={!r.name} onChange={(e) => set(i, { name: e.target.value })} />
             )}
             {pickOf(r) && (
               <div className="grid2" style={{ marginTop: 8 }}>
