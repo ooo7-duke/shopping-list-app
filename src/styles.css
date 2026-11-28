@@ -231,6 +231,7 @@ label.field > span { display: block; font-size: 0.85rem; color: var(--muted); ma
 .trip .head { flex-wrap: wrap; row-gap: 6px; }
 .trip .head > .grow { flex: 1 1 200px; min-width: 0; }
 .trip > .row > .btn { white-space: nowrap; }
+.btn > svg { flex: none; }
 .trip ul { list-style: none; padding: 0; margin: 10px 0; }
 .trip li { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 2px 0; border-top: 1px dashed var(--line-soft); }
 .trip li.dragging { opacity: 0.4; }
