@@ -65,6 +65,13 @@ function fit(el) {
     while (s > min && wrapCount(text, room - 1, measurer(cs, base * s)) > lines) s = Math.max(min, Math.round((s - 0.02) * 100) / 100);
   }
   if (s !== cur) apply(s);
+  // The page's own wrapping is the final word: if the box still holds more lines than it shows, step down again.
+  if (el.dataset.fitLines && lines > 1) {
+    for (let i = 0; i < 12 && s > min && el.scrollHeight > el.clientHeight + 1; i += 1) {
+      s = Math.max(min, Math.round((s - 0.02) * 100) / 100);
+      apply(s);
+    }
+  }
   // Past the smallest size, a word that still can't fit is shortened, never split.
   if (lines > 1 && full != null) {
     // A box narrower than three letters is still being laid out; leave the words whole until it settles.
