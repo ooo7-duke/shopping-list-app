@@ -110,7 +110,7 @@ export default function ExpenseView() {
           {sorted.length === 0 ? (
             <div className="card empty" style={{ marginTop: 14 }}>
               <h2>No trips yet</h2>
-              <p>Start a folder for your next trip, like CES in Las Vegas. Then add receipts as you go: a photo, a saved picture, or a forwarded email.</p>
+              <p>Start a folder for your next trip. Then add receipts as you go: a photo, a saved picture, or a forwarded email.</p>
             </div>
           ) : (
             <>
