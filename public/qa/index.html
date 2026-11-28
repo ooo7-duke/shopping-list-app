@@ -134,6 +134,15 @@ function inspect(win) {
     // Text cut off without an ellipsis.
     const hasText = [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim());
     if (hasText && el.scrollWidth > el.clientWidth + 2 && /(hidden|clip)/.test(s.overflowX) && s.textOverflow !== 'ellipsis') issues.push(['clipped', desc(el)]);
+    // Text that runs past the edge of a box that hides its overflow (a card), so the end is cut off.
+    if (hasText && s.textOverflow !== 'ellipsis') {
+      for (let a = el.parentElement; a && a !== root; a = a.parentElement) {
+        if (!/(hidden|clip)/.test(getComputedStyle(a).overflowX)) continue;
+        const ar = a.getBoundingClientRect();
+        if (r.right > ar.right + 1 || r.left < ar.left - 1) issues.push(['cut-off', `${desc(el)} runs past ${desc(a)}`]);
+        break;
+      }
+    }
     if (hasText) {
       const fs = parseFloat(s.fontSize);
       if (fs < 11) issues.push(['tiny', `${desc(el)} at ${fs}px`]);
