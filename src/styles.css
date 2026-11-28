@@ -479,6 +479,7 @@ table.data td.num, table.data th.num { text-align: right; }
 .xday { margin-top: 10px; }
 .xday-h { display: flex; justify-content: space-between; font-size: 0.85rem; font-weight: 700; color: var(--muted); padding: 4px 4px; }
 .item .meta .chip { font-size: 0.75rem; padding: 0 8px; }
+.item .meta .trip-chip { max-width: 100%; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* Trip tables keep every cell on one line and shrink their text to fit the card (FitTable), so
    they never scroll sideways. Only if the smallest size is still too wide does the first column wrap. */
 .fit-table { padding: 0; overflow: hidden; }

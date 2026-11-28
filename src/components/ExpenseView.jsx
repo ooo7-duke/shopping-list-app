@@ -708,7 +708,7 @@ function TravelInbox({ tripId, onReview }) {
           <div key={m.id} className="item email-item">
             <div className="grow" style={{ minWidth: 0 }}>
               <FitText className="name" lines={2}>{m.subject || '(no subject)'}</FitText>
-              <div className="meta"><span>{String(m.from || '').replace(/<.*>/, '').trim()}</span>{m.date && <span>{fmtDate(m.date, { withYear: true })}</span>}{!tripId && <span className="chip blue">{trip.name}</span>}</div>
+              <div className="meta"><span>{String(m.from || '').replace(/<.*>/, '').trim()}</span>{m.date && <span>{fmtDate(m.date, { withYear: true })}</span>}{!tripId && <span className="chip blue trip-chip" title={trip.name}>{trip.name}</span>}</div>
               {why && <div className="meta">{why}</div>}
             </div>
             <div className="row" style={{ gap: 6, flex: 'none' }}>
