@@ -12,7 +12,7 @@ import { DEMO_MODE } from '../lib/config.js';
 import { aiErrorMessage } from '../lib/errors.js';
 import { CameraIcon } from './Icons.jsx';
 import { extractReceiptText } from '../lib/receipts.js';
-import { fetchInbox, ackInbox, cachedRead, cacheRead, dropRead } from '../lib/emailReceipts.js';
+import { fetchInbox, ackInbox, cachedRead, cacheRead, dropRead, keptIds, keepId, dropKept } from '../lib/emailReceipts.js';
 import { planLines, alreadySaved, looksLikeReceipt, INBOX_ADDRESS } from '../lib/inbox.js';
 import { HOUSEHOLD_CATEGORIES, householdCategories, isHouseholdList, foldCategory } from '../lib/categories.js';
 import { emailTrip, notTravelIds } from '../lib/expenses.js';
@@ -237,7 +237,7 @@ function ReceiptReview({ data, onClose, onSaved }) {
       <div className="row" style={{ marginTop: 12, justifyContent: 'space-between' }}>
         <span className="small">Tracked lines: <strong>{fmtMoney(sum)}</strong>{head.total != null && Math.abs(sum - head.total) > 0.05 ? <span className="muted"> (receipt says {fmtMoney(head.total)}, tax and skipped lines account for the gap)</span> : null}</span>
       </div>
-      <button type="button" className="btn primary block" style={{ marginTop: 12 }} onClick={save} disabled={saving || (!kept.length && !data.qr)}>{saving ? 'Saving…' : kept.length ? `Save ${kept.length} purchase${kept.length === 1 ? '' : 's'}` : 'Save receipt'}</button>
+      <button type="button" className="btn primary block" style={{ marginTop: 12 }} onClick={save} disabled={saving || (!kept.length && !data.qr && !(data.source === 'email' && head.total != null))}>{saving ? 'Saving…' : kept.length ? `Save ${kept.length} purchase${kept.length === 1 ? '' : 's'}` : 'Save receipt'}</button>
     </Sheet>
   );
 }
@@ -305,6 +305,7 @@ function EmailedReceipts() {
   const [inbox, setInbox] = useState({ loading: true, items: [] });
   const [state, setState] = useState({});
   const [done, setDone] = useState(null);
+  const [skipped, setSkipped] = useState([]);
   const [review, setReview] = useState(null);
   const ran = useRef(false);
   const account = ctx?.account;
@@ -322,34 +323,57 @@ function EmailedReceipts() {
     let data;
     try { data = await fetchInbox(); } catch (e) { setInbox({ loading: false, error: e.message, items: [] }); return; }
     setInbox({ loading: false, ...data });
-    const out = { found: 0, travel: 0, other: 0 };
+    const out = { found: 0, travel: 0 };
     const notTravel = notTravelIds();
-    // Mail that isn't a receipt never shows here. Words alone rule most of it out without an AI
-    // read; the AI reader rules out the rest. Either way it is cleared from the inbox.
-    const setAside = async (id) => { out.other++; dropRead(id); setOne(id, { status: 'dismissed' }); await ackInbox(id).catch(() => {}); };
+    const kept = keptIds();
+    const aside = [];
     for (const m of data.items || []) {
-      if (!looksLikeReceipt(m)) { await setAside(m.id); continue; }
-      if (!notTravel.includes(m.id) && emailTrip(m, latest.current.expenseTrips, latest.current.expenses)) { out.travel++; continue; }
-      setOne(m.id, { status: 'reading', m });
-      try {
-        let res = cachedRead(m.id);
-        if (!res) {
-          res = await extractReceiptText(m, latest.current.items.map((i) => i.name), backend.getApp(), cats);
-          cacheRead(m.id, res);
-        }
-        if (!res.isReceipt) { await setAside(m.id); continue; }
-        const plan = planLines(res, latest.current.items, cats);
-        // Nothing from email is saved on its own. Every receipt waits here for the person to
-        // include or exclude it, with a note when it looks already saved.
-        const dup = alreadySaved(latest.current.receipts, { emailId: m.id, orderId: res.orderId, store: res.store });
-        out.found++;
-        setOne(m.id, { status: 'review', why: dup ? 'dup' : '', m, res, plan });
-      } catch (e) {
-        console.error(e);
-        setOne(m.id, { status: 'error', m, error: aiErrorMessage(e, 'Receipt reading') });
-      }
+      const keep = kept.includes(m.id);
+      // Mail that isn't a receipt waits in a skipped list, out of the way, where the person can
+      // pull one back. Words alone rule most of it out without an AI read.
+      if (!keep && !looksLikeReceipt(m)) { aside.push({ m, by: 'words' }); continue; }
+      if (!keep && !notTravel.includes(m.id) && emailTrip(m, latest.current.expenseTrips, latest.current.expenses)) { out.travel++; continue; }
+      const r = await readOne(m, keep);
+      if (r === 'other') aside.push({ m, by: 'ai' });
+      else if (r === 'found') out.found++;
     }
-    if (out.found || out.travel || out.other) setDone(out);
+    setSkipped(aside);
+    if (out.found || out.travel || aside.length) setDone(out);
+  }
+
+  // Reads one email and puts it in the list to include or exclude. A pulled-back email stays in
+  // the list even when the AI reader says it isn't a receipt.
+  async function readOne(m, keep) {
+    setOne(m.id, { status: 'reading', m });
+    try {
+      let res = cachedRead(m.id);
+      if (!res) {
+        res = await extractReceiptText(m, latest.current.items.map((i) => i.name), backend.getApp(), cats);
+        cacheRead(m.id, res);
+      }
+      if (!keep && !res.isReceipt) { setOne(m.id, { status: 'skipped', m }); return 'other'; }
+      const plan = planLines(res, latest.current.items, cats);
+      // Nothing from email is saved on its own. Every receipt waits here for the person to
+      // include or exclude it, with a note when it looks already saved.
+      const dup = res.isReceipt && alreadySaved(latest.current.receipts, { emailId: m.id, orderId: res.orderId, store: res.store });
+      setOne(m.id, { status: 'review', why: dup ? 'dup' : '', pulled: keep, m, res, plan });
+      return 'found';
+    } catch (e) {
+      console.error(e);
+      setOne(m.id, { status: 'error', m, error: aiErrorMessage(e, 'Receipt reading') });
+      return 'error';
+    }
+  }
+
+  async function pullBack(m) {
+    keepId(m.id);
+    setSkipped((list) => list.filter((x) => x.m.id !== m.id));
+    await readOne(m, true);
+  }
+  async function clearSkipped() {
+    const list = skipped;
+    setSkipped([]);
+    for (const { m } of list) { dropRead(m.id); await ackInbox(m.id).catch(() => {}); }
   }
 
   function openReview(id) {
@@ -359,12 +383,14 @@ function EmailedReceipts() {
   async function finish(id, saved) {
     await ackInbox(id);
     dropRead(id);
+    dropKept(id);
     setOne(id, { status: saved ? 'saved' : 'dismissed', m: state[id]?.m });
     setReview(null);
   }
 
   const waiting = Object.entries(state).filter(([, v]) => ['review', 'reading', 'error'].includes(v.status));
   const nothingYet = !inbox.loading && !waiting.length && !done?.found && !done?.travel;
+  const sender = (from) => String(from || '').replace(/<[^>]*>/, '').replace(/"/g, '').trim() || String(from || '');
 
   return (
     <>
@@ -372,15 +398,14 @@ function EmailedReceipts() {
       <div className="card email-card">
         {inbox.loading && <p className="small">Checking for emailed receipts…</p>}
         {inbox.error && <p className="small">{inbox.error}</p>}
-        {done && (
+        {done && (done.found || done.travel) ? (
           <p className="small" style={{ marginBottom: waiting.length ? 10 : 0 }}>
             {[
               done.found ? `Found ${plural(done.found, 'email')}. Include the ones you want on the record and exclude the rest.` : '',
               done.travel ? `${done.travel} look${done.travel === 1 ? 's' : ''} like travel and ${done.travel === 1 ? 'is' : 'are'} waiting on the Expense Report page.` : '',
-              done.other ? `Skipped ${plural(done.other, 'email')} that ${done.other === 1 ? "isn't a receipt" : "aren't receipts"}.` : '',
             ].filter(Boolean).join(' ')}
           </p>
-        )}
+        ) : null}
         {waiting.map(([id, v]) => (
           <div key={id} className="email-row">
             <div className="grow" style={{ minWidth: 0 }}>
@@ -389,19 +414,38 @@ function EmailedReceipts() {
                 {v.status === 'reading' ? 'Reading…'
                   : v.status === 'error' ? `Couldn't read it. ${v.error}`
                   : v.why === 'dup' ? 'Looks already saved'
+                  : v.pulled && !v.res?.isReceipt ? `Pulled back${v.plan.lines.length ? ` · ${plural(v.plan.lines.length, 'item')}` : ' · no items found'}`
                   : `${plural(v.plan.lines.length, 'item')}${v.plan.weak ? ` · ${v.plan.weak} best guess${v.plan.weak === 1 ? '' : 'es'} to check` : ''}`}
                 {v.m?.date ? ` · emailed\u00a0${fmtDate(v.m.date).replace(/ /g, '\u00a0')}` : ''}
               </div>
             </div>
             {['review', 'error'].includes(v.status) && (
               <div className="email-acts">
-                {v.status === 'review' && v.plan?.lines.length > 0 && <button type="button" className={`btn${v.why ? '' : ' primary'}`} onClick={() => openReview(id)}>Include</button>}
+                {v.status === 'review' && <button type="button" className={`btn${v.why ? '' : ' primary'}`} onClick={() => openReview(id)}>Include</button>}
                 <button type="button" className="btn" onClick={() => finish(id, false)}>Exclude</button>
               </div>
             )}
           </div>
         ))}
         {nothingYet && <p className="small">No emailed receipts waiting.</p>}
+        {skipped.length > 0 && (
+          <details className="email-how email-skipped">
+            <summary>Skipped {plural(skipped.length, 'email')} that {skipped.length === 1 ? "isn't a receipt" : "aren't receipts"}</summary>
+            <p className="tiny muted">Tap Pull back on any that is a receipt.</p>
+            {skipped.map(({ m, by }) => (
+              <div key={m.id} className="email-row">
+                <div className="grow" style={{ minWidth: 0 }}>
+                  <FitText className="name" lines={2}>{m.subject || 'No subject'}</FitText>
+                  <div className="meta">{sender(m.from)}{m.date ? ` · emailed\u00a0${fmtDate(m.date).replace(/ /g, '\u00a0')}` : ''}{by === 'ai' ? ' · read, no receipt found' : ''}</div>
+                </div>
+                <div className="email-acts">
+                  <button type="button" className="btn" onClick={() => pullBack(m)}>Pull back</button>
+                </div>
+              </div>
+            ))}
+            <button type="button" className="btn block" style={{ marginTop: 8 }} onClick={clearSkipped}>Clear skipped emails</button>
+          </details>
+        )}
         <details className="email-how">
           <summary>How to send receipts here</summary>
           <ol className="small">

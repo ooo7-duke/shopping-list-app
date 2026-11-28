@@ -42,7 +42,7 @@ export function cacheRead(id, res) {
     const all = JSON.parse(localStorage.getItem(CACHE) || '{}');
     all[id] = res;
     const keys = Object.keys(all);
-    for (const k of keys.slice(0, Math.max(0, keys.length - 40))) delete all[k];
+    for (const k of keys.slice(0, Math.max(0, keys.length - 150))) delete all[k];
     localStorage.setItem(CACHE, JSON.stringify(all));
   } catch { /* storage full or blocked */ }
 }
@@ -52,4 +52,17 @@ export function dropRead(id) {
     delete all[id];
     localStorage.setItem(CACHE, JSON.stringify(all));
   } catch { /* storage blocked */ }
+}
+
+// Emails the person pulled back from the skipped list. They stay in the list to include or
+// exclude even when the word check or the AI reader says they aren't receipts.
+const KEPT = 'sla-email-kept';
+export function keptIds() {
+  try { return JSON.parse(localStorage.getItem(KEPT) || '[]'); } catch { return []; }
+}
+export function keepId(id) {
+  try { localStorage.setItem(KEPT, JSON.stringify([...new Set([...keptIds(), id])].slice(-100))); } catch { /* storage blocked */ }
+}
+export function dropKept(id) {
+  try { localStorage.setItem(KEPT, JSON.stringify(keptIds().filter((x) => x !== id))); } catch { /* storage blocked */ }
 }
