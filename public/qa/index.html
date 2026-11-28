@@ -84,7 +84,7 @@ function inspect(win) {
   const sheet = document.querySelector('.scrim .sheet, .photo-view, [role=dialog][aria-modal=true]');
   const menu = document.querySelector('.menu.open');
   const root = sheet || document.body;
-  const vis = (el) => { const s = getComputedStyle(el); if (s.visibility === 'hidden' || s.display === 'none' || +s.opacity === 0) return false; const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
+  const vis = (el) => { if (el.closest('details:not([open])') && !el.closest('summary')) return false; const s = getComputedStyle(el); if (s.visibility === 'hidden' || s.display === 'none' || +s.opacity === 0) return false; const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
   const desc = (el) => { const t = (el.getAttribute('aria-label') || el.innerText || el.alt || el.tagName).trim().replace(/\s+/g, ' ').slice(0, 60); return `${el.tagName.toLowerCase()}${el.className && typeof el.className === 'string' ? '.' + el.className.trim().split(/\s+/).slice(0, 2).join('.') : ''} "${t}"`; };
   if (document.documentElement.scrollWidth > W + 1) issues.push(['hscroll', `page scrolls sideways: ${document.documentElement.scrollWidth}px wide in ${W}px`]);
   const clippers = (el) => { for (let a = el.parentElement; a && a !== document.body; a = a.parentElement) { const s = getComputedStyle(a); if (/(auto|scroll|hidden|clip)/.test(s.overflowX)) return a; } return null; };
