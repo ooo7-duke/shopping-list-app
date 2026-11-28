@@ -252,7 +252,6 @@ function TripDetail({ trip, expenses, onBack, onEdit, onDeleted }) {
 
       <div className="kpis" style={{ marginTop: 12 }}>
         <div className="kpi"><div className="v">{fmtMoney(totals.owedToYou)}</div><div className="l">Owed to you</div></div>
-        <div className="kpi"><div className="v">{fmtMoney(totals.business)}</div><div className="l">Business, claimed</div></div>
         <div className="kpi"><div className="v">{fmtMoney(totals.personal)}</div><div className="l">Personal, not claimed</div></div>
       </div>
 
