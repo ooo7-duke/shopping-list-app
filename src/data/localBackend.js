@@ -1,6 +1,7 @@
 // Demo backend: same interface as firebaseBackend, stored in this browser only.
 import { HOUSEHOLD_CATEGORIES } from '../lib/categories.js';
 import { DAY } from '../lib/predict.js';
+import { buildSampleTrips } from './sampleTrips.js';
 
 const KEY = 'sla-demo-v2';
 const listeners = new Set();
@@ -38,9 +39,29 @@ function save() {
 }
 function uid() { return Math.random().toString(36).slice(2, 11); }
 
+const SAMPLE_TRIPS = 4;
 const DEMO_USER = { uid: 'demo-user', name: 'Demo user', email: 'demo@example.com', photo: '' };
 state.invites ||= {};
 addSampleInvite();
+addSampleTrips();
+
+// Three sample business trips for the Expense Report page. Bumping SAMPLE_TRIPS swaps
+// in new samples on devices that already have demo data, leaving trips the person made.
+function addSampleTrips() {
+  state.mine ||= {};
+  const mine = (state.mine[DEMO_USER.uid] ||= { expenseTrips: {}, expenses: {}, expenseImages: {} });
+  if (state.sampleTrips === SAMPLE_TRIPS) return;
+  const isSample = (id, x) => x?.sample || String(id).startsWith('demo-');
+  for (const coll of ['expenseTrips', 'expenses', 'expenseImages']) {
+    mine[coll] = Object.fromEntries(Object.entries(mine[coll] || {}).filter(([id, x]) => !isSample(id, x)));
+  }
+  const { trips, expenses, images } = buildSampleTrips();
+  Object.assign(mine.expenseTrips, trips);
+  Object.assign(mine.expenses, expenses);
+  Object.assign(mine.expenseImages, images);
+  state.sampleTrips = SAMPLE_TRIPS;
+  save();
+}
 
 function seed() {
   const now = Date.now();
@@ -155,7 +176,10 @@ export async function deleteMyAccount(user, accounts) {
   save();
 }
 export const idToken = async () => null;
-export function resetDemo() { state = seed(); state.signedIn = true; save(); }
+export function resetDemo() {
+  state = seed(); state.signedIn = true; addSampleTrips(); save();
+  try { localStorage.removeItem('sla-demo-inbox-done'); } catch { /* storage blocked */ }
+}
 
 function watch(get, cb) {
   const fire = () => cb(get());
@@ -234,6 +258,24 @@ export async function commit(accountId, ops) {
 }
 export async function getDocData(accountId, coll, id) {
   return state.data[accountId]?.[coll]?.[id] || null;
+}
+
+// Private travel expense reports, kept per person (see firebaseBackend.subscribeMine).
+const mine = (uid, coll) => ((state.mine ||= {})[uid] ||= {})[coll] ||= {};
+export const subscribeMine = (uid, coll, cb) => watch(() => Object.values(mine(uid, coll)), cb);
+export const newMineId = () => uid();
+export async function commitMine(userId, ops) {
+  for (const op of ops) {
+    const c = mine(userId, op.coll);
+    const id = op.id || uid();
+    if (op.type === 'remove') delete c[id];
+    else if (op.type === 'update') c[id] = { ...c[id], ...op.data };
+    else c[id] = { ...op.data, id };
+  }
+  save();
+}
+export async function getMine(userId, coll, id) {
+  return mine(userId, coll)[id] || null;
 }
 
 export async function createInvite(account, email, role, user) {

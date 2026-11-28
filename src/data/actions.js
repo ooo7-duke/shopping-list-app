@@ -4,6 +4,7 @@ import { normalizeName } from '../lib/parse.js';
 import { guessCategory, HOUSEHOLD_CATEGORIES } from '../lib/categories.js';
 import { DAY } from '../lib/predict.js';
 import { fetchQuotes, hasPriceProvider, mergeQuotes } from '../lib/prices.js';
+import { paidWithId } from '../lib/expenses.js';
 
 const clean = (o) => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined));
 
@@ -232,3 +233,87 @@ export async function deleteReceipt(ctx, receipt, purchases) {
   for (const p of purchases.filter((x) => x.receiptId === receipt.id)) ops.push({ type: 'remove', coll: 'purchases', id: p.id });
   await ctx.backend.commit(ctx.accountId, ops);
 }
+
+// ---- Travel expense reports (private to the signed-in person, under users/{uid}) ----
+
+const TRIP_FIELDS = ['name', 'location', 'startDate', 'endDate', 'purpose', 'employer', 'project', 'chargeCode', 'mealsMode', 'mieRate', 'mealsProvided', 'status', 'notes'];
+const EXPENSE_FIELDS = ['tripId', 'category', 'merchant', 'date', 'time', 'amount', 'originalAmount', 'originalCurrency', 'paidWith', 'business', 'nights', 'notes', 'summary', 'captions', 'imageIds', 'source', 'emailId'];
+const pick = (o, keys) => clean(Object.fromEntries(keys.map((k) => [k, o[k] === undefined ? undefined : o[k]])));
+const num = (v) => (v === '' || v == null || Number.isNaN(Number(v)) ? null : Math.round(Number(v) * 100) / 100);
+
+export async function saveExpenseTrip(ctx, trip) {
+  const { backend, user } = ctx;
+  const id = trip.id || backend.newMineId(user.uid, 'expenseTrips');
+  const data = pick({ ...trip, mieRate: num(trip.mieRate), mealsMode: trip.mealsMode || 'actual', status: trip.status || 'open' }, TRIP_FIELDS);
+  await backend.commitMine(user.uid, [trip.id
+    ? { type: 'update', coll: 'expenseTrips', id, data: { ...data, updatedAt: Date.now() } }
+    : { type: 'set', coll: 'expenseTrips', id, data: { ...data, createdAt: Date.now(), updatedAt: Date.now() } }]);
+  return id;
+}
+
+export async function updateExpenseTrip(ctx, id, patch) {
+  await ctx.backend.commitMine(ctx.user.uid, [{ type: 'update', coll: 'expenseTrips', id, data: { ...patch, updatedAt: Date.now() } }]);
+}
+
+// Deleting a trip folder deletes every expense and receipt photo in it.
+export async function deleteExpenseTrip(ctx, trip, expenses) {
+  const ops = [{ type: 'remove', coll: 'expenseTrips', id: trip.id }];
+  for (const e of expenses.filter((x) => x.tripId === trip.id)) {
+    ops.push({ type: 'remove', coll: 'expenses', id: e.id });
+    for (const img of e.imageIds || []) ops.push({ type: 'remove', coll: 'expenseImages', id: img });
+  }
+  await ctx.backend.commitMine(ctx.user.uid, ops);
+}
+
+// Saves an expense the person has checked. New photos are written one at a time, since each
+// can be close to Firestore's 1 MB limit for a single document.
+export async function saveExpense(ctx, expense, { newImages = [], removedImageIds = [] } = {}) {
+  const { backend, user } = ctx;
+  const id = expense.id || backend.newMineId(user.uid, 'expenses');
+  const kept = (expense.imageIds || []).filter((x) => !removedImageIds.includes(x));
+  const added = [];
+  for (const dataUrl of newImages) {
+    const imgId = backend.newMineId(user.uid, 'expenseImages');
+    await backend.commitMine(user.uid, [{ type: 'set', coll: 'expenseImages', id: imgId, data: { dataUrl, expenseId: id, createdAt: Date.now() } }]);
+    added.push(imgId);
+  }
+  const nights = (expense.nights || []).map((n) => ({ date: n.date, amount: num(n.amount) ?? 0, personal: !!n.personal }));
+  const data = pick({
+    ...expense, amount: num(expense.amount), originalAmount: num(expense.originalAmount), business: expense.business === '' || expense.business == null ? null : num(expense.business),
+    nights, paidWith: paidWithId(expense.paidWith), imageIds: [...kept, ...added], currency: 'USD',
+    captions: Object.fromEntries(Object.entries(expense.captions || {}).filter(([k, v]) => kept.includes(k) && v)),
+  }, EXPENSE_FIELDS);
+  const ops = [expense.id
+    ? { type: 'update', coll: 'expenses', id, data: { ...data, updatedAt: Date.now() } }
+    : { type: 'set', coll: 'expenses', id, data: { ...data, createdAt: Date.now(), updatedAt: Date.now() } }];
+  for (const r of removedImageIds) ops.push({ type: 'remove', coll: 'expenseImages', id: r });
+  await backend.commitMine(user.uid, ops);
+  return id;
+}
+
+// Sets or clears the caption the person typed for one receipt photo. A blank caption goes
+// back to the automatic one.
+export async function setPhotoCaption(ctx, expense, imageId, text) {
+  const captions = { ...(expense.captions || {}) };
+  const t = String(text || '').trim().slice(0, 140);
+  if (t) captions[imageId] = t; else delete captions[imageId];
+  await ctx.backend.commitMine(ctx.user.uid, [{ type: 'update', coll: 'expenses', id: expense.id, data: { captions, updatedAt: Date.now() } }]);
+}
+
+// Deletes an expense and its photos, and hands back an undo that puts them all back.
+export async function deleteExpense(ctx, expense) {
+  const { backend, user } = ctx;
+  const images = [];
+  for (const img of expense.imageIds || []) {
+    const d = await backend.getMine(user.uid, 'expenseImages', img);
+    if (d) images.push({ id: img, data: d });
+  }
+  const { id, ...rest } = expense;
+  await backend.commitMine(user.uid, [{ type: 'remove', coll: 'expenses', id }, ...images.map((i) => ({ type: 'remove', coll: 'expenseImages', id: i.id }))]);
+  return async () => {
+    for (const i of images) await backend.commitMine(user.uid, [{ type: 'set', coll: 'expenseImages', id: i.id, data: i.data }]);
+    await backend.commitMine(user.uid, [{ type: 'set', coll: 'expenses', id, data: clean(rest) }]);
+  };
+}
+
+export const getExpenseImage = (ctx, id) => ctx.backend.getMine(ctx.user.uid, 'expenseImages', id);

@@ -4,10 +4,11 @@ import ListView from './components/ListView.jsx';
 import TripsView from './components/TripsView.jsx';
 import ReceiptsView from './components/ReceiptsView.jsx';
 import InsightsView from './components/InsightsView.jsx';
+import ExpenseView from './components/ExpenseView.jsx';
 import AccountSheet from './components/AccountSheet.jsx';
 import { SignIn, Onboarding, InviteBanner } from './components/Welcome.jsx';
 import { LookupMeter, BackToTop, LookPicker } from './components/PageExtras.jsx';
-import { ListIcon, CartIcon, ReceiptIcon, ChartIcon, ChevronDown, LogoMark, MenuIcon } from './components/Icons.jsx';
+import { ListIcon, CartIcon, ReceiptIcon, ChartIcon, BriefcaseIcon, ChevronDown, LogoMark, MenuIcon } from './components/Icons.jsx';
 import { isOnList } from './data/actions.js';
 import { can, DEMO_MODE, APP_NAME } from './lib/config.js';
 import { initials } from './lib/format.js';
@@ -17,6 +18,8 @@ const TABS = [
   { id: 'trips', label: 'Trips', Icon: CartIcon },
   { id: 'receipts', label: 'Receipts', Icon: ReceiptIcon, spend: true },
   { id: 'insights', label: 'Insights', Icon: ChartIcon, spend: true },
+  // Private to each person, so it shows whatever their role on the list.
+  { id: 'expenses', label: 'Expense Report', Icon: BriefcaseIcon },
 ];
 
 function useHashTab() {
@@ -58,7 +61,7 @@ function Shell() {
   const tabs = TABS.filter((t) => !t.spend || can(role, 'spend'));
   const current = tabs.find((t) => t.id === tab) ? tab : 'list';
   const listCount = items.filter((i) => isOnList(i) && i.status !== 'ordered').length;
-  const View = { list: ListView, trips: TripsView, receipts: ReceiptsView, insights: InsightsView }[current];
+  const View = { list: ListView, trips: TripsView, receipts: ReceiptsView, insights: InsightsView, expenses: ExpenseView }[current];
 
   return (
     <div className="app">

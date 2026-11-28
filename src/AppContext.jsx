@@ -92,6 +92,20 @@ export function AppProvider({ children }) {
     }
   }, [user, switchAccount]);
 
+  // Travel expense reports belong to the person, not the list, so they follow them across lists.
+  const [expenseTrips, setExpenseTrips] = useState([]);
+  const [expenses, setExpenses] = useState([]);
+  const [expenseError, setExpenseError] = useState(null);
+  const [expenseReady, setExpenseReady] = useState(false);
+  useEffect(() => {
+    if (!user) { setExpenseTrips([]); setExpenses([]); setExpenseReady(false); return undefined; }
+    setExpenseError(null);
+    const onError = (e) => { setExpenseError(e); setExpenseReady(true); };
+    const onTrips = (list) => { setExpenseTrips(list); setExpenseReady(true); };
+    const subs = [backend.subscribeMine(user.uid, 'expenseTrips', onTrips, onError), backend.subscribeMine(user.uid, 'expenses', setExpenses, onError)];
+    return () => subs.forEach((u) => u());
+  }, [user?.uid]);
+
   // Re-run predictions when data changes, and once an hour so "due in" stays fresh.
   const [tick, setTick] = useState(0);
   useEffect(() => {
@@ -122,7 +136,7 @@ export function AppProvider({ children }) {
 
   const value = {
     backend, user, accounts, account, role, items, purchases, receipts, batches, predictions,
-    switchAccount, invites, joinInvite, ctx, look, setLook, toast, showToast, dismissToast: () => setToast(null),
+    switchAccount, invites, joinInvite, ctx, expenseTrips, expenses, expenseError, expenseReady, look, setLook, toast, showToast, dismissToast: () => setToast(null),
   };
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

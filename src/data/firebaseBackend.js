@@ -136,6 +136,31 @@ export async function getDocData(accountId, coll, id) {
   return s.exists() ? s.data() : null;
 }
 
+// Private to one person, not shared with a list: travel expense reports live under
+// users/{uid}, which the security rules let only that person read or write.
+export const MINE = ['expenseTrips', 'expenses', 'expenseImages'];
+
+export function subscribeMine(uid, coll, cb, onError) {
+  return onSnapshot(collection(db, 'users', uid, coll), (s) => cb(snapList(s)), (e) => { cb([]); onError?.(e); });
+}
+export const newMineId = (uid, coll) => doc(collection(db, 'users', uid, coll)).id;
+export async function commitMine(uid, ops) {
+  for (let i = 0; i < ops.length; i += 450) {
+    const b = writeBatch(db);
+    for (const op of ops.slice(i, i + 450)) {
+      const ref = doc(db, 'users', uid, op.coll, op.id || newMineId(uid, op.coll));
+      if (op.type === 'remove') b.delete(ref);
+      else if (op.type === 'update') b.update(ref, op.data);
+      else b.set(ref, op.data);
+    }
+    await b.commit();
+  }
+}
+export async function getMine(uid, coll, id) {
+  const s = await getDoc(doc(db, 'users', uid, coll, id));
+  return s.exists() ? s.data() : null;
+}
+
 // Invites live in a top-level collection keyed by an auto id, holding the invitee's email.
 export async function createInvite(account, email, role, user) {
   await addDoc(collection(db, 'invites'), {
@@ -203,6 +228,10 @@ export async function deleteMyAccount(user, accounts) {
       await updateDoc(doc(db, 'accounts', a.id), { [`members.${next}.role`]: 'owner' });
     }
     await updateDoc(doc(db, 'accounts', a.id), { [`members.${me}`]: deleteField(), memberUids: others });
+  }
+  for (const coll of MINE) {
+    const snap = await getDocs(collection(db, 'users', me, coll)).catch(() => ({ docs: [] }));
+    for (const d of snap.docs) await deleteDoc(d.ref);
   }
   const sent = await getDocs(query(collection(db, 'invites'), where('invitedByUid', '==', me)));
   const received = user.email ? await getDocs(query(collection(db, 'invites'), where('email', '==', user.email))) : { docs: [] };

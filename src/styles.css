@@ -173,6 +173,7 @@ label.field > span { display: block; font-size: 0.85rem; color: var(--muted); ma
 @media (hover: hover) and (pointer: fine) {
   .item:hover .hover-actions { display: flex; }
   .item:hover .price { display: none; }
+  .item.xrow:hover .price { display: block; }
 }
 .suggest-strip { display: flex; flex-wrap: wrap; gap: 8px; padding: 2px 2px 8px; }
 .suggest-strip .chip { flex: none; max-width: 100%; white-space: normal; text-align: left; }
@@ -394,3 +395,51 @@ table.data td.num, table.data th.num { text-align: right; }
 .snooze-date { margin-top: 12px; align-items: flex-end; gap: 8px; }
 .snooze-card summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; gap: 8px; list-style: none; }
 .snooze-card summary::-webkit-details-marker { display: none; }
+
+/* Expense Report */
+.xfolders { display: grid; gap: 10px; margin-top: 14px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); }
+.xfolder { display: flex; gap: 12px; align-items: flex-start; text-align: left; cursor: pointer; width: 100%; font: inherit; color: inherit; min-height: var(--tap); }
+.xfolder:hover { border-color: var(--bb); }
+.xfolder-name { font-weight: 700; color: var(--bb); font-size: 1.05rem; }
+.xfolder .price { font-weight: 700; color: var(--bb); white-space: nowrap; }
+.xfolder .price small { display: block; font-weight: 400; color: var(--muted); font-size: 0.75rem; }
+.xchips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.xday { margin-top: 10px; }
+.xday-h { display: flex; justify-content: space-between; font-size: 0.85rem; font-weight: 700; color: var(--muted); padding: 4px 4px; }
+.item .meta .chip { font-size: 0.75rem; padding: 0 8px; }
+.xtable td { white-space: normal; }
+.xnight { gap: 8px; padding: 4px 0; border-bottom: 1px solid var(--line-soft); }
+.xthumbs { display: flex; flex-wrap: wrap; gap: 8px; }
+.xthumb { position: relative; width: 92px; height: 120px; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--card); display: grid; place-items: center; }
+.xthumb img { width: 100%; height: 100%; object-fit: cover; }
+.xthumb .icon-btn { position: absolute; top: 2px; right: 2px; min-width: 32px; min-height: 32px; width: 32px; height: 32px; background: color-mix(in srgb, var(--cream) 85%, transparent); font-size: 1.2rem; }
+.xthumb.add { cursor: pointer; color: var(--bb); border-style: dashed; align-content: center; gap: 2px; }
+.print-report { display: none; }
+@media print {
+  body > *:not(.print-report) { display: none !important; }
+  body { background: #fff; }
+  .print-report { display: block; color: #111; font-size: 11pt; }
+  .print-report h1 { font-size: 18pt; color: #111; margin-bottom: 8pt; }
+  .print-report h2 { font-size: 13pt; color: #111; margin: 14pt 0 6pt; }
+  .print-report h3 { font-size: 11pt; color: #111; margin-bottom: 6pt; }
+  .print-report table { width: 100%; border-collapse: collapse; }
+  .print-report th, .print-report td { border: 1px solid #bbb; padding: 4pt 6pt; text-align: left; vertical-align: top; }
+  .print-report .p-head th { width: 16%; background: #f3f3f3; }
+  .print-report .num { text-align: right; white-space: nowrap; }
+  .print-report tr.tot td { font-weight: 700; }
+  .print-report .p-sign { display: grid; grid-template-columns: 2fr 1fr 2fr 1fr; gap: 14pt; margin-top: 36pt; }
+  .print-report .p-sign span { border-top: 1px solid #111; padding-top: 3pt; font-size: 9pt; }
+  .print-report .p-receipt { break-before: page; page-break-before: always; }
+  .print-report .p-receipt img { max-width: 100%; max-height: 9in; display: block; margin: 0 auto; }
+}
+
+/* Receipt photo gallery in a trip folder */
+.xgallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+.xtile { display: flex; flex-direction: column; gap: 4px; padding: 8px; text-align: left; background: var(--card, #fff); border: 1px solid var(--line); border-radius: 14px; cursor: pointer; font: inherit; color: inherit; min-width: 0; }
+.xtile:focus-visible { outline: 3px solid var(--bb); outline-offset: 2px; }
+.xtile-img { display: flex; align-items: center; justify-content: center; aspect-ratio: 3 / 4; border-radius: 10px; overflow: hidden; background: var(--line); }
+.xtile-img img { width: 100%; height: 100%; object-fit: cover; }
+.xtile-cap { font-size: 0.86rem; font-weight: 600; line-height: 1.25; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.xviewer { display: flex; justify-content: center; background: var(--line); border-radius: 12px; overflow: hidden; }
+.xviewer img { max-width: 100%; max-height: 65vh; object-fit: contain; }
+.print-report .p-sub { margin: 0 0 6px; font-size: 10pt; color: #444; }

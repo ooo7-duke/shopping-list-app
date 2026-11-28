@@ -13,6 +13,7 @@ import { extractReceiptText } from '../lib/receipts.js';
 import { fetchInbox, ackInbox, cachedRead, cacheRead, dropRead } from '../lib/emailReceipts.js';
 import { planLines, alreadySaved, INBOX_ADDRESS } from '../lib/inbox.js';
 import { HOUSEHOLD_CATEGORIES, householdCategories, isHouseholdList, foldCategory } from '../lib/categories.js';
+import { emailTrip, notTravelIds } from '../lib/expenses.js';
 
 export default function ReceiptsView() {
   const { ctx, items, receipts, purchases, backend, showToast } = useApp();
@@ -261,9 +262,9 @@ function QrNote({ qr }) {
 // Receipts forwarded to the app's Gmail inbox. Strong matches are saved and checked off on
 // their own; an email with a weaker guess waits here for a person to confirm it.
 function EmailedReceipts() {
-  const { ctx, items, receipts, backend, showToast } = useApp();
+  const { ctx, items, receipts, backend, showToast, expenseTrips, expenses, expenseReady } = useApp();
   const latest = useRef({});
-  latest.current = { ctx, items, receipts };
+  latest.current = { ctx, items, receipts, expenseTrips, expenses };
   const [inbox, setInbox] = useState({ loading: true, items: [] });
   const [state, setState] = useState({});
   const [done, setDone] = useState(null);
@@ -274,17 +275,20 @@ function EmailedReceipts() {
   const setOne = (id, v) => setState((s) => ({ ...s, [id]: v }));
 
   useEffect(() => {
-    if (ran.current || !ctx?.accountId) return;
+    // Waits for the trip folders, so a hotel or flight receipt goes to the Expense Report page.
+    if (ran.current || !ctx?.accountId || !expenseReady) return;
     ran.current = true;
     run();
-  }, [ctx?.accountId]);
+  }, [ctx?.accountId, expenseReady]);
 
   async function run() {
     let data;
     try { data = await fetchInbox(); } catch (e) { setInbox({ loading: false, error: e.message, items: [] }); return; }
     setInbox({ loading: false, ...data });
-    const out = { receipts: 0, checked: [], skipped: 0, waiting: 0 };
+    const out = { receipts: 0, checked: [], skipped: 0, waiting: 0, travel: 0 };
+    const notTravel = notTravelIds();
     for (const m of data.items || []) {
+      if (!notTravel.includes(m.id) && emailTrip(m, latest.current.expenseTrips, latest.current.expenses)) { out.travel++; continue; }
       setOne(m.id, { status: 'reading', m });
       try {
         let res = cachedRead(m.id);
@@ -317,7 +321,7 @@ function EmailedReceipts() {
         setOne(m.id, { status: 'error', m, error: aiErrorMessage(e, 'Receipt reading') });
       }
     }
-    if (out.receipts || out.skipped || out.waiting) setDone(out);
+    if (out.receipts || out.skipped || out.waiting || out.travel) setDone(out);
     if (out.receipts) showToast(`Added ${out.receipts} emailed receipt${out.receipts === 1 ? '' : 's'}`);
   }
 
@@ -346,6 +350,7 @@ function EmailedReceipts() {
             {[
               done.receipts ? `Added ${done.receipts} receipt${done.receipts === 1 ? '' : 's'}${done.checked.length ? ` and checked off ${listNames(done.checked)}` : ''}.` : '',
               done.waiting ? `${done.waiting} ${done.waiting === 1 ? 'needs' : 'need'} your OK below.` : '',
+              done.travel ? `${done.travel} look${done.travel === 1 ? 's' : ''} like travel and ${done.travel === 1 ? 'is' : 'are'} waiting on the Expense Report page.` : '',
               done.skipped ? `Skipped ${done.skipped} email${done.skipped === 1 ? '' : 's'} that ${done.skipped === 1 ? 'wasn\'t a receipt or was' : 'weren\'t receipts or were'} already saved.` : '',
             ].filter(Boolean).join(' ')}
           </p>

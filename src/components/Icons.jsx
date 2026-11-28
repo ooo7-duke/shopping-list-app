@@ -17,6 +17,7 @@ export const CameraIcon = I(<><path d="M4 8h3l2-3h6l2 3h3v11H4z" /><circle cx="1
 export const CloseIcon = I(<path d="M6 6l12 12M18 6L6 18" />);
 export const CheckIcon = I(<path d="M5 12l5 5 9-10" />);
 export const TruckIcon = I(<><path d="M3 6h11v10H3zM14 10h4l3 3v3h-7" /><circle cx="7" cy="18" r="1.8" /><circle cx="17" cy="18" r="1.8" /></>);
+export const BriefcaseIcon = I(<><rect x="3" y="7" width="18" height="13" rx="2" /><path d="M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2M3 13h18" /></>);
 export const DownloadIcon = I(<><path d="M12 4v11M7 10l5 5 5-5M5 20h14" /></>);
 export const LogoMark = (props) => (
   <svg viewBox="0 0 48 48" aria-hidden="true" {...props}>
