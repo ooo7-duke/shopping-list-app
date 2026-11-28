@@ -75,6 +75,13 @@ service cloud.firestore {
       }
     }
 
+    // Travel expense reports: private to the one person who made them. Nobody else, not even
+    // the other people on a shared list, can read or change them.
+    match /users/{uid}/{coll}/{id} {
+      allow read, write: if signedIn() && request.auth.uid == uid
+        && coll in ['expenseTrips', 'expenses', 'expenseImages'];
+    }
+
     match /invites/{inviteId} {
       allow read: if signedIn() && (resource.data.email == myEmail() || resource.data.invitedByUid == request.auth.uid);
       allow create: if signedIn()

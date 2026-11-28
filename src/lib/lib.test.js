@@ -639,3 +639,73 @@ describe('AI retries', async () => {
     expect(isModelMissing({ customErrorData: { status: 404 } })).toBe(true);
   });
 });
+
+import { tripDays, perDiemDays, businessAmount, expenseFlags, tripTotals, expensesCSV, emailTrip, normalizeRead, fromDayKey } from './expenses.js';
+describe('expense reports', () => {
+  const d = (s) => fromDayKey(s);
+  const trip = { id: 't1', name: 'CES 2027', location: 'Las Vegas, NV', startDate: d('2027-01-05'), endDate: d('2027-01-09'), mealsMode: 'actual' };
+
+  it('lists every day of the trip, first to last', () => {
+    expect(tripDays(trip)).toEqual(['2027-01-05', '2027-01-06', '2027-01-07', '2027-01-08', '2027-01-09']);
+  });
+
+  it('gives 75% per diem on the first and last day and takes off provided meals', () => {
+    const days = perDiemDays({ ...trip, mealsMode: 'perDiem', mieRate: 92, mealsProvided: { '2027-01-07': ['lunch'] } });
+    expect(days.map((x) => x.amount)).toEqual([69, 92, 66, 92, 69]);
+  });
+
+  it('claims only the business nights of a hotel stay', () => {
+    const nights = [1, 2, 3, 4, 5].map((i) => ({ date: d(`2027-01-0${i + 4}`), amount: 200, personal: i === 5 }));
+    expect(businessAmount({ amount: 1000, nights })).toBe(800);
+    expect(businessAmount({ amount: 50, business: 20 })).toBe(20);
+    expect(businessAmount({ amount: 50 })).toBe(50);
+  });
+
+  it('flags a missing receipt, a duplicate and a date outside the trip', () => {
+    const a = { id: 'a', tripId: 't1', category: 'dinner', merchant: 'Lotus of Siam', date: d('2027-01-06'), amount: 80, imageIds: ['x'] };
+    const b = { ...a, id: 'b', imageIds: [] };
+    const late = { id: 'c', tripId: 't1', category: 'ground', merchant: 'Uber', date: d('2027-01-12'), amount: 20, imageIds: ['y'] };
+    const early = { id: 'e', tripId: 't1', category: 'airfare', merchant: 'Delta', date: d('2026-12-01'), amount: 400, imageIds: ['z'] };
+    const codes = (e) => expenseFlags(e, [a, b, late, early], trip).map((f) => f.code);
+    expect(codes(b)).toEqual(['receipt', 'duplicate']);
+    expect(codes(late)).toEqual(['dates']);
+    expect(codes(early)).toEqual([]); // airfare is booked ahead
+    expect(expenseFlags({ ...b, amount: 12, merchant: 'Cafe' }, [], trip)[0]).toMatchObject({ code: 'receipt', level: 'info' });
+  });
+
+  it('works out what is owed, keeping company card charges out of it', () => {
+    const list = [
+      { id: '1', category: 'lodging', amount: 1000, nights: [{ amount: 800 }, { amount: 200, personal: true }] },
+      { id: '2', category: 'airfare', amount: 400, paidWith: 'corporate' },
+      { id: '3', category: 'dinner', amount: 50 },
+    ];
+    const t = tripTotals(trip, list);
+    expect(t).toMatchObject({ spent: 1450, business: 1250, personal: 200, companyCard: 400, owedToYou: 850 });
+    const pd = tripTotals({ ...trip, mealsMode: 'perDiem', mieRate: 68 }, list);
+    expect(pd.perDiem).toBe(51 + 68 * 3 + 51);
+    expect(pd.owedToYou).toBe(800 + 306);
+  });
+
+  it('writes a CSV that a spreadsheet will not run as a formula', () => {
+    const csv = expensesCSV(trip, [{ id: '1', category: 'supplies', merchant: '=HYPERLINK("x")', date: d('2027-01-04'), amount: 86.4, notes: 'Brochures, sell sheets' }]);
+    expect(csv).toContain(`"'=HYPERLINK(""x"")"`);
+    expect(csv).toContain('"Brochures, sell sheets"');
+    expect(csv).toContain('Owed to you,86.40');
+  });
+
+  it('routes a hotel email in the trip window to the trip, and leaves a grocery order alone', () => {
+    const hotel = { id: 'h', from: 'Wynn <folio@wynnlasvegas.com>', subject: 'Your hotel folio', date: d('2027-01-09') };
+    const grocery = { id: 'g', from: 'Target <orders@target.com>', subject: 'Your Target order', date: d('2026-12-10') };
+    const flight = { id: 'f', from: 'Delta <delta@delta.com>', subject: 'Your eTicket itinerary', date: d('2026-11-20') };
+    expect(emailTrip(hotel, [trip], [])?.id).toBe('t1');
+    expect(emailTrip(grocery, [trip], [])).toBeNull();
+    expect(emailTrip(flight, [trip], [])?.id).toBe('t1');
+    expect(emailTrip(hotel, [{ ...trip, status: 'submitted' }], [])).toBeNull();
+  });
+
+  it('leaves the dollar amount blank for a receipt in another currency', () => {
+    const r = normalizeRead({ merchant: 'Tim Hortons', category: 'breakfast', total: 12.5, currency: 'cad', date: '2027-01-06', time: '7:45' });
+    expect(r).toMatchObject({ amount: null, originalAmount: 12.5, originalCurrency: 'CAD', time: '07:45', category: 'breakfast' });
+    expect(normalizeRead({ category: 'nonsense' }).category).toBe('other');
+  });
+});
