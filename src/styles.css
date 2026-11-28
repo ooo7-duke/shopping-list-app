@@ -233,6 +233,10 @@ label.field > span { display: block; font-size: 0.85rem; color: var(--muted); ma
 .drop-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 8px; }
 .drop-actions .btn { position: relative; cursor: pointer; min-width: 140px; }
 .drop-actions .btn.is-disabled { opacity: 0.55; cursor: progress; pointer-events: none; }
+label.btn, label.chip { position: relative; cursor: pointer; }
+label.btn.is-disabled { opacity: 0.55; cursor: progress; pointer-events: none; }
+.photo-choices { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.photo-choices .chip { min-height: 40px; padding: 6px 14px; display: inline-flex; align-items: center; }
 .drop.over { background: var(--gold-soft); border-color: var(--gold-ink); }
 .drop svg { width: 40px; height: 40px; color: var(--bb); }
 .rline { display: grid; grid-template-columns: 1fr auto; gap: 6px 10px; padding: 12px 0; border-top: 1px solid var(--line-soft); }
