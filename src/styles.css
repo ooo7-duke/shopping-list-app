@@ -74,6 +74,8 @@ main.wide { max-width: 1240px; }
 .menu-btn .badge, .menu .badge { background: var(--gold); color: var(--on-gold); font-size: 0.7rem; min-width: 18px; height: 18px; border-radius: 9px; display: grid; place-items: center; padding: 0 5px; font-weight: 700; }
 .menu-btn .badge { position: absolute; top: 2px; right: 0; }
 .topbar .acct .page-name { color: var(--muted); font-size: 1rem; white-space: nowrap; flex: none; }
+/* On a phone the list name needs the room. Every tab but the list has its own heading, so the tab name can go. */
+@media (max-width: 480px) { .topbar .acct .page-name.has-heading { display: none; } }
 .menu-scrim { position: fixed; inset: 0; z-index: 40; background: rgba(20, 28, 64, 0.35); animation: fade 0.15s; }
 .menu {
   position: fixed; top: 0; left: 0; bottom: 0; z-index: 41; transform: translateX(-100%); visibility: hidden; transition: transform 0.18s ease, visibility 0.18s; width: min(280px, 82vw); background: var(--card);
@@ -122,6 +124,8 @@ label.field > span { display: block; font-size: 0.85rem; color: var(--muted); ma
 }
 .input:focus { outline: none; border-color: var(--bb); box-shadow: 0 0 0 3px color-mix(in srgb, var(--gold) 55%, transparent); }
 .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
+/* Grid cells may shrink below their content, so a wide table or picture can't spill into the next cell. */
+.grid2 > * { min-width: 0; }
 
 /* ---------- quick add ---------- */
 .quickadd { position: sticky; top: var(--top-h, 64px); z-index: 15; background: var(--cream); padding: 4px 0 10px; margin: -4px 0 4px; }
@@ -162,6 +166,10 @@ label.field > span { display: block; font-size: 0.85rem; color: var(--muted); ma
 .item .name { font-weight: 600; }
 .item .meta { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; font-size: 0.85rem; color: var(--muted); margin-top: 2px; }
 .item .price { font-weight: 700; color: var(--bb); text-align: right; white-space: nowrap; }
+/* The name column always keeps room to read, and long words wrap instead of running under the price. */
+.item > .grow { min-width: min(40%, 150px); overflow-wrap: anywhere; }
+@media (max-width: 480px) { .item { gap: 8px; } }
+.item > .price { flex: 0 1 auto; min-width: 0; white-space: normal; overflow-wrap: anywhere; }
 .item .price small { display: block; font-weight: 400; color: var(--muted); font-size: 0.75rem; }
 .item.done .name { text-decoration: line-through; color: var(--muted); font-weight: 500; }
 .item .hover-actions { display: none; gap: 2px; }
@@ -266,6 +274,11 @@ table.data { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
 table.data th, table.data td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--line-soft); white-space: nowrap; }
 table.data th { color: var(--muted); font-weight: 600; cursor: pointer; position: sticky; top: 0; background: var(--card); }
 table.data td.num, table.data th.num { text-align: right; }
+/* On a phone the first column wraps and cells pack closer, so every column fits without scrolling sideways. */
+@media (max-width: 480px) {
+  table.data th, table.data td { padding: 8px 6px; }
+  table.data td:first-child, table.data th:first-child { white-space: normal; overflow-wrap: anywhere; }
+}
 
 /* ---------- sign in ---------- */
 .signin { min-height: 100dvh; display: grid; place-items: center; padding: 24px; }
@@ -327,6 +340,10 @@ table.data td.num, table.data th.num { text-align: right; }
 .photo-box .row { display: flex; flex-wrap: wrap; gap: 8px; }
 .photo-view { position: fixed; inset: 0; z-index: 1000; background: rgba(12, 18, 40, 0.92); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 16px; cursor: zoom-out; }
 .photo-view img { max-width: 100%; max-height: 78vh; border-radius: 12px; background: #fff; }
+/* Receipt sheet: names wrap so every price stays in view; the photo sits below, small, and opens full screen. */
+.receipt-lines td:first-child { white-space: normal; overflow-wrap: anywhere; }
+.receipt-thumb { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin-top: 12px; padding: 0; border: 0; background: none; color: var(--bb); font: inherit; cursor: zoom-in; text-decoration: underline; }
+.receipt-thumb img { display: block; max-width: min(100%, 220px); max-height: 240px; object-fit: contain; border-radius: 10px; border: 1px solid var(--line); background: #fff; }
 .photo-cap { color: #fffbee; text-align: center; font-weight: 600; }
 
 .invite-banner { margin: 4px 0 14px; padding: 12px 14px; background: var(--card); border: 2px solid var(--bb); border-radius: 14px; }

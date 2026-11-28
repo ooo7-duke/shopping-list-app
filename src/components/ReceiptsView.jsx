@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useApp } from '../AppContext.jsx';
 import Sheet from './Sheet.jsx';
 import { compressImage, extractReceipt, isImageFile, toReadableImage } from '../lib/receipts.js';
@@ -242,23 +243,36 @@ function ReceiptReview({ data, onClose, onSaved }) {
 function ReceiptDetail({ receipt, onClose, onDelete }) {
   const { backend, ctx, purchases } = useApp();
   const [img, setImg] = useState(null);
+  const [zoom, setZoom] = useState(false);
   const [confirm, setConfirm] = useState(false);
   const lines = purchases.filter((p) => p.receiptId === receipt.id);
   useEffect(() => {
     if (receipt.hasImage) backend.getDocData(ctx.accountId, 'receiptImages', receipt.id).then((d) => setImg(d?.dataUrl || null));
   }, [receipt.id]);
+  // The lines come first and use the full width, so names and prices are never covered.
+  // The photo sits below as a small picture that opens full screen.
   return (
     <Sheet title={`${receipt.store || 'Receipt'} · ${fmtDate(receipt.date, { withYear: true })}`} onClose={onClose} wide>
-      <div className="grid2" style={{ alignItems: 'start' }}>
-        <table className="data">
-          <tbody>
-            {lines.map((p) => <tr key={p.id}><td className="ellipsis" style={{ maxWidth: 220 }}>{p.name}</td><td className="num">{p.qty}</td><td className="num">{fmtMoney(p.total)}</td></tr>)}
-            <tr><td><strong>Total</strong></td><td /><td className="num"><strong>{fmtMoney(receipt.total)}</strong></td></tr>
-          </tbody>
-        </table>
-        {receipt.qrUrl && <p className="small">QR code on the receipt: <a href={receipt.qrUrl} target="_blank" rel="noopener noreferrer">open on {qrHost(receipt.qrUrl)} ↗</a></p>}
-        {img && <img src={img} alt={`Receipt from ${receipt.store}`} style={{ width: '100%', borderRadius: 10, border: '1px solid var(--line)' }} />}
-      </div>
+      <table className="data receipt-lines">
+        <tbody>
+          {lines.map((p) => <tr key={p.id}><td>{p.name}</td><td className="num">{p.qty}</td><td className="num">{fmtMoney(p.total)}</td></tr>)}
+          <tr><td><strong>Total</strong></td><td /><td className="num"><strong>{fmtMoney(receipt.total)}</strong></td></tr>
+        </tbody>
+      </table>
+      {receipt.qrUrl && <p className="small" style={{ marginTop: 10 }}>QR code on the receipt: <a href={receipt.qrUrl} target="_blank" rel="noopener noreferrer">open on {qrHost(receipt.qrUrl)} ↗</a></p>}
+      {img && (
+        <button type="button" className="receipt-thumb" onClick={() => setZoom(true)} aria-label={`See the full photo of the receipt from ${receipt.store || 'the store'}`}>
+          <img src={img} alt="" />
+          <span className="small">Tap to see the full receipt</span>
+        </button>
+      )}
+      {zoom && img && createPortal(
+        <div className="photo-view" role="dialog" aria-label={`Receipt from ${receipt.store || 'the store'}`} onClick={() => setZoom(false)}>
+          <img src={img} alt={`Receipt from ${receipt.store || 'the store'}`} />
+          <div className="photo-cap"><span className="small">Tap anywhere to close</span></div>
+        </div>,
+        document.body,
+      )}
       <button type="button" className="btn danger block" style={{ marginTop: 14 }} onClick={() => (confirm ? onDelete() : setConfirm(true))}>{confirm ? 'Tap again to delete the receipt and its purchases' : 'Delete receipt'}</button>
     </Sheet>
   );
