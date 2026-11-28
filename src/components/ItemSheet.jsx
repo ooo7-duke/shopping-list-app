@@ -167,9 +167,8 @@ export default function ItemSheet({ item, focus, onClose }) {
               </label>
             </div>
             <div className="field photo-field">
-              <span className="small muted" style={{ display: 'block', marginBottom: 4 }}>Photo of the right item</span>
               {item.photo && <div className="photo-box"><img src={item.photo} alt={`The ${item.name} to buy`} /></div>}
-              {!item.photo && <p className="small muted" style={{ margin: '0 0 6px' }}>{photoBusy ? 'Saving the photo…' : 'Add a photo so the wrong one isn\'t bought.'}</p>}
+              {photoBusy && <p className="small muted" style={{ margin: '0 0 6px' }}>Saving the photo…</p>}
               {/* Two inputs: "capture" opens the camera straight away on phones but hides saved photos. */}
               <div className="row" style={{ flexWrap: 'wrap', gap: 8 }}>
                 <label className={`btn${photoBusy ? ' is-disabled' : ''}`}>{item.photo ? 'Retake photo' : 'Take photo'}
