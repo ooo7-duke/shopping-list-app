@@ -39,7 +39,7 @@ function save() {
 }
 function uid() { return Math.random().toString(36).slice(2, 11); }
 
-const SAMPLE_TRIPS = 3;
+const SAMPLE_TRIPS = 4;
 const DEMO_USER = { uid: 'demo-user', name: 'Demo user', email: 'demo@example.com', photo: '' };
 state.invites ||= {};
 addSampleInvite();

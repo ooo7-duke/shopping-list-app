@@ -640,7 +640,7 @@ describe('AI retries', async () => {
   });
 });
 
-import { tripDays, perDiemDays, businessAmount, expenseFlags, tripTotals, expensesCSV, emailTrip, normalizeRead, fromDayKey, autoCaption, captionFor, expenseWorkbook } from './expenses.js';
+import { tripDays, perDiemDays, businessAmount, expenseFlags, tripTotals, expensesCSV, emailTrip, normalizeRead, fromDayKey, autoCaption, captionFor, expenseWorkbook, paidWithLabel, paidWithId } from './expenses.js';
 import { xlsxBytes, colName } from './xlsx.js';
 describe('expense reports', () => {
   const d = (s) => fromDayKey(s);
@@ -674,17 +674,23 @@ describe('expense reports', () => {
     expect(expenseFlags({ ...b, amount: 12, merchant: 'Cafe' }, [], trip)[0]).toMatchObject({ code: 'receipt', level: 'info' });
   });
 
-  it('works out what is owed, keeping company card charges out of it', () => {
+  it('works out what is owed: every business dollar, however it was paid', () => {
     const list = [
       { id: '1', category: 'lodging', amount: 1000, nights: [{ amount: 800 }, { amount: 200, personal: true }] },
-      { id: '2', category: 'airfare', amount: 400, paidWith: 'corporate' },
+      { id: '2', category: 'airfare', amount: 400, paidWith: 'cash' },
       { id: '3', category: 'dinner', amount: 50 },
     ];
     const t = tripTotals(trip, list);
-    expect(t).toMatchObject({ spent: 1450, business: 1250, personal: 200, companyCard: 400, owedToYou: 850 });
+    expect(t).toMatchObject({ spent: 1450, business: 1250, personal: 200, owedToYou: 1250 });
+    expect(t).not.toHaveProperty('companyCard');
     const pd = tripTotals({ ...trip, mealsMode: 'perDiem', mieRate: 68 }, list);
     expect(pd.perDiem).toBe(51 + 68 * 3 + 51);
-    expect(pd.owedToYou).toBe(800 + 306);
+    expect(pd.owedToYou).toBe(800 + 400 + 306);
+  });
+
+  it('names how an expense was paid, reading old company card entries as Other', () => {
+    expect(['personal', 'cash', 'other', 'corporate', undefined].map(paidWithLabel)).toEqual(['Personal card', 'Cash', 'Other', 'Other', 'Personal card']);
+    expect(paidWithId('corporate')).toBe('other');
   });
 
   it('writes a CSV that a spreadsheet will not run as a formula', () => {

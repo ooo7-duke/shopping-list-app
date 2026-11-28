@@ -121,27 +121,36 @@ export function expenseFlags(e, all = [], trip = null) {
   return flags;
 }
 
-// Totals for the report. "Owed to you" is the business part of what you paid yourself, plus
-// any per diem; business charges on a company card are reported but not owed to you.
+// How an expense was paid. There is no company card, so everything claimed is owed to you;
+// this only helps match a receipt to a card statement. Older entries saved as 'corporate'
+// read as Other.
+export const PAID_WITH = [
+  { id: 'personal', label: 'Personal card' },
+  { id: 'cash', label: 'Cash' },
+  { id: 'other', label: 'Other' },
+];
+export const paidWithId = (v) => (PAID_WITH.some((p) => p.id === v) ? v : v ? 'other' : 'personal');
+export const paidWithLabel = (v) => PAID_WITH.find((p) => p.id === paidWithId(v)).label;
+
+// Totals for the report. "Owed to you" is the business part of every expense, plus any per diem.
 export function tripTotals(trip, expenses) {
   const perDiem = trip?.mealsMode === 'perDiem' ? perDiemDays(trip) : [];
   const perDiemTotal = round2(perDiem.reduce((s, d) => s + d.amount, 0));
   const cats = {};
-  let spent = 0; let business = 0; let owed = 0; let company = 0;
+  let spent = 0; let business = 0;
   for (const e of expenses) {
     const amt = round2(e.amount);
     const biz = trip?.mealsMode === 'perDiem' && isMeal(e.category) ? 0 : businessAmount(e);
     spent += amt;
     business += biz;
-    if (e.paidWith === 'corporate') company += amt; else owed += biz;
     const c = (cats[e.category || 'other'] ||= { id: e.category || 'other', label: categoryLabel(e.category), spent: 0, business: 0, count: 0 });
     c.spent += amt; c.business += biz; c.count++;
   }
   const byCategory = EXPENSE_CATEGORIES.filter((c) => cats[c.id]).map((c) => ({ ...cats[c.id], spent: round2(cats[c.id].spent), business: round2(cats[c.id].business) }));
   return {
     spent: round2(spent), business: round2(business), personal: round2(spent - business),
-    companyCard: round2(company), perDiem: perDiemTotal, perDiemDays: perDiem,
-    owedToYou: round2(owed + perDiemTotal), byCategory,
+    perDiem: perDiemTotal, perDiemDays: perDiem,
+    owedToYou: round2(business + perDiemTotal), byCategory,
   };
 }
 
@@ -170,7 +179,7 @@ export function expensesCSV(trip, expenses) {
     rows.push([
       usDate(e.date), e.time || '', categoryLabel(e.category), e.merchant || '', round2(e.amount).toFixed(2),
       e.originalCurrency && e.originalCurrency !== 'USD' ? `${e.originalAmount ?? ''} ${e.originalCurrency}` : '',
-      e.paidWith === 'corporate' ? 'Company card' : 'Personal', biz.toFixed(2), round2((Number(e.amount) || 0) - biz).toFixed(2),
+      paidWithLabel(e.paidWith), biz.toFixed(2), round2((Number(e.amount) || 0) - biz).toFixed(2),
       hasReceipt(e) ? 'Yes' : 'No', expenseFlags(e, expenses, trip).filter((f) => f.code !== 'perdiem').map((f) => f.label).join('; '), e.notes || '',
     ]);
   }
@@ -180,7 +189,7 @@ export function expensesCSV(trip, expenses) {
     for (const d of t.perDiemDays) rows.push([usDate(fromDayKey(d.day)), d.base.toFixed(2), d.provided.join(' ') || '', d.amount.toFixed(2)]);
   }
   rows.push([], ['Total spent', t.spent.toFixed(2)], ['Business (claimed)', t.business.toFixed(2)], ['Personal', t.personal.toFixed(2)],
-    ['Paid on company card', t.companyCard.toFixed(2)], ['Per diem', t.perDiem.toFixed(2)], ['Owed to you', t.owedToYou.toFixed(2)]);
+    ['Per diem', t.perDiem.toFixed(2)], ['Owed to you', t.owedToYou.toFixed(2)]);
   return rows.map((r) => r.map(csvCell).join(',')).join('\r\n');
 }
 
@@ -345,7 +354,7 @@ export function expenseWorkbook(trip, expenses) {
     rows.push([
       D(e.date), S(e.time || ''), S(categoryLabel(e.category)), S(e.merchant || ''),
       S(photos ? captionFor(e, e.imageIds[0]) : ''), M(amt), M(biz), M(amt - biz),
-      S(e.paidWith === 'corporate' ? 'Company card' : 'Personal'), S(photos ? 'Photo' : e.emailId ? 'Emailed' : 'Missing'),
+      S(paidWithLabel(e.paidWith)), S(photos ? 'Photo' : e.emailId ? 'Emailed' : 'Missing'),
       S(expenseFlags(e, expenses, trip).filter((f) => f.code !== 'perdiem').map((f) => f.label).join('; ')), S(e.notes || ''),
     ]);
   }
@@ -362,7 +371,7 @@ export function expenseWorkbook(trip, expenses) {
   ];
   if (t.perDiem > 0) summary.push([S('Meals per diem'), S(''), M(t.perDiem)]);
   summary.push([B('Total'), M(t.spent, 'moneyBold'), M(t.business + t.perDiem, 'moneyBold')], [],
-    [S('Personal, not claimed'), S(''), M(t.personal)], [S('Paid on a company card'), S(''), M(t.companyCard)],
+    [S('Personal, not claimed'), S(''), M(t.personal)],
     [B('Owed to you'), S(''), M(t.owedToYou, 'moneyBold')]);
 
   const sheets = [

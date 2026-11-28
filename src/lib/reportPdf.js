@@ -2,7 +2,7 @@
 // shared from the phone's share sheet, emailed or saved. jsPDF is loaded only when a report
 // is made, so it doesn't slow down the rest of the app.
 import {
-  tripTotals, sortExpenses, categoryLabel, isMeal, businessAmount, expenseFlags, hasReceipt, tripPhotos,
+  tripTotals, sortExpenses, categoryLabel, paidWithLabel, isMeal, businessAmount, expenseFlags, hasReceipt, tripPhotos,
 } from './expenses.js';
 import { fmtMoney, fmtDate } from './format.js';
 
@@ -98,7 +98,6 @@ export async function buildReportPdf({ trip, expenses, userName = '', loadPhoto,
   rule(y - 9); sumRow('Total', t.spent, t.business + t.perDiem, true);
   y += 4;
   sumRow('Personal, not claimed', null, t.personal);
-  sumRow('Paid on a company card', null, t.companyCard);
   sumRow('Owed to the employee', null, t.owedToYou, true);
   y += 10;
 
@@ -125,7 +124,7 @@ export async function buildReportPdf({ trip, expenses, userName = '', loadPhoto,
       date: `${e.date ? fmtDate(e.date, { withYear: true }) : ''}${e.time ? `\n${fmtTime(e.time)}` : ''}`,
       cat: categoryLabel(e.category),
       merchant: `${e.merchant || ''}${hasReceipt(e) ? '' : '\n(no receipt)'}`,
-      paid: e.paidWith === 'corporate' ? 'Company card' : 'Personal',
+      paid: paidWithLabel(e.paidWith),
       amount: fmtMoney(e.amount), claimed: fmtMoney(biz),
       notes: [e.notes, personalNights.length ? `Personal nights, not claimed: ${personalNights.join(', ')}` : '', ...flags]
         .map((s) => String(s || '').trim().replace(/[.\s]+$/, '')).filter(Boolean).map((s) => `${s}.`).join(' '),

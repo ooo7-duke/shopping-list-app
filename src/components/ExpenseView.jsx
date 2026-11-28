@@ -7,6 +7,7 @@ import {
   EXPENSE_CATEGORIES, categoryLabel, isMeal, tripDays, perDiemDays, businessAmount, expenseFlags, tripTotals,
   sortExpenses, dayKey, fromDayKey, extractExpense, extractExpenseText, emailTrip, notTravelIds, markNotTravel,
   demoTravelInbox, GSA_MIE, hasReceipt, tripPhotos, autoCaption, expenseWorkbook, expensesCSV,
+  PAID_WITH, paidWithId, paidWithLabel,
 } from '../lib/expenses.js';
 import { xlsxBytes } from '../lib/xlsx.js';
 import { buildReportPdf } from '../lib/reportPdf.js';
@@ -253,7 +254,6 @@ function TripDetail({ trip, expenses, onBack, onEdit, onDeleted }) {
         <div className="kpi"><div className="v">{fmtMoney(totals.owedToYou)}</div><div className="l">Owed to you</div></div>
         <div className="kpi"><div className="v">{fmtMoney(totals.business)}</div><div className="l">Business, claimed</div></div>
         <div className="kpi"><div className="v">{fmtMoney(totals.personal)}</div><div className="l">Personal, not claimed</div></div>
-        <div className="kpi"><div className="v">{fmtMoney(totals.companyCard)}</div><div className="l">On a company card</div></div>
       </div>
 
       <div
@@ -333,7 +333,7 @@ function ExpenseRow({ e, all, trip, onOpen }) {
         <div className="meta">
           <span>{categoryLabel(e.category)}</span>
           {e.time && <span>{fmtTime(e.time)}</span>}
-          {e.paidWith === 'corporate' && <span>Company card</span>}
+          {paidWithId(e.paidWith) !== 'personal' && <span>{paidWithLabel(e.paidWith)}</span>}
           {hasReceipt(e) && <span>{e.emailId ? 'Emailed receipt' : `${e.imageIds.length} photo${e.imageIds.length === 1 ? '' : 's'}`}</span>}
           {flags.map((f) => <span key={f.code} className={`chip ${f.level === 'warn' ? 'warn' : ''}`}>{f.label}</span>)}
         </div>
@@ -474,8 +474,9 @@ function ExpenseSheet({ initial, trip, all, onClose, onSaved }) {
         <div>
           <div className="small muted" style={{ marginBottom: 4 }}>Paid with</div>
           <div className="seg" role="group" aria-label="Paid with">
-            <button type="button" aria-pressed={f.paidWith !== 'corporate'} onClick={() => set({ paidWith: 'personal' })}>My own card or cash</button>
-            <button type="button" aria-pressed={f.paidWith === 'corporate'} onClick={() => set({ paidWith: 'corporate' })}>Company card</button>
+            {PAID_WITH.map((p) => (
+              <button key={p.id} type="button" aria-pressed={paidWithId(f.paidWith) === p.id} onClick={() => set({ paidWith: p.id })}>{p.label}</button>
+            ))}
           </div>
         </div>
 
@@ -722,7 +723,7 @@ function SendReport({ trip, expenses, totals }) {
   }
 
   const subject = `Expense report: ${trip.name} (${fmtRange(trip.startDate, trip.endDate)})`;
-  const body = `Attached is my expense report for ${trip.name}, ${trip.location}, ${fmtRange(trip.startDate, trip.endDate)}.\n\nTotal claimed: ${fmtMoney(totals.business + totals.perDiem)}\nOwed to me: ${fmtMoney(totals.owedToYou)}\nPaid on the company card: ${fmtMoney(totals.companyCard)}\n\nThe PDF has every expense and receipt; the Excel file has the same lines.`;
+  const body = `Attached is my expense report for ${trip.name}, ${trip.location}, ${fmtRange(trip.startDate, trip.endDate)}.\n\nTotal claimed: ${fmtMoney(totals.business + totals.perDiem)}\nOwed to me: ${fmtMoney(totals.owedToYou)}\n\nThe PDF has every expense and receipt; the Excel file has the same lines.`;
 
   async function share() {
     const both = [files.pdf, files.xlsx];

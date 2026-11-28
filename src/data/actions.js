@@ -4,6 +4,7 @@ import { normalizeName } from '../lib/parse.js';
 import { guessCategory, HOUSEHOLD_CATEGORIES } from '../lib/categories.js';
 import { DAY } from '../lib/predict.js';
 import { fetchQuotes, hasPriceProvider, mergeQuotes } from '../lib/prices.js';
+import { paidWithId } from '../lib/expenses.js';
 
 const clean = (o) => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined));
 
@@ -279,7 +280,7 @@ export async function saveExpense(ctx, expense, { newImages = [], removedImageId
   const nights = (expense.nights || []).map((n) => ({ date: n.date, amount: num(n.amount) ?? 0, personal: !!n.personal }));
   const data = pick({
     ...expense, amount: num(expense.amount), originalAmount: num(expense.originalAmount), business: expense.business === '' || expense.business == null ? null : num(expense.business),
-    nights, paidWith: expense.paidWith || 'personal', imageIds: [...kept, ...added], currency: 'USD',
+    nights, paidWith: paidWithId(expense.paidWith), imageIds: [...kept, ...added], currency: 'USD',
     captions: Object.fromEntries(Object.entries(expense.captions || {}).filter(([k, v]) => kept.includes(k) && v)),
   }, EXPENSE_FIELDS);
   const ops = [expense.id
