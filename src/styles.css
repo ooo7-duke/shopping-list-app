@@ -280,7 +280,8 @@ label.btn.is-disabled { opacity: 0.55; cursor: progress; pointer-events: none; }
 }
 
 /* ---------- insights ---------- */
-.filters { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+/* Each filter needs about 200px (more with large text) so a Min and Max pair still shows its words. */
+.filters { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr)); }
 .kpis { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 160px), 1fr)); margin: 14px 0; }
 .kpi { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; }
 .kpi .v { font-size: 1.45rem; font-weight: 800; color: var(--bb); }
