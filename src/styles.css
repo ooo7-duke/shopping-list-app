@@ -41,6 +41,8 @@ a { color: var(--bb); }
 .tiny { font-size: 0.8rem; }
 .row { display: flex; align-items: center; gap: 10px; }
 .wrap { flex-wrap: wrap; }
+/* A paragraph beside a button keeps a readable width; on a phone the button drops below it. */
+.row.wrap > p.grow { flex: 1 1 220px; }
 .grow { flex: 1; min-width: 0; }
 .stack > * + * { margin-top: 12px; }
 .ellipsis { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -474,3 +476,20 @@ table.data td.num, table.data th.num { text-align: right; }
 .card.selected { background: var(--bb-soft); border-color: var(--bb); }
 .xfolder .check.pick { margin: -6px 0 -6px -6px; }
 .clear-row .pick-head { margin-left: auto; }
+
+/* Insights purchases on a phone: each purchase is a small block (item and cost on top, date and
+   quantity under them, store last) so the cost is never pushed off the side. */
+@media (max-width: 480px) {
+  .purchases-table, .purchases-table thead, .purchases-table tbody { display: block; }
+  .purchases-table thead { position: sticky; top: 0; z-index: 1; background: var(--card); border-bottom: 1px solid var(--line-soft); }
+  .purchases-table thead tr { display: flex; flex-wrap: wrap; gap: 2px 4px; }
+  table.data.purchases-table th { position: static; border: 0; padding: 6px 8px; }
+  .purchases-table th:nth-child(3), .purchases-table td:nth-child(3) { display: none; }
+  .purchases-table tbody tr { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 12px; row-gap: 2px; padding: 9px 4px; border-bottom: 1px solid var(--line-soft); }
+  table.data.purchases-table td { border: 0; padding: 0; white-space: normal; overflow-wrap: anywhere; }
+  .purchases-table td:nth-child(2) { grid-area: 1 / 1; font-weight: 600; }
+  .purchases-table td:nth-child(6) { grid-area: 1 / 2; }
+  .purchases-table td:nth-child(1) { grid-area: 2 / 1; color: var(--muted); font-size: 0.85rem; }
+  .purchases-table td:nth-child(5) { grid-area: 2 / 2; color: var(--muted); font-size: 0.85rem; }
+  .purchases-table td:nth-child(4) { grid-area: 3 / 1 / 3 / 3; color: var(--muted); font-size: 0.85rem; }
+}
