@@ -6,6 +6,7 @@ import { fmtMoney, fmtQty, fmtDate } from '../lib/format.js';
 import { seenPrices, refurbPrice } from '../lib/prices.js';
 import { deptOf } from '../lib/tripPlan.js';
 import { ClockIcon, TrashIcon } from './Icons.jsx';
+import FitText from './FitText.jsx';
 
 export default function ItemRow({ item, pred, done, last, showHistory = false, onPrices, showStore = true, showCategory = false, onToggle, onOpen, onSnooze, onRemove, onDelete, readOnly, extra, onLongPress, selecting = false, selected = false }) {
   const [viewing, setViewing] = useState(false);
@@ -45,8 +46,8 @@ export default function ItemRow({ item, pred, done, last, showHistory = false, o
           <img src={item.photo} alt="" />
         </button>
       )}
-      <div className="grow">
-        <div className="name ellipsis">{item.name}{qty && <span className="muted" style={{ fontWeight: 400 }}> · {qty}</span>}</div>
+      <div className="grow" style={{ minWidth: 0 }}>
+        <FitText className="name">{item.name}{qty && <span className="muted" style={{ fontWeight: 400 }}> · {qty}</span>}</FitText>
         <div className="meta">
           {item.urgent && !done && <span className="chip warn">Needed now</span>}
           {item.status === 'ordered' && <span className="chip blue">Ordered</span>}

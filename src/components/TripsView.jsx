@@ -9,6 +9,7 @@ import { fmtMoney, fmtDate, fmtQty, firstName } from '../lib/format.js';
 import { can } from '../lib/config.js';
 import { CartIcon, TruckIcon } from './Icons.jsx';
 import { planTrips, carries, storeLabel, storeType, rememberStoreKinds, guessStoreType, COMMON_STORES } from '../lib/tripPlan.js';
+import FitText from './FitText.jsx';
 
 export default function TripsView() {
   const { ctx, items, batches, predictions, account, role, showToast } = useApp();
@@ -217,7 +218,7 @@ export default function TripsView() {
           <div className="list">
             {done.map((b) => (
               <div key={b.id} className="item" style={{ cursor: 'default' }}>
-                <div className="grow"><div className="name">{b.name}</div><div className="meta">{b.itemIds?.length || 0} items · arrived {fmtDate(b.arrivedAt, { withYear: true })}</div></div>
+                <div className="grow" style={{ minWidth: 0 }}><FitText className="name">{b.name}</FitText><FitText className="meta-line">{b.itemIds?.length || 0} items · arrived {fmtDate(b.arrivedAt, { withYear: true })}</FitText></div>
                 {b.estTotal ? <div className="price">{fmtMoney(b.estTotal)}</div> : null}
               </div>
             ))}

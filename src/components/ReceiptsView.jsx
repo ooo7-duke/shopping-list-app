@@ -16,6 +16,7 @@ import { fetchInbox, ackInbox, cachedRead, cacheRead, dropRead } from '../lib/em
 import { planLines, alreadySaved, INBOX_ADDRESS } from '../lib/inbox.js';
 import { HOUSEHOLD_CATEGORIES, householdCategories, isHouseholdList, foldCategory } from '../lib/categories.js';
 import { emailTrip, notTravelIds } from '../lib/expenses.js';
+import FitText from './FitText.jsx';
 
 export default function ReceiptsView() {
   const { ctx, items, receipts, purchases, backend, showToast } = useApp();
@@ -392,8 +393,8 @@ function EmailedReceipts() {
         )}
         {waiting.map(([id, v]) => (
           <div key={id} className="email-row">
-            <div className="grow">
-              <div className="name">{v.res?.store || storeFromSubject(v.m?.subject) || 'Emailed receipt'}</div>
+            <div className="grow" style={{ minWidth: 0 }}>
+              <FitText className="name">{v.res?.store || storeFromSubject(v.m?.subject) || 'Emailed receipt'}</FitText>
               <div className="meta">
                 {v.status === 'reading' ? 'Reading…' : v.status === 'error' ? `Couldn't read it. ${v.error}` : `${plural(v.plan.lines.length, 'item')} · ${v.plan.weak} best guess${v.plan.weak === 1 ? '' : 'es'} to check`}
               </div>
@@ -477,9 +478,9 @@ function ReceiptRow({ r, picking, picked, onHold, onOpen, onToggle }) {
       onKeyDown={(e) => { if (e.key === 'Enter') onOpen(); else if (e.key === ' ' && picking) { e.preventDefault(); onToggle(); } }}
       aria-label={`${r.store || 'Receipt'}${picked ? ', selected' : ''}`}>
       {picking && <PickBox on={picked} name={r.store || 'this receipt'} onToggle={onToggle} />}
-      <div className="grow">
-        <div className="name">{r.store || 'Receipt'}</div>
-        <div className="meta">{fmtDate(r.date, { withYear: true })} · {plural(r.lineCount, 'item')} · {r.matched} matched to your list · {r.source === 'email' ? 'emailed' : r.uploadedByName}</div>
+      <div className="grow" style={{ minWidth: 0 }}>
+        <FitText className="name">{r.store || 'Receipt'}</FitText>
+        <FitText className="meta-line">{fmtDate(r.date, { withYear: true })} · {plural(r.lineCount, 'item')} · {r.matched} matched to your list · {r.source === 'email' ? 'emailed' : r.uploadedByName}</FitText>
       </div>
       <div className="price">{fmtMoney(r.total)}</div>
     </div>

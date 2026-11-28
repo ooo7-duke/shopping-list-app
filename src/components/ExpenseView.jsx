@@ -13,12 +13,13 @@ import { xlsxBytes } from '../lib/xlsx.js';
 import { buildReportPdf } from '../lib/reportPdf.js';
 import { fetchInbox, ackInbox } from '../lib/emailReceipts.js';
 import {
-  saveExpenseTrip, updateExpenseTrip, deleteExpenseTrip, deleteExpenseTrips, saveExpense, deleteExpense, deleteExpenses, getExpenseImage, setPhotoCaption,
+  saveExpenseTrip, updateExpenseTrip, deleteExpenseTrips, saveExpense, deleteExpense, deleteExpenses, getExpenseImage, setPhotoCaption,
 } from '../data/actions.js';
 import { fmtMoney, fmtDate, toInputDate, fromInputDate } from '../lib/format.js';
 import { aiErrorMessage, saveErrorMessage } from '../lib/errors.js';
 import { useHold, usePick, PickHeader, PickBar, PickBox, ConfirmDelete, plural } from './Pick.jsx';
 import { DEMO_MODE } from '../lib/config.js';
+import FitText, { FitTable } from './FitText.jsx';
 
 const OPEN_KEY = 'sla-open-trip';
 const dayName = (ms) => new Date(ms).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
@@ -53,6 +54,7 @@ export default function ExpenseView() {
   // Press and hold a folder to pick several, then delete them with every expense in them, with Undo.
   const tPick = usePick(open ? [] : sorted.map((t) => t.id));
   const [delAsk, setDelAsk] = useState(false);
+  const [delTrip, setDelTrip] = useState(null);
   const pickedTrips = sorted.filter((t) => tPick.has(t.id));
   const pickedCount = expenses.filter((e) => tPick.has(e.tripId)).length;
   async function deletePicked() {
@@ -65,6 +67,18 @@ export default function ExpenseView() {
       showToast(`Deleted ${plural(list.length, 'trip folder')}`, undo, 12000);
     } catch (e) {
       showToast(saveErrorMessage(e, 'delete those folders'));
+    }
+  }
+  // The trash can on one folder asks first, since the folder's expenses and photos go with it.
+  async function deleteOneTrip() {
+    const trip = delTrip;
+    setDelTrip(null);
+    if (!trip) return;
+    try {
+      const undo = await deleteExpenseTrips(ctx, [trip], expenses);
+      showToast(`Deleted ${trip.name}`, undo, 12000);
+    } catch (e) {
+      showToast(saveErrorMessage(e, 'delete that folder'));
     }
   }
 
@@ -102,7 +116,7 @@ export default function ExpenseView() {
               <div className="xfolders">
                 {sorted.map((t) => (
                   <TripCard key={t.id} trip={t} expenses={expenses.filter((e) => e.tripId === t.id)} picking={tPick.on} picked={tPick.has(t.id)}
-                    onHold={() => tPick.start(t.id)} onOpen={() => (tPick.on ? tPick.toggle(t.id) : go(t.id))} />
+                    onHold={() => tPick.start(t.id)} onOpen={() => (tPick.on ? tPick.toggle(t.id) : go(t.id))} onDelete={() => setDelTrip(t)} />
                 ))}
               </div>
               <PickBar pick={tPick} label="Selected trip folders" onDelete={() => setDelAsk(true)} />
@@ -114,6 +128,15 @@ export default function ExpenseView() {
               <p className="small muted">You can tap Undo for a few seconds after.</p>
             </ConfirmDelete>
           )}
+          {delTrip && (() => {
+            const n = expenses.filter((e) => e.tripId === delTrip.id).length;
+            return (
+              <ConfirmDelete title="Delete this trip folder?" count="folder" onCancel={() => setDelTrip(null)} onConfirm={deleteOneTrip}>
+                <p>This deletes <strong>{delTrip.name}</strong> and the {plural(n, 'expense')} and receipt photos in it.</p>
+                <p className="small muted">You can tap Undo for a few seconds after.</p>
+              </ConfirmDelete>
+            );
+          })()}
         </>
       )}
       {tripForm && <TripForm trip={tripForm} onClose={() => setTripForm(null)} onSaved={(id) => { setTripForm(null); go(id); }} />}
@@ -121,26 +144,42 @@ export default function ExpenseView() {
   );
 }
 
-function TripCard({ trip, expenses, onOpen, onHold, picking, picked }) {
+function TripCard({ trip, expenses, onOpen, onHold, onDelete, picking, picked }) {
   const t = tripTotals(trip, expenses);
   const warn = expenses.reduce((n, e) => n + expenseFlags(e, expenses, trip).filter((f) => f.level === 'warn').length, 0);
   const hold = useHold(onHold);
   return (
-    <button type="button" className={`card xfolder holdable${picked ? ' selected' : ''}`} onClick={onOpen} {...hold} aria-pressed={picking ? picked : undefined}>
+    <div className={`card xfolder holdable${picked ? ' selected' : ''}`} role="group" tabIndex={0} onClick={onOpen} {...hold}
+      onKeyDown={(ev) => { if (ev.target === ev.currentTarget && (ev.key === 'Enter' || ev.key === ' ')) { ev.preventDefault(); onOpen(); } }}
+      aria-label={`${trip.name}${picking && picked ? ', selected' : ''}`}>
       {picking && <span className={`check pick${picked ? ' on' : ''}`} aria-hidden="true"><span /></span>}
       <div className="grow" style={{ minWidth: 0 }}>
-        <div className="xfolder-name">{trip.name}</div>
-        <div className="small muted">{trip.location} · {fmtRange(trip.startDate, trip.endDate)}</div>
+        <FitText className="xfolder-name" title={trip.name}>{trip.name}</FitText>
+        <FitText className="small muted">{trip.location} · {fmtRange(trip.startDate, trip.endDate)}</FitText>
         <div className="xchips">
           <span className="chip blue">{expenses.length} expense{expenses.length === 1 ? '' : 's'}</span>
           {warn > 0 && <span className="chip warn">{warn} to check</span>}
           {trip.status === 'submitted' && <span className="chip">Submitted</span>}
         </div>
       </div>
-      <div className="price" style={{ textAlign: 'right' }}>
-        {fmtMoney(t.owedToYou)}
-        <small>owed to you</small>
+      <div className="xfolder-side">
+        <div className="price">
+          {fmtMoney(t.owedToYou)}
+          <small>owed to you</small>
+        </div>
+        {!picking && onDelete && <RowTrash label={`Delete ${trip.name}`} onDelete={onDelete} />}
       </div>
+    </div>
+  );
+}
+
+// The trash can on a row. Pressing it never opens the row or starts picking.
+function RowTrash({ label, onDelete }) {
+  const stop = (e) => e.stopPropagation();
+  return (
+    <button type="button" className="icon-btn row-del" title="Delete" aria-label={label}
+      onPointerDown={stop} onContextMenu={stop} onKeyDown={stop} onClick={(e) => { e.stopPropagation(); onDelete(); }}>
+      <TrashIcon />
     </button>
   );
 }
@@ -223,6 +262,14 @@ function TripDetail({ trip, expenses, onBack, onEdit, onDeleted }) {
       showToast(`Deleted ${plural(picked.length, 'expense')}`, undo, 12000);
     } catch (e) {
       showToast(saveErrorMessage(e, 'delete those expenses'));
+    }
+  }
+  async function deleteOne(e) {
+    try {
+      const undo = await deleteExpenses(ctx, [e]);
+      showToast(`Deleted ${e.merchant || categoryLabel(e.category)}`, undo, 12000);
+    } catch (err) {
+      showToast(saveErrorMessage(err, 'delete that expense'));
     }
   }
 
@@ -322,7 +369,7 @@ function TripDetail({ trip, expenses, onBack, onEdit, onDeleted }) {
           <div className="list">
             {g.items.map((e) => (
               <ExpenseRow key={e.id} e={e} all={expenses} trip={trip} picking={ePick.on} picked={ePick.has(e.id)}
-                onHold={() => ePick.start(e.id)} onToggle={() => ePick.toggle(e.id)} onOpen={() => (ePick.on ? ePick.toggle(e.id) : setEditing(e))} />
+                onHold={() => ePick.start(e.id)} onToggle={() => ePick.toggle(e.id)} onOpen={() => (ePick.on ? ePick.toggle(e.id) : setEditing(e))} onDelete={() => deleteOne(e)} />
             ))}
           </div>
         </div>
@@ -340,7 +387,7 @@ function TripDetail({ trip, expenses, onBack, onEdit, onDeleted }) {
       {totals.byCategory.length > 0 && (
         <>
           <div className="section-h"><h2>By category</h2></div>
-          <div className="card" style={{ padding: 0, overflowX: 'auto' }}>
+          <FitTable>
             <table className="data xtable">
               <thead><tr><th>Category</th><th className="num">Spent</th><th className="num">Claimed</th></tr></thead>
               <tbody>
@@ -349,7 +396,7 @@ function TripDetail({ trip, expenses, onBack, onEdit, onDeleted }) {
                 <tr><td><strong>Total</strong></td><td className="num"><strong>{fmtMoney(totals.spent)}</strong></td><td className="num"><strong>{fmtMoney(totals.business + totals.perDiem)}</strong></td></tr>
               </tbody>
             </table>
-          </div>
+          </FitTable>
         </>
       )}
 
@@ -358,7 +405,14 @@ function TripDetail({ trip, expenses, onBack, onEdit, onDeleted }) {
       <SendReport trip={trip} expenses={list} totals={totals} />
 
       <button type="button" className="btn danger block" style={{ marginTop: 20 }}
-        onClick={async () => { if (!confirmDel) { setConfirmDel(true); return; } await deleteExpenseTrip(ctx, trip, expenses); showToast(`Deleted ${trip.name} and its ${expenses.length} expense${expenses.length === 1 ? '' : 's'}`); onDeleted(); }}>
+        onClick={async () => {
+          if (!confirmDel) { setConfirmDel(true); return; }
+          try {
+            const undo = await deleteExpenseTrips(ctx, [trip], expenses);
+            showToast(`Deleted ${trip.name} and its ${plural(expenses.length, 'expense')}`, undo, 12000);
+            onDeleted();
+          } catch (e) { showToast(saveErrorMessage(e, 'delete that folder')); }
+        }}>
         <TrashIcon width="20" height="20" /> {confirmDel ? `Tap again to delete the folder and its ${expenses.length} expense${expenses.length === 1 ? '' : 's'}` : 'Delete this trip folder'}
       </button>
 
@@ -367,30 +421,34 @@ function TripDetail({ trip, expenses, onBack, onEdit, onDeleted }) {
   );
 }
 
-function ExpenseRow({ e, all, trip, onOpen, onHold, onToggle, picking, picked }) {
+function ExpenseRow({ e, all, trip, onOpen, onHold, onToggle, onDelete, picking, picked }) {
   const flags = expenseFlags(e, all, trip);
   const biz = trip.mealsMode === 'perDiem' && isMeal(e.category) ? 0 : businessAmount(e);
   const partial = Math.abs(biz - (Number(e.amount) || 0)) > 0.004;
   const hold = useHold(onHold);
+  const name = e.merchant || categoryLabel(e.category);
+  const meta = [
+    categoryLabel(e.category),
+    e.time && fmtTime(e.time),
+    paidWithId(e.paidWith) !== 'personal' && paidWithLabel(e.paidWith),
+    hasReceipt(e) && (e.emailId ? 'Emailed receipt' : `${e.imageIds.length} photo${e.imageIds.length === 1 ? '' : 's'}`),
+  ].filter(Boolean).join(' · ');
   return (
-    <div className={`item xrow holdable${picked ? ' selected' : ''}`} role="button" tabIndex={0} onClick={onOpen} {...hold}
-      aria-pressed={picking ? picked : undefined} onKeyDown={(ev) => ev.key === 'Enter' && onOpen()}>
-      {picking && <PickBox on={picked} name={e.merchant || categoryLabel(e.category)} onToggle={onToggle} />}
+    <div className={`item xrow holdable${picked ? ' selected' : ''}`} role="group" tabIndex={0} onClick={onOpen} {...hold}
+      aria-label={`${name}, ${fmtMoney(e.amount)}${picking && picked ? ', selected' : ''}`}
+      onKeyDown={(ev) => { if (ev.target === ev.currentTarget && ev.key === 'Enter') onOpen(); }}>
+      {picking && <PickBox on={picked} name={name} onToggle={onToggle} />}
       <div className="grow" style={{ minWidth: 0 }}>
-        <div className="name ellipsis">{e.merchant || categoryLabel(e.category)}</div>
-        <div className="meta">
-          <span>{categoryLabel(e.category)}</span>
-          {e.time && <span>{fmtTime(e.time)}</span>}
-          {paidWithId(e.paidWith) !== 'personal' && <span>{paidWithLabel(e.paidWith)}</span>}
-          {hasReceipt(e) && <span>{e.emailId ? 'Emailed receipt' : `${e.imageIds.length} photo${e.imageIds.length === 1 ? '' : 's'}`}</span>}
-          {flags.map((f) => <span key={f.code} className={`chip ${f.level === 'warn' ? 'warn' : ''}`}>{f.label}</span>)}
-        </div>
-        {e.notes && <div className="tiny muted ellipsis" style={{ marginTop: 2 }}>{e.notes}</div>}
+        <FitText className="name" title={name}>{name}</FitText>
+        <FitText className="meta-line">{meta}</FitText>
+        {flags.length > 0 && <div className="meta">{flags.map((f) => <span key={f.code} className={`chip ${f.level === 'warn' ? 'warn' : ''}`}>{f.label}</span>)}</div>}
+        {e.notes && <FitText className="tiny muted" style={{ marginTop: 2 }}>{e.notes}</FitText>}
       </div>
       <div className="price">
         {fmtMoney(e.amount)}
         {partial && <small>{fmtMoney(biz)} claimed</small>}
       </div>
+      {!picking && onDelete && <RowTrash label={`Delete ${name}, ${fmtMoney(e.amount)}`} onDelete={onDelete} />}
     </div>
   );
 }
@@ -413,7 +471,7 @@ function PerDiem({ trip, days }) {
   return (
     <>
       <div className="section-h"><h2>Meals per diem</h2><span className="small muted">${Number(trip.mieRate)} a day</span></div>
-      <div className="card" style={{ padding: 0, overflowX: 'auto' }}>
+      <FitTable>
         <table className="data xtable">
           <thead><tr><th>Day</th>{parts && <th>Meal provided</th>}<th className="num">Amount</th></tr></thead>
           <tbody>
@@ -432,7 +490,7 @@ function PerDiem({ trip, days }) {
             ))}
           </tbody>
         </table>
-      </div>
+      </FitTable>
       <p className="tiny muted" style={{ marginTop: 6 }}>{parts ? 'Tap a meal the event or hotel provided, and its GSA share comes off that day.' : 'Meals provided by the event come off only for the standard GSA rates ($68 to $92).'}</p>
     </>
   );
@@ -634,7 +692,7 @@ function TravelInbox({ tripId, onReview }) {
         {matches.map(({ m, trip }) => (
           <div key={m.id} className="item">
             <div className="grow" style={{ minWidth: 0 }}>
-              <div className="name ellipsis">{m.subject || '(no subject)'}</div>
+              <FitText className="name">{m.subject || '(no subject)'}</FitText>
               <div className="meta"><span>{String(m.from || '').replace(/<.*>/, '').trim()}</span>{m.date && <span>{fmtDate(m.date, { withYear: true })}</span>}{!tripId && <span className="chip blue">{trip.name}</span>}</div>
             </div>
             <div className="row" style={{ gap: 6, flex: 'none' }}>

@@ -173,15 +173,20 @@ label.field > span { display: block; font-size: 0.85rem; color: var(--muted); ma
 /* The name column always keeps room to read, and long words wrap instead of running under the price.
    A price never splits inside the number: when a big one can't fit beside the name, it moves to
    its own line under it, on the right. */
-.item { flex-wrap: wrap; row-gap: 4px; }
-.item > .grow { flex: 1 1 0%; min-width: min(35%, 120px); overflow-wrap: anywhere; }
+.item { flex-wrap: nowrap; }
+.item > .grow { flex: 1 1 0%; min-width: 0; overflow-wrap: anywhere; }
+/* Each line of a row stays on one line at the largest size that fits (see FitText.jsx). */
+.fit { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; max-width: 100%; }
+.item .meta-line { font-size: 0.85rem; color: var(--muted); margin-top: 2px; }
+.item .meta-line + .meta { margin-top: 4px; }
 @media (max-width: 480px) { .item { gap: 8px; } }
 .item > .price { flex: none; margin-left: auto; white-space: nowrap; }
 .item .price small { display: block; font-weight: 400; color: var(--muted); font-size: 0.75rem; }
 .item.done .name { text-decoration: line-through; color: var(--muted); font-weight: 500; }
 .item .hover-actions { display: none; gap: 2px; }
-.item .row-del { margin-right: -6px; color: var(--muted); }
-.item .row-del:hover { color: var(--danger); background: #fdecea; }
+.row-del { color: var(--muted); }
+.item .row-del { margin-right: -6px; }
+.row-del:hover { color: var(--danger); background: #fdecea; }
 .clear-row { display: flex; justify-content: flex-end; margin: 6px 2px 2px; }
 .clear-btn { display: inline-flex; align-items: center; gap: 6px; min-height: var(--tap); padding: 0 14px; font-size: 0.92rem; }
 .clear-btn svg { width: 20px; height: 20px; }
@@ -443,17 +448,21 @@ table.data td.num, table.data th.num { text-align: right; }
 .xfolder { display: flex; gap: 12px; align-items: flex-start; text-align: left; cursor: pointer; width: 100%; font: inherit; color: inherit; min-height: var(--tap); }
 .xfolder:hover { border-color: var(--bb); }
 .xfolder-name { font-weight: 700; color: var(--bb); font-size: 1.05rem; }
-.xfolder .price { font-weight: 700; color: var(--bb); white-space: nowrap; }
+.xfolder .price { font-weight: 700; color: var(--bb); white-space: nowrap; text-align: right; }
+.xfolder-side { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; margin-right: -6px; }
 .xfolder .price small { display: block; font-weight: 400; color: var(--muted); font-size: 0.75rem; }
 .xchips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 .xday { margin-top: 10px; }
 .xday-h { display: flex; justify-content: space-between; font-size: 0.85rem; font-weight: 700; color: var(--muted); padding: 4px 4px; }
 .item .meta .chip { font-size: 0.75rem; padding: 0 8px; }
-.xtable td { white-space: normal; }
-/* Trip tables have three columns of money; on a phone they pack tighter so they fit without scrolling sideways, even with large text. */
+/* Trip tables keep every cell on one line and shrink their text to fit the card (FitTable), so
+   they never scroll sideways. Only if the smallest size is still too wide does the first column wrap. */
+.fit-table { padding: 0; overflow: hidden; }
+table.data.xtable th, table.data.xtable td { white-space: nowrap; }
+.fit-table.fit-wrap table.data.xtable th:first-child, .fit-table.fit-wrap table.data.xtable td:first-child { white-space: normal; }
 @media (max-width: 480px) {
-  table.data.xtable { font-size: 0.8rem; }
-  table.data.xtable th, table.data.xtable td { padding: 8px 4px; }
+  table.data.xtable th, table.data.xtable td { padding: 8px 4px; white-space: nowrap; }
+  .fit-table.fit-wrap table.data.xtable th:first-child, .fit-table.fit-wrap table.data.xtable td:first-child { white-space: normal; }
   table.data.xtable th:first-child, table.data.xtable td:first-child { padding-left: 8px; }
   table.data.xtable th:last-child, table.data.xtable td:last-child { padding-right: 8px; }
 }

@@ -60,7 +60,7 @@ function buildSeed() {
   const cats = ['airfare', 'lodging', 'dinner', 'lunch', 'ground', 'car_rental', 'breakfast'];
   for (let k = 0; k < 9; k++) {
     const e = `x${k}`; const img = `img${k}`;
-    expenses[e] = { id: e, tripId: t1, category: cats[k % cats.length], merchant: k === 0 ? 'Lufthansa German Airlines Frequent Traveller Service Center' : `Merchant ${k} Restaurant and Bar am Roemerberg`, date: now - (10 - k) * DAY, time: '19:45', amount: k === 0 ? 12345.67 : 123.45 * (k + 1), currency: 'USD', paidWith: k % 3 === 0 ? 'cash' : 'personal', nights: [], notes: k === 1 ? 'A very long note that explains why this hotel was booked instead of the conference hotel, including the dates, the rates, and the approval from the manager who signed off on it.' : '', summary: 'Summary line for the expense', source: 'photo', createdAt: now, imageIds: k < 6 ? [img] : [] };
+    expenses[e] = { id: e, tripId: t1, category: cats[k % cats.length], merchant: k === 0 ? 'Lufthansa German Airlines Frequent Traveller Service Center' : `Merchant ${k} Restaurant and Bar am Roemerberg`, date: now - (10 - k) * DAY, time: '19:45', amount: k === 0 ? 123456.78 : 123.45 * (k + 1), currency: 'USD', paidWith: k % 3 === 0 ? 'cash' : 'personal', nights: [], notes: k === 1 ? 'A very long note that explains why this hotel was booked instead of the conference hotel, including the dates, the rates, and the approval from the manager who signed off on it.' : '', summary: 'Summary line for the expense', source: 'photo', createdAt: now, imageIds: k < 6 ? [img] : [] };
     if (k < 6) expenseImages[img] = { id: img, expenseId: e, createdAt: now, caption: `Receipt ${k}, ${expenses[e].merchant}, $${expenses[e].amount.toFixed(2)}`, dataUrl: photo(k % 2 ? 1080 : 2400, k % 2 ? 2400 : 1080, `RECEIPT ${k}`) };
   }
   expenses.x1.category = 'lodging';
@@ -86,7 +86,21 @@ function inspect(win) {
   const root = sheet || document.body;
   const vis = (el) => { if (el.closest('details:not([open])') && !el.closest('summary')) return false; const s = getComputedStyle(el); if (s.visibility === 'hidden' || s.display === 'none' || +s.opacity === 0) return false; const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
   const desc = (el) => { const t = (el.getAttribute('aria-label') || el.innerText || el.alt || el.tagName).trim().replace(/\s+/g, ' ').slice(0, 60); return `${el.tagName.toLowerCase()}${el.className && typeof el.className === 'string' ? '.' + el.className.trim().split(/\s+/).slice(0, 2).join('.') : ''} "${t}"`; };
-  if (document.documentElement.scrollWidth > W + 1) issues.push(['hscroll', `page scrolls sideways: ${document.documentElement.scrollWidth}px wide in ${W}px`]);
+  const pageW = Math.max(document.documentElement.scrollWidth, document.body.scrollWidth);
+  if (pageW > W + 1) issues.push(['hscroll', `page scrolls sideways: ${pageW}px wide in ${W}px`]);
+  // A line of a list row, a trip folder or a trip table that wraps onto a second line.
+  const rng = document.createRange();
+  for (const box of root.querySelectorAll('.item, .xfolder, .xday-h, table.xtable')) {
+    if (!vis(box)) continue;
+    const tw = document.createTreeWalker(box, 4);
+    for (let n = tw.nextNode(); n; n = tw.nextNode()) {
+      if (!n.textContent.trim() || !vis(n.parentElement)) continue;
+      if (box.matches('table.xtable') && n.parentElement.closest('.fit-wrap td:first-child')) continue;
+      rng.selectNodeContents(n);
+      const tops = new Set([...rng.getClientRects()].filter((b) => b.width > 0).map((b) => Math.round(b.top)));
+      if (tops.size > 1) issues.push(['wrapped', `"${n.textContent.trim().slice(0, 50)}" in ${desc(box).slice(0, 40)} takes ${tops.size} lines`]);
+    }
+  }
   const clippers = (el) => { for (let a = el.parentElement; a && a !== document.body; a = a.parentElement) { const s = getComputedStyle(a); if (/(auto|scroll|hidden|clip)/.test(s.overflowX)) return a; } return null; };
   const all = [...root.querySelectorAll('*')].filter(vis);
   for (const el of all) {
@@ -172,13 +186,13 @@ function inspect(win) {
   return [...new Map(issues.map((i) => [i.join('|'), i])).values()];
 }
 const q = new URLSearchParams(location.search);
-const w = +(q.get('w') || 412), h = +(q.get('h') || (w <= 360 ? 760 : 860)), big = q.get('big') === '1', hash = q.get('hash') || 'list';
+const w = +(q.get('w') || 412), h = +(q.get('h') || (w <= 320 ? 640 : w <= 360 ? 760 : w <= 390 ? 844 : 860)), big = q.get('big') === '1', hash = q.get('hash') || 'list';
 if (q.get('seed') === '1') { localStorage.setItem('sla-demo-v3', JSON.stringify(buildSeed())); q.delete('seed'); history.replaceState(null, '', '?' + q); }
 if (q.get('clear') === '1') { localStorage.removeItem('sla-demo-v3'); q.delete('clear'); history.replaceState(null, '', '?' + q); }
 const link = (label, patch, on) => { const p = new URLSearchParams(q); for (const [k, v] of Object.entries(patch)) p.set(k, v); return `<a href="?${p}" class="${on ? 'on' : ''}">${label}</a>`; };
 const tabs = ['list', 'trips', 'receipts', 'insights', 'expenses'];
 document.getElementById('bar').innerHTML =
-  link('360', { w: 360 }, w === 360) + link('412', { w: 412 }, w === 412) + link('normal text', { big: 0 }, !big) + link('large text', { big: 1 }, big) +
+  [320, 360, 390, 412].map((x) => link(String(x), { w: x }, w === x)).join('') + link('normal text', { big: 0 }, !big) + link('large text', { big: 1 }, big) +
   tabs.map((t) => link(t, { hash: t }, t === hash)).join('') +
   link('load test data', { seed: 1 }) + link('clear test data', { clear: 1 }) + '<button id="chk" type="button">Check this screen</button><button id="sweep" type="button">Sweep all fields</button>';
 const f = document.getElementById('f');
@@ -202,7 +216,7 @@ async function sweep() {
   const win = f.contentWindow;
   const doc = () => f.contentDocument;
   const waitFor = async (fn, ms = 5000) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { const v = fn(); if (v) return v; await sleep(150); } return null; };
-  const byText = (sel, re) => [...doc().querySelectorAll(sel)].filter((e) => re.test((e.getAttribute('aria-label') || '') + ' ' + e.textContent)).sort((a, b) => a.textContent.length - b.textContent.length)[0];
+  const byText = (sel, re) => [...doc().querySelectorAll(sel)].filter((e) => !e.closest('.row-del')).filter((e) => re.test((e.getAttribute('aria-label') || '') + ' ' + e.textContent)).sort((a, b) => a.textContent.length - b.textContent.length)[0];
   const click = async (sel, re) => { const el = await waitFor(() => byText(sel, re)); if (!el) return false; el.click(); await sleep(700); return true; };
   const closeAll = async () => { for (let i = 0; i < 4; i++) { const sheets = doc().querySelectorAll('[role=dialog] button[aria-label=Close], .sheet button[aria-label=Close]'); if (!sheets.length) break; sheets[sheets.length - 1].click(); await sleep(400); } };
   const go = async (h) => { await closeAll(); win.location.hash = '#/' + h; await sleep(900); };
@@ -230,6 +244,8 @@ async function sweep() {
   await step('trip form', async () => { await go('expenses'); await sleep(800); const back = byText('button', /All trips/); if (back) { back.click(); await sleep(600); } return click('button', /New trip folder/); });
   await step('trip folder', async () => { await go('expenses'); await sleep(800); const back = byText('button', /All trips/); if (back) { back.click(); await sleep(600); } return click('[role=button], button, .card, article', /Annual International/); });
   await step('expense sheet', async () => click('[role=button], button, .item, .card', /Lufthansa/));
+  await step('trash on every row', async () => { await closeAll(); const rows = doc().querySelectorAll('.item.xrow'); const bins = doc().querySelectorAll('.item.xrow .row-del'); if (!rows.length || rows.length !== bins.length) { out.push(`trash: ${bins.length} of ${rows.length} expense rows`); } });
+  await step('folder delete confirm', async () => { await go('expenses'); await sleep(800); const back = byText('button', /All trips/); if (back) { back.click(); await sleep(600); } const folders = doc().querySelectorAll('.xfolder'); const bins = doc().querySelectorAll('.xfolder .row-del'); if (folders.length !== bins.length) out.push(`trash: ${bins.length} of ${folders.length} trip folders`); const bin = [...bins].find((b) => /Annual/.test(b.getAttribute('aria-label'))); if (!bin) return false; bin.click(); await sleep(700); const t = doc().querySelector('[role=dialog]')?.textContent || ''; if (!/Annual International/.test(t) || !/9 expenses/.test(t)) out.push(`confirm text: ${t.slice(0, 160)}`); });
   await closeAll();
   return out;
 }
