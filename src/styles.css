@@ -527,3 +527,8 @@ body:has(.pick-bar) .to-top { display: none; }
   white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2;
   overflow: hidden; overflow-wrap: anywhere;
 }
+/* Trip cards with large text: "Shop now" and "Ordered" keep their full words and drop onto two lines when
+   both don't fit, and a "Due soon" chip wraps inside the card instead of running past its edge. */
+.trip > .row { flex-wrap: wrap; }
+.trip > .row > .btn { flex: 1 1 auto; min-width: max-content; }
+.trip .chip { max-width: 100%; white-space: normal; text-align: left; }
