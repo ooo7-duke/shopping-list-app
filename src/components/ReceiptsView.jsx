@@ -385,7 +385,7 @@ function EmailedReceipts() {
                   : v.why === 'dup' ? 'Looks already saved'
                   : v.why === 'other' ? 'Doesn\'t look like a receipt'
                   : `${plural(v.plan.lines.length, 'item')}${v.plan.weak ? ` · ${v.plan.weak} best guess${v.plan.weak === 1 ? '' : 'es'} to check` : ''}`}
-                {v.m?.date ? ` · emailed ${fmtDate(v.m.date)}` : ''}
+                {v.m?.date ? ` · emailed\u00a0${fmtDate(v.m.date).replace(/ /g, '\u00a0')}` : ''}
               </div>
             </div>
             {['review', 'error'].includes(v.status) && (
