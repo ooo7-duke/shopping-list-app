@@ -160,11 +160,21 @@ document.getElementById('bar').innerHTML =
   link('load test data', { seed: 1 }) + link('clear test data', { clear: 1 }) + '<button id="chk" type="button">Check this screen</button>';
 const f = document.getElementById('f');
 f.width = w; f.height = h; f.style.width = w + 'px'; f.style.height = h + 'px';
+const errs = [];
+f.addEventListener('load', () => {
+  const cw = f.contentWindow;
+  const keep = (kind) => (...a) => errs.push(`${kind}: ${a.map((x) => (x && x.stack) || (x && x.message) || String(x)).join(' ').slice(0, 400)}`);
+  const oe = cw.console.error.bind(cw.console), ow = cw.console.warn.bind(cw.console);
+  cw.console.error = (...a) => { keep('error')(...a); oe(...a); };
+  cw.console.warn = (...a) => { keep('warn')(...a); ow(...a); };
+  cw.addEventListener('error', (e) => keep('uncaught')(e.error || e.message));
+  cw.addEventListener('unhandledrejection', (e) => keep('rejection')(e.reason));
+});
 f.addEventListener('load', () => { if (big) { const s = f.contentDocument.createElement('style'); s.textContent = 'html{font-size:22px !important}'; f.contentDocument.head.appendChild(s); } });
 f.src = `/?demo#/${hash}`;
 document.getElementById('chk').onclick = () => {
   const found = inspect(f.contentWindow);
   const keep = found.filter(([k]) => k !== 'small-tap' || q.get('taps') === '1');
-  document.getElementById('out').textContent = `${w}px${big ? ' large text' : ''}, ${keep.length} issues\n` + keep.map(([k, d]) => `${k}: ${d}`).join('\n');
+  document.getElementById('out').textContent = `${w}px${big ? ' large text' : ''}, ${keep.length} issues\n` + keep.map(([k, d]) => `${k}: ${d}`).join('\n') + (errs.length ? '\n\nApp errors:\n' + errs.join('\n') : '');
 };
 </script></body></html>
