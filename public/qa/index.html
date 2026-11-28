@@ -134,6 +134,10 @@ function inspect(win) {
       const pts = boxes.flatMap((b) => [[b.left + Math.min(8, b.width / 2), b.top + b.height / 2], [b.left + b.width / 2, b.top + b.height / 2], [b.right - Math.min(8, b.width / 2), b.top + b.height / 2]]);
       for (const [x, y] of pts) {
         if (x < 0 || y < 0 || x >= W || y >= H) continue;
+        // Text cut off by a two-line limit sits outside the box that hides it: it isn't on screen to be covered.
+        let hidden = false;
+        for (let a = el.parentElement; a && a !== document.body; a = a.parentElement) { const as = getComputedStyle(a); if (as.overflow !== 'visible' && as.overflowY !== 'visible') { const ar = a.getBoundingClientRect(); if (y < ar.top || y > ar.bottom || x < ar.left || x > ar.right) { hidden = true; break; } } }
+        if (hidden) continue;
         const top = document.elementFromPoint(x, y);
         if (!top || el.contains(top) || top.contains(el)) continue;
         if (sheet && !sheet.contains(el)) continue;
