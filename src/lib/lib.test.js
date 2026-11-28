@@ -640,7 +640,7 @@ describe('AI retries', async () => {
   });
 });
 
-import { tripDays, perDiemDays, businessAmount, expenseFlags, tripTotals, expensesCSV, emailTrip, matchTrip, normalizeRead, fromDayKey, autoCaption, captionFor, expenseWorkbook, paidWithLabel, paidWithId } from './expenses.js';
+import { tripDays, perDiemDays, businessAmount, expenseFlags, tripTotals, expensesCSV, emailTrip, matchTrip, datesIn, normalizeRead, fromDayKey, autoCaption, captionFor, expenseWorkbook, paidWithLabel, paidWithId } from './expenses.js';
 import { xlsxBytes, colName } from './xlsx.js';
 describe('expense reports', () => {
   const d = (s) => fromDayKey(s);
@@ -730,6 +730,31 @@ describe('expense reports', () => {
     // Of two trips, the nearer one wins a tie.
     const later = { ...trip, id: 't2', name: 'Later trip', startDate: d('2027-01-25'), endDate: d('2027-01-27') };
     expect(emailTrip(mail('Your Uber receipt', '2027-01-08'), [later, trip], [])?.id).toBe('t1');
+  });
+
+  it('matches a flight or hotel by when you travel, not when you bought it', () => {
+    const mail = (subject, day, text = '') => ({ id: subject, from: 'Delta <receipts@delta.com>', subject, text, date: d(day) });
+    // Bought last month or this month, flying on the trip's dates to its city: a strong match.
+    expect(matchTrip(mail('Your flight to Las Vegas', '2026-11-20', 'Departs Tue, Jan 5 at 8:10 AM. Returns Jan 9.'), [trip], [])?.why)
+      .toBe('Travel to Las Vegas on Jan\u00a05, during the trip');
+    expect(matchTrip(mail('Hotel reservation confirmed', '2026-12-20', 'Check-in: 01/05/2027 at the Wynn, Las Vegas. Check-out: 01/09/2027'), [trip], [])?.trip?.id).toBe('t1');
+    // Booked four months ahead still counts when the dates and city fit.
+    expect(matchTrip(mail('Your flight to Las Vegas', '2026-09-01', 'Outbound flight on January 5, 2027'), [trip], [])?.trip?.id).toBe('t1');
+    // On the trip's dates but no place named: suggested, and the reason says so.
+    expect(matchTrip(mail('Your flight is confirmed', '2026-11-20', 'Departs Jan 6'), [trip], [])?.why).toMatch(/no place named/);
+    // The right city on other dates belongs to another trip.
+    expect(matchTrip(mail('Your flight to Las Vegas', '2026-11-20', 'Departs Feb 20, 2027'), [trip], [])).toBeNull();
+    // A booking that only shows the day it was bought still matches on the city.
+    expect(matchTrip(mail('Your flight to Las Vegas', '2026-11-22', 'Booked Nov 22, 2026'), [trip], [])?.why).toMatch(/6 weeks before/);
+  });
+
+  it('reads dates written in an email', () => {
+    const sent = d('2026-11-20');
+    const keys = (t) => datesIn(t, sent).map((x) => new Date(x).toISOString().slice(0, 10));
+    expect(keys('Dec 18 and 18 December 2026')).toEqual(['2026-12-18', '2026-12-18']);
+    expect(keys('on 12/18/2026 or 2027-01-07')).toEqual(['2027-01-07', '2026-12-18']);
+    expect(keys('Jan 7')).toEqual(['2027-01-07']);
+    expect(keys('Dec 2026 and you may 2 be')).toEqual(['2027-05-02']);
   });
 
   it('leaves the dollar amount blank for a receipt in another currency', () => {

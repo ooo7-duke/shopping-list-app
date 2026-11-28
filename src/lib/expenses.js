@@ -195,9 +195,14 @@ export function expensesCSV(trip, expenses) {
 // Which trip an emailed receipt most likely belongs to, weighing the trip's dates, its place
 // and what was bought together. It only suggests: the person still includes or excludes each one.
 //   Same merchant as an expense already on the trip: from 60 days before to 3 days after.
+//   A flight, hotel or other booking is judged by when you travel, not when you bought it: if the
+//     email gives a travel date inside the trip (a day either side), it matches however early it was
+//     booked, up to a year ahead. Naming the trip's city or show makes it a strong match. If every
+//     travel date it gives falls outside the trip, it is left alone.
 //   During the trip (a day either side): travel, meals and rides, or anything naming the trip's city.
-//   Before the trip: travel naming the trip's city or show up to 90 days ahead; other travel up to
-//     3 weeks ahead; show or work gear (networking, cables, displays, printing) up to 2 weeks ahead.
+//   Before the trip, when the email gives no travel date: travel naming the trip's city or show up to
+//     90 days ahead; other travel up to 3 weeks ahead; show or work gear (networking, cables,
+//     displays, printing) up to 2 weeks ahead.
 //   After the trip: only a final hotel or travel bill naming the city or show, within a week.
 //     Anything bought more than a week after the trip ended is left alone.
 const TRAVEL = /\b(flights?|airlines?|airways|airfare|itinerary|boarding pass|e-?ticket|folio|hotels?|resort|suites|inn|lodging|marriott|hilton|hyatt|ihg|holiday inn|hampton|courtyard|westin|sheraton|wyndham|best western|caesars|mgm|airbnb|vrbo|expedia|booking\.com|hotels\.com|delta|united|american airlines|southwest|alaska airlines|jetblue|spirit|frontier|hertz|avis|enterprise rent|national car|alamo|sixt|uber|lyft|taxi|parking|toll|amtrak|rental car|car rental|registration|badge|exhibitor|conference|expo|summit)\b/i;
@@ -214,6 +219,32 @@ function tripPlaces(t) {
   const first = city.split(/\s+/)[0]; // "Frankfurt" for "Frankfurt am Main"
   return [city.length >= 3 ? city : '', first !== city && first.length >= 5 ? first : '', show].filter(Boolean);
 }
+const MON = 'jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?';
+const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+// Dates written in an email: "Dec 18", "December 18, 2026", "18 Dec", "12/18/2026", "2026-12-18".
+// A date with no year takes the year that puts it nearest the day the email was sent.
+export function datesIn(text, sent) {
+  const out = [];
+  const add = (mo, dd, yy) => {
+    if (!(mo >= 0 && mo <= 11 && dd >= 1 && dd <= 31)) return;
+    const base = new Date(sent).getFullYear();
+    const years = yy ? [yy < 100 ? 2000 + yy : yy] : [base - 1, base, base + 1];
+    let best = null;
+    for (const y of years) {
+      const t = new Date(y, mo, dd, 12).getTime();
+      if (best == null || Math.abs(t - sent) < Math.abs(best - sent)) best = t;
+    }
+    out.push(best);
+  };
+  const s = String(text || '');
+  const mo = (w) => MONTHS.indexOf(w.slice(0, 3).toLowerCase());
+  for (const m of s.matchAll(new RegExp(`\\b(${MON})\\.?\\s+(\\d{1,2})(?:st|nd|rd|th)?\\b(?:,?\\s+(\\d{4})\\b)?`, 'gi'))) add(mo(m[1]), +m[2], m[3] && +m[3]);
+  for (const m of s.matchAll(new RegExp(`\\b(\\d{1,2})(?:st|nd|rd|th)?\\s+(${MON})\\b\\.?(?:,?\\s+(\\d{4})\\b)?`, 'gi'))) add(mo(m[2]), +m[1], m[3] && +m[3]);
+  for (const m of s.matchAll(/\b(\d{4})-(\d{2})-(\d{2})\b/g)) add(+m[2] - 1, +m[3], +m[1]);
+  for (const m of s.matchAll(/\b(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})\b/g)) add(+m[1] - 1, +m[2], +m[3]);
+  return out;
+}
+const shortDay = (ms) => new Date(ms).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }).replace(' ', '\u00a0');
 const names = (text, place) => new RegExp(`\\b${place.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+')}\\b`, 'i').test(text);
 
 export function matchTrip(m, trips = [], expenses = []) {
@@ -226,14 +257,27 @@ export function matchTrip(m, trips = [], expenses = []) {
     if (!t.startDate || !t.endDate || t.status === 'submitted') continue;
     const before = t.startDate - at; // > 0: sent before the trip began
     const after = at - t.endDate; // > 0: sent after it ended
-    if (after > 7 * DAY || before > 90 * DAY) continue;
+    if (after > 7 * DAY || before > 365 * DAY) continue;
     const place = tripPlaces(t).find((p) => names(hay, p));
     const travel = TRAVEL.test(hay);
+    // For a booking, the travel dates it gives count, not the day it was bought. A date within a
+    // day and a half of sending is usually the booking date itself, so it doesn't rule a trip out.
+    const dated = travel ? datesIn(hay, at) : [];
+    const inTrip = dated.find((x) => x >= t.startDate - DAY && x <= t.endDate + DAY);
+    const elsewhere = !inTrip && dated.some((x) => Math.abs(x - at) > 1.5 * DAY);
+    const during = before <= DAY && after <= DAY;
     const known = expenses.some((e) => e.tripId === t.id && norm(e.merchant).length > 3 && norm(head).includes(norm(e.merchant)));
     let score = 0;
     let why = '';
     if (known && before <= 60 * DAY && after <= 3 * DAY) { score = 5; why = 'Same merchant as an expense already on this trip'; }
-    else if (before <= DAY && after <= DAY) {
+    else if (inTrip && !during) {
+      score = place ? 5 : 3;
+      why = place ? `Travel to ${place} on ${shortDay(inTrip)}, during the trip` : `Travel on ${shortDay(inTrip)}, during the trip, but no place named`;
+    } else if (elsewhere && !during) {
+      // Its travel dates fall outside this trip, so it belongs to another one.
+    } else if (before > 90 * DAY) {
+      // Too early to call without a travel date.
+    } else if (during) {
       if (place || travel || ON_TRIP.test(head)) { score = 4; why = place ? `Names ${place}, dated during the trip` : 'Dated during the trip'; }
     } else if (before > DAY) {
       const lead = ago(days(before));
