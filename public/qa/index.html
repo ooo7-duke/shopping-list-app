@@ -210,6 +210,7 @@ function seedInbox() {
   localStorage.setItem('sla-demo-inbox', JSON.stringify([
     { id: 'qa-mail-1', from: 'demo@example.com', subject: 'Your Home Depot order has shipped and is on its way to you', date: now - 36e5, text: '' },
     { id: 'qa-mail-2', from: 'demo@example.com', subject: 'Your Giant Food receipt', date: now - 72e5, text: '' },
+    { id: 'qa-mail-3', from: 'Frankfurt Marriott Hotel <demo@example.com>', subject: 'Your Frankfurt Marriott Hotel folio and receipt for your recent stay', date: now - 5 * 864e5, text: '' },
   ]));
   localStorage.setItem('sla-email-reads', JSON.stringify({
     'qa-mail-1': { isReceipt: false, store: '', items: [] },
@@ -220,7 +221,7 @@ function seedInbox() {
   }));
 }
 if (q.get('seed') === '1') { localStorage.setItem('sla-demo-v3', JSON.stringify(buildSeed())); seedInbox(); q.delete('seed'); history.replaceState(null, '', '?' + q); }
-if (q.get('clear') === '1') { ['sla-demo-v3', 'sla-demo-inbox', 'sla-email-reads'].forEach((k) => localStorage.removeItem(k)); q.delete('clear'); history.replaceState(null, '', '?' + q); }
+if (q.get('clear') === '1') { ['sla-demo-v3', 'sla-demo-inbox', 'sla-email-reads', 'sla-not-travel'].forEach((k) => localStorage.removeItem(k)); q.delete('clear'); history.replaceState(null, '', '?' + q); }
 const link = (label, patch, on) => { const p = new URLSearchParams(q); for (const [k, v] of Object.entries(patch)) p.set(k, v); return `<a href="?${p}" class="${on ? 'on' : ''}">${label}</a>`; };
 const tabs = ['list', 'trips', 'receipts', 'insights', 'expenses'];
 document.getElementById('bar').innerHTML =
