@@ -29,10 +29,11 @@ You need a Google account for Firebase and the Netlify account you already have.
    - `preview--your-site.netlify.app` (the preview branch)
 5. **Firestore Database:** create a database in production mode. Choose a US location such as `us-east1` (nam5 also works).
 6. **Firestore Database > Rules:** replace the contents with the file `firestore.rules` from this repository and click **Publish**.
-7. **AI Services > AI Logic:** click Get started and choose the **Gemini Developer API**. It works on the free Spark plan. The guided setup turns on App Check, which needs a reCAPTCHA v3 site key:
-   - Create a v3 key at [google.com/recaptcha/admin](https://www.google.com/recaptcha/admin) for both Netlify domains above.
-   - In **App Check**, register the web app with the reCAPTCHA v3 provider and paste the secret key there.
-   - Keep the site key for step 2.
+7. **AI Services > AI Logic:** click Get started and choose the **Gemini Developer API**. It works on the free Spark plan. The guided setup turns on App Check, which needs a Fraud Defense (formerly reCAPTCHA Enterprise) key. The classic reCAPTCHA v3 provider is deprecated.
+   - In the Google Cloud console, open **Security > Fraud Defense** with the same project selected. Enable the reCAPTCHA Enterprise API if asked. Billing is not required; the free tier covers 10,000 assessments a month.
+   - Create a key of type **Web**, add both Netlify domains above (never `localhost`) and leave **Use checkbox challenge** unticked. Copy the key ID.
+   - In Firebase **App Check > Apps**, register the web app with the **Fraud Defense** provider and paste the same key. There is no secret key.
+   - Use the same key for step 2.
 
 Receipt images are compressed and stored in Firestore, so you do not need Cloud Storage. Cloud Storage would require the paid Blaze plan.
 

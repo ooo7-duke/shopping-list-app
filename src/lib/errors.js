@@ -15,7 +15,7 @@ export function aiErrorMessage(e, what = 'Receipt reading') {
     return `${what} isn't turned on yet. In the Firebase console, open AI Services > AI Logic, tap Get started and pick Gemini Developer API. Then try again in a few minutes.`;
   }
   if (text.includes('app check') || text.includes('app-check') || text.includes('appcheck')) {
-    return `${what} is blocked by App Check. Add the reCAPTCHA site key in Netlify (see the setup guide), then try again.`;
+    return `${what} is blocked by App Check. Register the Fraud Defense key in App Check and add it in Netlify (see the setup guide), then try again.`;
   }
   if (text.includes('quota') || text.includes('429') || text.includes('resource-exhausted') || text.includes('rate limit')) {
     return `${what} is busy right now. Try again in a minute.`;
