@@ -640,7 +640,7 @@ describe('AI retries', async () => {
   });
 });
 
-import { tripDays, perDiemDays, businessAmount, expenseFlags, tripTotals, expensesCSV, emailTrip, normalizeRead, fromDayKey, autoCaption, captionFor, expenseWorkbook, paidWithLabel, paidWithId } from './expenses.js';
+import { tripDays, perDiemDays, businessAmount, expenseFlags, tripTotals, expensesCSV, emailTrip, matchTrip, normalizeRead, fromDayKey, autoCaption, captionFor, expenseWorkbook, paidWithLabel, paidWithId } from './expenses.js';
 import { xlsxBytes, colName } from './xlsx.js';
 describe('expense reports', () => {
   const d = (s) => fromDayKey(s);
@@ -703,11 +703,33 @@ describe('expense reports', () => {
   it('routes a hotel email in the trip window to the trip, and leaves a grocery order alone', () => {
     const hotel = { id: 'h', from: 'Wynn <folio@wynnlasvegas.com>', subject: 'Your hotel folio', date: d('2027-01-09') };
     const grocery = { id: 'g', from: 'Target <orders@target.com>', subject: 'Your Target order', date: d('2026-12-10') };
-    const flight = { id: 'f', from: 'Delta <delta@delta.com>', subject: 'Your eTicket itinerary', date: d('2026-11-20') };
+    const flight = { id: 'f', from: 'Delta <delta@delta.com>', subject: 'Your eTicket itinerary: Washington to Las Vegas', date: d('2026-11-20') };
     expect(emailTrip(hotel, [trip], [])?.id).toBe('t1');
     expect(emailTrip(grocery, [trip], [])).toBeNull();
     expect(emailTrip(flight, [trip], [])?.id).toBe('t1');
     expect(emailTrip(hotel, [{ ...trip, status: 'submitted' }], [])).toBeNull();
+  });
+
+  it('weighs dates, place and what was bought, and says why', () => {
+    const mail = (subject, day, from = 'Store <orders@example.com>') => ({ id: subject, from, subject, date: d(day) });
+    // A flight naming the trip's city, booked six weeks ahead.
+    expect(matchTrip(mail('Your flight to Las Vegas is confirmed', '2026-11-22'), [trip], [])?.why).toMatch(/Las Vegas, 6 weeks before/);
+    // The same flight with no place named, six weeks ahead, could be any trip.
+    expect(matchTrip(mail('Your flight is confirmed', '2026-11-22'), [trip], [])).toBeNull();
+    // Networking gear the week before the show.
+    expect(matchTrip(mail('Your order: 24-port network switch and Cat6 cables', '2027-01-01'), [trip], [])?.why).toMatch(/gear, 4 days before/);
+    // The same gear a month before is too early to call.
+    expect(matchTrip(mail('Your order: 24-port network switch and Cat6 cables', '2026-12-05'), [trip], [])).toBeNull();
+    // A purchase a week or two after the show ended is not for the show.
+    expect(matchTrip(mail('Your order: network switch', '2027-01-20'), [trip], [])).toBeNull();
+    expect(matchTrip(mail('Your Uber receipt', '2027-01-17'), [trip], [])).toBeNull();
+    // A hotel's final bill a couple of days after checkout still counts.
+    expect(matchTrip(mail('Your folio', '2027-01-11', 'Wynn Las Vegas <folio@wynnlasvegas.com>'), [trip], [])?.why).toMatch(/2 days after/);
+    // A show name in the subject counts like the city.
+    expect(matchTrip(mail('CES 2027 badge pickup and registration receipt', '2026-10-20'), [trip], [])?.why).toMatch(/CES/);
+    // Of two trips, the nearer one wins a tie.
+    const later = { ...trip, id: 't2', name: 'Later trip', startDate: d('2027-01-25'), endDate: d('2027-01-27') };
+    expect(emailTrip(mail('Your Uber receipt', '2027-01-08'), [later, trip], [])?.id).toBe('t1');
   });
 
   it('leaves the dollar amount blank for a receipt in another currency', () => {

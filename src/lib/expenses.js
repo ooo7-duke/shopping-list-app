@@ -192,27 +192,67 @@ export function expensesCSV(trip, expenses) {
   return rows.map((r) => r.map(csvCell).join(',')).join('\r\n');
 }
 
-// Emailed receipts that look like this trip's: a travel merchant in the trip's window
-// (airfare is often booked weeks ahead), a restaurant or other receipt on a trip day, or a
-// merchant already in the trip.
-const TRAVEL = /\b(flight|airlines?|airways|itinerary|boarding pass|e-?ticket|folio|hotel|resort|suites|marriott|hilton|hyatt|ihg|holiday inn|hampton|courtyard|westin|sheraton|wyndham|best western|caesars|mgm|airbnb|vrbo|expedia|booking\.com|hotels\.com|delta|united|american airlines|southwest|alaska airlines|jetblue|spirit|frontier|hertz|avis|enterprise rent|national car|alamo|sixt|uber|lyft|taxi|parking|toll|amtrak|registration|badge|exhibitor|staples|fedex office|ups store|vistaprint)\b/i;
-const ON_TRIP = /\b(receipt|restaurant|grill|cafe|coffee|bistro|kitchen|bar|starbucks|toast|square|doordash|grubhub|gratuity|tip)\b/i;
+// Which trip an emailed receipt most likely belongs to, weighing the trip's dates, its place
+// and what was bought together. It only suggests: the person still includes or excludes each one.
+//   Same merchant as an expense already on the trip: from 60 days before to 3 days after.
+//   During the trip (a day either side): travel, meals and rides, or anything naming the trip's city.
+//   Before the trip: travel naming the trip's city or show up to 90 days ahead; other travel up to
+//     3 weeks ahead; show or work gear (networking, cables, displays, printing) up to 2 weeks ahead.
+//   After the trip: only a final hotel or travel bill naming the city or show, within a week.
+//     Anything bought more than a week after the trip ended is left alone.
+const TRAVEL = /\b(flights?|airlines?|airways|airfare|itinerary|boarding pass|e-?ticket|folio|hotels?|resort|suites|inn|lodging|marriott|hilton|hyatt|ihg|holiday inn|hampton|courtyard|westin|sheraton|wyndham|best western|caesars|mgm|airbnb|vrbo|expedia|booking\.com|hotels\.com|delta|united|american airlines|southwest|alaska airlines|jetblue|spirit|frontier|hertz|avis|enterprise rent|national car|alamo|sixt|uber|lyft|taxi|parking|toll|amtrak|rental car|car rental|registration|badge|exhibitor|conference|expo|summit)\b/i;
+const ON_TRIP = /\b(receipt|restaurant|grill|cafe|coffee|bistro|kitchen|bar|starbucks|toast|square|doordash|grubhub|gratuity|tip|meal|dinner|lunch|breakfast)\b/i;
+const GEAR = /\b(network(ing)?|router|switch(es)?|ethernet|cat ?6a?|cables?|adapters?|chargers?|power strip|extension cord|surge|monitors?|displays?|tv|projector|hdmi|usb-?c|wi-?fi|hotspot|e?sim|banners?|booth|backdrop|tablecloth|signage|brochures?|flyers?|business cards|printing|prints|lanyards?|badge holders?|shipping|freight|crates?|staples|fedex office|ups store|vistaprint|micro ?center|best buy|b&h|newegg|cdw)\b/i;
 const DAY = 864e5;
+const days = (n) => Math.max(1, Math.round(n / DAY));
+const ago = (n) => (n >= 14 ? `${Math.round(n / 7)} weeks` : `${n} day${n === 1 ? '' : 's'}`);
 
-export function emailTrip(m, trips = [], expenses = []) {
+// The trip's city (the first part of its location) and a short show name like "CES".
+function tripPlaces(t) {
+  const city = String(t.location || '').split(',')[0].trim();
+  const show = (String(t.name || '').match(/\b[A-Z][A-Z0-9&]{1,7}\b/) || [])[0] || '';
+  const first = city.split(/\s+/)[0]; // "Frankfurt" for "Frankfurt am Main"
+  return [city.length >= 3 ? city : '', first !== city && first.length >= 5 ? first : '', show].filter(Boolean);
+}
+const names = (text, place) => new RegExp(`\\b${place.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+')}\\b`, 'i').test(text);
+
+export function matchTrip(m, trips = [], expenses = []) {
   const at = m?.date || m?.receivedAt;
+  if (!at) return null;
   const hay = `${m?.from || ''} ${m?.subject || ''} ${String(m?.text || '').slice(0, 4000)}`;
   const head = `${m?.from || ''} ${m?.subject || ''}`;
   let best = null;
   for (const t of trips) {
     if (!t.startDate || !t.endDate || t.status === 'submitted') continue;
-    const inTrip = at && at >= t.startDate - DAY && at <= t.endDate + DAY;
-    const inWindow = at && at >= t.startDate - 60 * DAY && at <= t.endDate + 14 * DAY;
+    const before = t.startDate - at; // > 0: sent before the trip began
+    const after = at - t.endDate; // > 0: sent after it ended
+    if (after > 7 * DAY || before > 90 * DAY) continue;
+    const place = tripPlaces(t).find((p) => names(hay, p));
+    const travel = TRAVEL.test(hay);
     const known = expenses.some((e) => e.tripId === t.id && norm(e.merchant).length > 3 && norm(head).includes(norm(e.merchant)));
-    const score = known && inWindow ? 3 : inTrip && (TRAVEL.test(hay) || ON_TRIP.test(head)) ? 2 : inWindow && TRAVEL.test(head) ? 1 : 0;
-    if (score && (!best || score > best.score)) best = { trip: t, score };
+    let score = 0;
+    let why = '';
+    if (known && before <= 60 * DAY && after <= 3 * DAY) { score = 5; why = 'Same merchant as an expense already on this trip'; }
+    else if (before <= DAY && after <= DAY) {
+      if (place || travel || ON_TRIP.test(head)) { score = 4; why = place ? `Names ${place}, dated during the trip` : 'Dated during the trip'; }
+    } else if (before > DAY) {
+      const lead = ago(days(before));
+      if (place && travel) { score = 4; why = `Travel naming ${place}, ${lead} before the trip`; }
+      else if (place && before <= 60 * DAY) { score = 3; why = `Names ${place}, ${lead} before the trip`; }
+      else if (GEAR.test(hay) && before <= 14 * DAY) { score = 3; why = `Work or show gear, ${lead} before the trip`; }
+      else if (travel && before <= 21 * DAY) { score = 2; why = `Travel booked ${lead} before the trip`; }
+    } else if (travel && (place || /\bfolio\b/i.test(hay))) {
+      score = 3; why = `Sent ${ago(days(after))} after the trip, likely a final bill`;
+    }
+    if (!score) continue;
+    const gap = Math.max(0, before, after);
+    if (!best || score > best.score || (score === best.score && gap < best.gap)) best = { trip: t, why, score, gap };
   }
-  return best?.trip || null;
+  return best && { trip: best.trip, why: best.why };
+}
+
+export function emailTrip(m, trips = [], expenses = []) {
+  return matchTrip(m, trips, expenses)?.trip || null;
 }
 
 // Emails someone said aren't travel, kept on this device so they go back to the Receipts page.

@@ -5,7 +5,7 @@ import { CameraIcon, PlusIcon, DownloadIcon, TrashIcon } from './Icons.jsx';
 import { compressImage, isImageFile, toReadableImage } from '../lib/receipts.js';
 import {
   EXPENSE_CATEGORIES, categoryLabel, isMeal, tripDays, perDiemDays, businessAmount, expenseFlags, tripTotals,
-  sortExpenses, dayKey, fromDayKey, extractExpense, extractExpenseText, emailTrip, notTravelIds, markNotTravel,
+  sortExpenses, dayKey, fromDayKey, extractExpense, extractExpenseText, matchTrip, notTravelIds, markNotTravel,
   GSA_MIE, hasReceipt, tripPhotos, autoCaption, expenseWorkbook, expensesCSV,
   PAID_WITH, paidWithId, paidWithLabel,
 } from '../lib/expenses.js';
@@ -684,7 +684,7 @@ function TravelInbox({ tripId, onReview }) {
 
   const matches = (mail || [])
     .filter((m) => !hidden.includes(m.id))
-    .map((m) => ({ m, trip: emailTrip(m, expenseTrips, expenses) }))
+    .map((m) => ({ m, ...matchTrip(m, expenseTrips, expenses) }))
     .filter((x) => x.trip && (!tripId || x.trip.id === tripId) && !expenses.some((e) => e.emailId === x.m.id));
   if (!matches.length) return null;
 
@@ -704,11 +704,12 @@ function TravelInbox({ tripId, onReview }) {
     <>
       <div className="section-h"><h2>Emailed receipts for {tripId ? 'this trip' : 'your trips'}</h2><span className="small muted">{matches.length}</span></div>
       <div className="list">
-        {matches.map(({ m, trip }) => (
+        {matches.map(({ m, trip, why }) => (
           <div key={m.id} className="item email-item">
             <div className="grow" style={{ minWidth: 0 }}>
               <FitText className="name" lines={2}>{m.subject || '(no subject)'}</FitText>
               <div className="meta"><span>{String(m.from || '').replace(/<.*>/, '').trim()}</span>{m.date && <span>{fmtDate(m.date, { withYear: true })}</span>}{!tripId && <span className="chip blue">{trip.name}</span>}</div>
+              {why && <div className="meta">{why}</div>}
             </div>
             <div className="row" style={{ gap: 6, flex: 'none' }}>
               <button type="button" className="btn primary" disabled={!!reading} onClick={() => review({ m, trip })}>{reading === m.id ? 'Reading…' : 'Include'}</button>
