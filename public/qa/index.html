@@ -214,7 +214,7 @@ function inspect(win) {
 }
 const q = new URLSearchParams(location.search);
 const w = +(q.get('w') || 412), h = +(q.get('h') || (w <= 320 ? 640 : w <= 360 ? 760 : w <= 390 ? 844 : 860)), big = q.get('big') === '1', hash = q.get('hash') || 'list';
-// Two sample emailed receipts: one that isn't a receipt, one with a guess to check. Already "read",
+// Sample emails: two that aren't receipts, a receipt with a guess to check, a hotel and a flight. Already "read",
 // so no AI call is made.
 function seedInbox() {
   const now = Date.now();
@@ -225,6 +225,8 @@ function seedInbox() {
     // A flight bought three weeks ago for the Warsaw trip that starts in 20 days: matched by its travel dates.
     { id: 'qa-mail-4', from: 'LOT Polish Airlines <demo@example.com>', subject: 'Your flight to Warsaw is booked', date: now - 21 * 864e5,
       text: `Departs ${new Date(now + 20 * 864e5).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} from Washington Dulles. Returns ${new Date(now + 24 * 864e5).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}.` },
+    // Everyday mail, as when all mail is forwarded: set aside without an AI read, never listed.
+    { id: 'qa-mail-5', from: 'demo@example.com', subject: 'Dinner on Sunday?', date: now - 2 * 36e5, text: 'Are you free after church? Bring the kids.' },
   ]));
   localStorage.setItem('sla-email-reads', JSON.stringify({
     'qa-mail-1': { isReceipt: false, store: '', items: [] },

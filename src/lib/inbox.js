@@ -29,6 +29,19 @@ export const isForwardingConfirmation = (from) => /forwarding-noreply@google\.co
 // A safe key part for an email address or message id.
 export const keyPart = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9@._+-]/g, '').slice(0, 120);
 
+// Whether an email could be a receipt, judged from its words alone, before any AI read. When
+// a person forwards all their mail, most of it isn't receipts: mail that fails this is never
+// stored by the server, never sent to the AI reader and never shown in the list. It leans
+// toward yes, so a receipt is rarely set aside; the AI reader then makes the real call.
+const RECEIPT_WORDS = /\b(receipts?|invoices?|orders?|ordered|purchases?|purchased|payments?|paid|charged?|transactions?|totals?|subtotal|amount due|bill|billed|billing|folio|itinerar(?:y|ies)|e-?tickets?|tickets?|boarding pass|flights?|hotels?|booking|booked|reservations?|confirmations?|confirmed|refund(?:ed)?|rentals?|subscriptions?|renewal|renewed|shipped|delivered|checkout)\b/i;
+const MONEY = /(?:US\$|C\$|\$|USD|€|£|EUR|GBP|PLN|zł|CAD)\s?\d|\d[\d,]*\.\d{2}\s?(?:USD|EUR|GBP|PLN|zł|CAD)\b/i;
+export function looksLikeReceipt(m) {
+  if (Array.isArray(m?.pdfs) && m.pdfs.length) return true;
+  if (RECEIPT_WORDS.test(String(m?.subject || ''))) return true;
+  const text = String(m?.text || '').slice(0, 20000);
+  return RECEIPT_WORDS.test(text) && MONEY.test(text);
+}
+
 // Splits a read receipt into lines that can be saved straight away and lines a person should
 // check. A strong match (the AI named a list item exactly, or the names agree closely) is safe
 // to check off; a weaker guess is held for the person to confirm. Lines that match nothing

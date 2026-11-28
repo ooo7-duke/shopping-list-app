@@ -13,7 +13,7 @@ import { aiErrorMessage } from '../lib/errors.js';
 import { CameraIcon } from './Icons.jsx';
 import { extractReceiptText } from '../lib/receipts.js';
 import { fetchInbox, ackInbox, cachedRead, cacheRead, dropRead } from '../lib/emailReceipts.js';
-import { planLines, alreadySaved, INBOX_ADDRESS } from '../lib/inbox.js';
+import { planLines, alreadySaved, looksLikeReceipt, INBOX_ADDRESS } from '../lib/inbox.js';
 import { HOUSEHOLD_CATEGORIES, householdCategories, isHouseholdList, foldCategory } from '../lib/categories.js';
 import { emailTrip, notTravelIds } from '../lib/expenses.js';
 import FitText from './FitText.jsx';
@@ -322,9 +322,13 @@ function EmailedReceipts() {
     let data;
     try { data = await fetchInbox(); } catch (e) { setInbox({ loading: false, error: e.message, items: [] }); return; }
     setInbox({ loading: false, ...data });
-    const out = { found: 0, travel: 0 };
+    const out = { found: 0, travel: 0, other: 0 };
     const notTravel = notTravelIds();
+    // Mail that isn't a receipt never shows here. Words alone rule most of it out without an AI
+    // read; the AI reader rules out the rest. Either way it is cleared from the inbox.
+    const setAside = async (id) => { out.other++; dropRead(id); setOne(id, { status: 'dismissed' }); await ackInbox(id).catch(() => {}); };
     for (const m of data.items || []) {
+      if (!looksLikeReceipt(m)) { await setAside(m.id); continue; }
       if (!notTravel.includes(m.id) && emailTrip(m, latest.current.expenseTrips, latest.current.expenses)) { out.travel++; continue; }
       setOne(m.id, { status: 'reading', m });
       try {
@@ -333,18 +337,19 @@ function EmailedReceipts() {
           res = await extractReceiptText(m, latest.current.items.map((i) => i.name), backend.getApp(), cats);
           cacheRead(m.id, res);
         }
+        if (!res.isReceipt) { await setAside(m.id); continue; }
         const plan = planLines(res, latest.current.items, cats);
-        // Nothing from email is saved on its own. Every email waits here for the person to include
-        // or exclude it, with a note when it doesn't look like a receipt or looks already saved.
-        const dup = res.isReceipt && alreadySaved(latest.current.receipts, { emailId: m.id, orderId: res.orderId, store: res.store });
+        // Nothing from email is saved on its own. Every receipt waits here for the person to
+        // include or exclude it, with a note when it looks already saved.
+        const dup = alreadySaved(latest.current.receipts, { emailId: m.id, orderId: res.orderId, store: res.store });
         out.found++;
-        setOne(m.id, { status: 'review', why: !res.isReceipt ? 'other' : dup ? 'dup' : '', m, res, plan });
+        setOne(m.id, { status: 'review', why: dup ? 'dup' : '', m, res, plan });
       } catch (e) {
         console.error(e);
         setOne(m.id, { status: 'error', m, error: aiErrorMessage(e, 'Receipt reading') });
       }
     }
-    if (out.found || out.travel) setDone(out);
+    if (out.found || out.travel || out.other) setDone(out);
   }
 
   function openReview(id) {
@@ -359,7 +364,7 @@ function EmailedReceipts() {
   }
 
   const waiting = Object.entries(state).filter(([, v]) => ['review', 'reading', 'error'].includes(v.status));
-  const nothingYet = !inbox.loading && !waiting.length && !done;
+  const nothingYet = !inbox.loading && !waiting.length && !done?.found && !done?.travel;
 
   return (
     <>
@@ -372,6 +377,7 @@ function EmailedReceipts() {
             {[
               done.found ? `Found ${plural(done.found, 'email')}. Include the ones you want on the record and exclude the rest.` : '',
               done.travel ? `${done.travel} look${done.travel === 1 ? 's' : ''} like travel and ${done.travel === 1 ? 'is' : 'are'} waiting on the Expense Report page.` : '',
+              done.other ? `Skipped ${plural(done.other, 'email')} that ${done.other === 1 ? "isn't a receipt" : "aren't receipts"}.` : '',
             ].filter(Boolean).join(' ')}
           </p>
         )}
@@ -383,7 +389,6 @@ function EmailedReceipts() {
                 {v.status === 'reading' ? 'Reading…'
                   : v.status === 'error' ? `Couldn't read it. ${v.error}`
                   : v.why === 'dup' ? 'Looks already saved'
-                  : v.why === 'other' ? 'Doesn\'t look like a receipt'
                   : `${plural(v.plan.lines.length, 'item')}${v.plan.weak ? ` · ${v.plan.weak} best guess${v.plan.weak === 1 ? '' : 'es'} to check` : ''}`}
                 {v.m?.date ? ` · emailed\u00a0${fmtDate(v.m.date).replace(/ /g, '\u00a0')}` : ''}
               </div>

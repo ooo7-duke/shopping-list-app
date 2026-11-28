@@ -13,7 +13,7 @@
 import { getStore } from '@netlify/blobs';
 import { timingSafeEqual } from 'node:crypto';
 import { signedIn } from '../lib/auth.mjs';
-import { forwarderOf, isForwardingConfirmation, keyPart } from '../../src/lib/inbox.js';
+import { forwarderOf, isForwardingConfirmation, keyPart, looksLikeReceipt } from '../../src/lib/inbox.js';
 
 const KEEP_DAYS = 30;
 const MAX_TEXT = 60_000;
@@ -47,13 +47,17 @@ export default async (req) => {
     const msgs = Array.isArray(body.messages) ? body.messages.slice(0, 50) : [];
     let filed = 0;
     let skipped = 0;
+    let notReceipts = 0;
+    let full = 0;
     for (const m of msgs) {
       const id = keyPart(m.id);
       const who = forwarderOf(m.from, m.forwardedFor);
       if (!id || !who || isForwardingConfirmation(m.from)) { skipped++; continue; }
+      // Mail that can't be a receipt (when all mail is forwarded, most of it) is never stored.
+      if (!looksLikeReceipt(m)) { notReceipts++; continue; }
       if (await store.get(`done/${id}`)) { skipped++; continue; }
       const { blobs } = await store.list({ prefix: `pending/${keyPart(who)}/` });
-      if (blobs.length >= MAX_PER_PERSON) { skipped++; continue; }
+      if (blobs.length >= MAX_PER_PERSON) { full++; continue; }
       const pdfs = (Array.isArray(m.pdfs) ? m.pdfs : []).filter((p) => p && typeof p.data === 'string' && p.data.length <= MAX_PDF).slice(0, 2)
         .map((p) => ({ name: String(p.name || 'receipt.pdf').slice(0, 120), data: p.data }));
       await store.setJSON(`pending/${keyPart(who)}/${id}`, {
@@ -63,7 +67,10 @@ export default async (req) => {
       filed++;
     }
     await prune(store).catch(() => {});
-    return json({ ok: true, filed, skipped });
+    // Too many waiting: answer with an error so the script doesn't label the email as sent and
+    // tries it again on a later run, instead of dropping it without a word.
+    if (full) return json({ error: 'Too many emails waiting', filed, skipped, notReceipts, full }, 429);
+    return json({ ok: true, filed, skipped, notReceipts });
   }
 
   const user = await signedIn(req).catch(() => null);

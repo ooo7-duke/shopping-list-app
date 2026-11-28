@@ -896,3 +896,22 @@ describe('Batch delete with Undo', () => {
     expect(db.expenseTrips.t1.name).toBe('CES');
   });
 });
+
+import { looksLikeReceipt } from './inbox.js';
+describe('looksLikeReceipt', () => {
+  it('lets receipts, orders, folios and flights through', () => {
+    expect(looksLikeReceipt({ subject: 'Your Giant Food receipt' })).toBe(true);
+    expect(looksLikeReceipt({ subject: 'Your Home Depot order has shipped' })).toBe(true);
+    expect(looksLikeReceipt({ subject: 'Your Frankfurt Marriott Hotel folio' })).toBe(true);
+    expect(looksLikeReceipt({ subject: 'Your flight to Warsaw is booked' })).toBe(true);
+    expect(looksLikeReceipt({ subject: 'Thanks for shopping', text: 'Order total: $42.10' })).toBe(true);
+    expect(looksLikeReceipt({ subject: 'Thanks', text: 'Amount paid 120.00 PLN' })).toBe(true);
+    expect(looksLikeReceipt({ subject: 'Scan', pdfs: [{ name: 'doc.pdf', data: 'x' }] })).toBe(true);
+  });
+  it('keeps everyday mail out', () => {
+    expect(looksLikeReceipt({ subject: 'Dinner on Sunday?', text: 'Are you free after church? Bring the kids.' })).toBe(false);
+    expect(looksLikeReceipt({ subject: 'Weekly newsletter', text: 'Five tips for a better garden this fall.' })).toBe(false);
+    expect(looksLikeReceipt({ subject: 'Meeting notes', text: 'We spent about $500 on snacks last year.' })).toBe(false);
+    expect(looksLikeReceipt({})).toBe(false);
+  });
+});
