@@ -1,15 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
 import { useApp } from '../AppContext.jsx';
 import Sheet from './Sheet.jsx';
 import { CameraIcon, PlusIcon, DownloadIcon, TrashIcon } from './Icons.jsx';
 import { compressImage, isImageFile, toReadableImage } from '../lib/receipts.js';
 import {
   EXPENSE_CATEGORIES, categoryLabel, isMeal, tripDays, perDiemDays, businessAmount, expenseFlags, tripTotals,
-  sortExpenses, expensesCSV, dayKey, fromDayKey, extractExpense, extractExpenseText, emailTrip, notTravelIds, markNotTravel,
-  demoTravelInbox, GSA_MIE, hasReceipt, tripPhotos, captionFor, autoCaption, expenseWorkbook,
+  sortExpenses, dayKey, fromDayKey, extractExpense, extractExpenseText, emailTrip, notTravelIds, markNotTravel,
+  demoTravelInbox, GSA_MIE, hasReceipt, tripPhotos, autoCaption, expenseWorkbook,
 } from '../lib/expenses.js';
 import { xlsxBytes } from '../lib/xlsx.js';
+import { buildReportPdf } from '../lib/reportPdf.js';
 import { fetchInbox, ackInbox } from '../lib/emailReceipts.js';
 import {
   saveExpenseTrip, updateExpenseTrip, deleteExpenseTrip, saveExpense, deleteExpense, getExpenseImage, setPhotoCaption,
@@ -187,7 +187,6 @@ function TripDetail({ trip, expenses, onBack, onEdit, onDeleted }) {
   const [busy, setBusy] = useState('');
   const [over, setOver] = useState(false);
   const [editing, setEditing] = useState(null);
-  const [printing, setPrinting] = useState(0);
   const [confirmDel, setConfirmDel] = useState(false);
   const cameraRef = useRef(); const pickRef = useRef();
   const list = sortExpenses(expenses);
@@ -227,18 +226,6 @@ function TripDetail({ trip, expenses, onBack, onEdit, onDeleted }) {
     setEditing({ ...read, tripId: trip.id, paidWith: 'personal', source: 'photo', newImages: [image], date: read.date || Date.now() });
   }
   function clear() { if (cameraRef.current) cameraRef.current.value = ''; if (pickRef.current) pickRef.current.value = ''; }
-
-  function download(kind) {
-    const base = trip.name.replace(/[^\w -]+/g, '').trim() || 'trip';
-    const blob = kind === 'csv'
-      ? new Blob([`﻿${expensesCSV(trip, expenses)}`], { type: 'text/csv;charset=utf-8' })
-      : new Blob([xlsxBytes(expenseWorkbook(trip, expenses))], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `${base} expense report.${kind}`;
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
-  }
 
   const byDay = [];
   for (const e of list) {
@@ -323,20 +310,7 @@ function TripDetail({ trip, expenses, onBack, onEdit, onDeleted }) {
 
       <ReceiptGallery expenses={list} onOpenExpense={(e) => setEditing(e)} />
 
-      <div className="section-h"><h2>Send it in</h2></div>
-      <div className="card stack">
-        <p className="small">The PDF has the summary, every expense, your notes and each receipt photo with its caption. On a phone, tap Share or Print, then save it as a PDF. The Excel file has the same expenses with totals that add up as you edit.</p>
-        <div className="drop-actions" style={{ justifyContent: 'flex-start' }}>
-          <button type="button" className="btn primary" onClick={() => setPrinting((n) => n + 1)} disabled={!list.length}>PDF with receipts</button>
-          <button type="button" className="btn" onClick={() => download('xlsx')} disabled={!list.length}><DownloadIcon width="20" height="20" /> Excel</button>
-          <button type="button" className="btn ghost" onClick={() => download('csv')} disabled={!list.length}>CSV</button>
-        </div>
-        <label className="row small" style={{ gap: 8 }}>
-          <input type="checkbox" checked={trip.status === 'submitted'} style={{ width: 22, height: 22 }}
-            onChange={async (ev) => { const status = ev.target.checked ? 'submitted' : 'open'; await updateExpenseTrip(ctx, trip.id, { status }); showToast(status === 'submitted' ? 'Marked as submitted' : 'Marked as not submitted yet', () => updateExpenseTrip(ctx, trip.id, { status: trip.status || 'open' })); }} />
-          I've submitted this report
-        </label>
-      </div>
+      <SendReport trip={trip} expenses={list} totals={totals} />
 
       <button type="button" className="btn danger block" style={{ marginTop: 20 }}
         onClick={async () => { if (!confirmDel) { setConfirmDel(true); return; } await deleteExpenseTrip(ctx, trip, expenses); showToast(`Deleted ${trip.name} and its ${expenses.length} expense${expenses.length === 1 ? '' : 's'}`); onDeleted(); }}>
@@ -344,7 +318,6 @@ function TripDetail({ trip, expenses, onBack, onEdit, onDeleted }) {
       </button>
 
       {editing && <ExpenseSheet initial={editing} trip={trip} all={expenses} onClose={() => setEditing(null)} onSaved={() => setEditing(null)} />}
-      {printing > 0 && <PrintReport key={printing} trip={trip} expenses={list} />}
     </>
   );
 }
@@ -630,85 +603,6 @@ function TravelInbox({ tripId, onReview }) {
   );
 }
 
-// The report for printing or saving as a PDF: drawn off screen, shown only to the printer.
-function PrintReport({ trip, expenses }) {
-  const { ctx, user } = useApp();
-  const [imgs, setImgs] = useState(null);
-  const totals = tripTotals(trip, expenses);
-  useEffect(() => {
-    let live = true;
-    (async () => {
-      const out = [];
-      for (const p of tripPhotos(expenses)) {
-        const d = await getExpenseImage(ctx, p.id).catch(() => null);
-        if (d?.dataUrl) out.push({ ...p, src: d.dataUrl });
-      }
-      if (live) setImgs(out);
-    })();
-    return () => { live = false; };
-  }, []);
-  useEffect(() => {
-    if (!imgs) return;
-    const prev = document.title;
-    document.title = `${trip.name} expense report`;
-    const t = setTimeout(() => window.print(), 300);
-    const after = () => { document.title = prev; };
-    window.addEventListener('afterprint', after, { once: true });
-    return () => { clearTimeout(t); document.title = prev; };
-  }, [imgs]);
-  if (!imgs) return null;
-  return createPortal(
-    <div className="print-report">
-      <h1>Expense report: {trip.name}</h1>
-      <table className="p-head"><tbody>
-        <tr><th>Employee</th><td>{user?.name}</td><th>Dates</th><td>{fmtRange(trip.startDate, trip.endDate)}</td></tr>
-        <tr><th>Location</th><td>{trip.location}</td><th>Charge code</th><td>{trip.chargeCode || ''}</td></tr>
-        <tr><th>Employer</th><td>{trip.employer || ''}</td><th>Project</th><td>{trip.project || ''}</td></tr>
-        <tr><th>Purpose</th><td colSpan={3}>{trip.purpose || ''}</td></tr>
-      </tbody></table>
-      <h2>Summary</h2>
-      <table className="p-table"><tbody>
-        {totals.byCategory.map((c) => <tr key={c.id}><td>{c.label}</td><td className="num">{fmtMoney(c.spent)}</td><td className="num">{fmtMoney(c.business)}</td></tr>)}
-        {totals.perDiem > 0 && <tr><td>Meals per diem (${trip.mieRate} a day, 75% on travel days)</td><td /><td className="num">{fmtMoney(totals.perDiem)}</td></tr>}
-        <tr className="tot"><td>Total spent / claimed</td><td className="num">{fmtMoney(totals.spent)}</td><td className="num">{fmtMoney(totals.business + totals.perDiem)}</td></tr>
-        <tr><td>Personal, not claimed</td><td /><td className="num">{fmtMoney(totals.personal)}</td></tr>
-        <tr><td>Paid on a company card</td><td /><td className="num">{fmtMoney(totals.companyCard)}</td></tr>
-        <tr className="tot"><td>Owed to the employee</td><td /><td className="num">{fmtMoney(totals.owedToYou)}</td></tr>
-      </tbody></table>
-      <h2>Expenses</h2>
-      <table className="p-table">
-        <thead><tr><th>Date</th><th>Category</th><th>Merchant</th><th>Paid with</th><th className="num">Amount</th><th className="num">Claimed</th><th>Notes</th></tr></thead>
-        <tbody>
-          {expenses.map((e) => {
-            const biz = trip.mealsMode === 'perDiem' && isMeal(e.category) ? 0 : businessAmount(e);
-            const flags = expenseFlags(e, expenses, trip).filter((f) => f.level === 'warn').map((f) => f.label);
-            return (
-              <tr key={e.id}>
-                <td>{e.date ? fmtDate(e.date, { withYear: true }) : ''}{e.time ? ` ${fmtTime(e.time)}` : ''}</td>
-                <td>{categoryLabel(e.category)}</td>
-                <td>{e.merchant}{hasReceipt(e) ? '' : ' (no receipt)'}</td>
-                <td>{e.paidWith === 'corporate' ? 'Company card' : 'Personal'}</td>
-                <td className="num">{fmtMoney(e.amount)}</td>
-                <td className="num">{fmtMoney(biz)}</td>
-                <td>{[e.notes, ...flags].filter(Boolean).join('. ')}{e.nights?.some((n) => n.personal) ? ` Personal nights: ${e.nights.filter((n) => n.personal).map((n) => fmtDate(n.date)).join(', ')}.` : ''}</td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-      <div className="p-sign"><span>Employee signature</span><span>Date</span><span>Approver</span><span>Date</span></div>
-      {imgs.map(({ e, src, caption }, i) => (
-        <div key={i} className="p-receipt">
-          <h3>Receipt {i + 1}: {caption}</h3>
-          <p className="p-sub">{e.date ? fmtDate(e.date, { withYear: true }) : ''}{e.time ? ` at ${fmtTime(e.time)}` : ''} · {categoryLabel(e.category)}</p>
-          <img src={src} alt={caption} />
-        </div>
-      ))}
-    </div>,
-    document.body,
-  );
-}
-
 // Receipt photos load one by one and are kept for the session, so going back and forth
 // between trips doesn't download them again.
 const photoCache = new Map();
@@ -785,5 +679,104 @@ function PhotoViewer({ p, onClose, onOpenExpense }) {
         {src && <a className="btn ghost" href={src} download={`${text.replace(/[^\w ,.$-]+/g, '').slice(0, 60) || 'receipt'}.${(src.match(/^data:image\/(\w+)/) || [])[1]?.replace('jpeg', 'jpg').replace('svg+xml', 'svg') || 'jpg'}`}>Save photo</a>}
       </div>
     </Sheet>
+  );
+}
+
+const safeName = (n) => (String(n || '').replace(/[^\w ,.-]+/g, '').trim() || 'Trip');
+const saveFile = (file) => {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(file); a.download = file.name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+};
+
+// Makes the PDF and Excel files, then hands them to the phone's share sheet (Mail, Gmail,
+// Outlook, Messages, WhatsApp, Drive, AirDrop and the rest), or downloads them. The files are
+// made first and shared on a second tap, because browsers only open the share sheet straight
+// after a tap and a report with many receipts takes a few seconds to build.
+function SendReport({ trip, expenses, totals }) {
+  const { ctx, user, showToast } = useApp();
+  const [files, setFiles] = useState(null);
+  const [busy, setBusy] = useState('');
+  const [mailed, setMailed] = useState(false);
+  const stamp = `${trip.updatedAt || 0}:${expenses.map((e) => `${e.id}.${e.updatedAt || 0}`).join(',')}`;
+  const ready = files && files.stamp === stamp;
+  const canShareFiles = (list) => { try { return !!navigator.canShare?.({ files: list }); } catch { return false; } };
+
+  async function prepare() {
+    setBusy('Making the PDF…'); setMailed(false);
+    try {
+      const base = `${safeName(trip.name)} expense report`;
+      const pdfBlob = await buildReportPdf({
+        trip, expenses, userName: user?.name || '', onProgress: setBusy,
+        loadPhoto: async (id) => (await getExpenseImage(ctx, id))?.dataUrl,
+      });
+      const pdf = new File([pdfBlob], `${base}.pdf`, { type: 'application/pdf' });
+      const xlsx = new File([xlsxBytes(expenseWorkbook(trip, expenses))], `${base}.xlsx`, { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      setFiles({ pdf, xlsx, stamp });
+    } catch (e) {
+      console.error(e);
+      showToast("Couldn't make the report. Try again, and if it keeps failing, use the Excel file.", null, 8000);
+    }
+    setBusy('');
+  }
+
+  const subject = `Expense report: ${trip.name} (${fmtRange(trip.startDate, trip.endDate)})`;
+  const body = `Attached is my expense report for ${trip.name}, ${trip.location}, ${fmtRange(trip.startDate, trip.endDate)}.\n\nTotal claimed: ${fmtMoney(totals.business + totals.perDiem)}\nOwed to me: ${fmtMoney(totals.owedToYou)}\nPaid on the company card: ${fmtMoney(totals.companyCard)}\n\nThe PDF has every expense and receipt; the Excel file has the same lines.`;
+
+  async function share() {
+    const both = [files.pdf, files.xlsx];
+    const list = canShareFiles(both) ? both : [files.pdf];
+    try {
+      await navigator.share({ files: list, title: subject, text: body });
+    } catch (e) {
+      if (e?.name === 'AbortError') return;
+      console.error(e);
+      showToast("Your phone didn't open the share menu. Use Download or Email instead.", null, 8000);
+    }
+  }
+
+  function email() {
+    saveFile(files.pdf);
+    setTimeout(() => saveFile(files.xlsx), 400);
+    setMailed(true);
+    setTimeout(() => { window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`; }, 900);
+  }
+
+  const shareable = ready && canShareFiles([files.pdf]);
+  return (
+    <>
+      <div className="section-h"><h2>Send it in</h2></div>
+      <div className="card stack">
+        <p className="small">The PDF has the summary, every expense with your notes, and each receipt photo with its caption. The Excel file has the same lines with totals that add up as you edit.</p>
+        {!ready ? (
+          <button type="button" className="btn primary block" onClick={prepare} disabled={!expenses.length || !!busy}>
+            {busy || 'Get the report ready'}
+          </button>
+        ) : (
+          <>
+            <p className="small" style={{ fontWeight: 600 }}>Ready: {files.pdf.name.replace(/\.pdf$/, '')}, PDF ({Math.max(1, Math.round(files.pdf.size / 1024))} KB) and Excel.</p>
+            <div className="drop-actions" style={{ justifyContent: 'flex-start' }}>
+              {shareable && <button type="button" className="btn primary" onClick={share}>Share or email</button>}
+              {!shareable && <button type="button" className="btn primary" onClick={email}>Email</button>}
+              <button type="button" className="btn" onClick={() => saveFile(files.pdf)}><DownloadIcon width="20" height="20" /> PDF</button>
+              <button type="button" className="btn" onClick={() => saveFile(files.xlsx)}><DownloadIcon width="20" height="20" /> Excel</button>
+              {shareable && <button type="button" className="btn ghost" onClick={email}>Email draft</button>}
+            </div>
+            <p className="tiny muted">
+              {shareable
+                ? 'Share or email opens your phone’s share menu with both files attached: Mail, Gmail, Outlook, Messages, WhatsApp, Drive and the rest.'
+                : 'This browser can’t attach files for you. Email saves both files and opens a draft in your mail app; attach the two files from your Downloads.'}
+            </p>
+            {mailed && <p className="small" style={{ color: 'var(--gold-ink)', fontWeight: 600 }}>Both files are in your Downloads. Attach them to the email draft before you send it.</p>}
+          </>
+        )}
+        <label className="row small" style={{ gap: 8 }}>
+          <input type="checkbox" checked={trip.status === 'submitted'} style={{ width: 22, height: 22 }}
+            onChange={async (ev) => { const status = ev.target.checked ? 'submitted' : 'open'; await updateExpenseTrip(ctx, trip.id, { status }); showToast(status === 'submitted' ? 'Marked as submitted' : 'Marked as not submitted yet', () => updateExpenseTrip(ctx, trip.id, { status: trip.status || 'open' })); }} />
+          I've submitted this report
+        </label>
+      </div>
+    </>
   );
 }
