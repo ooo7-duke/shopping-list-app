@@ -4,7 +4,7 @@ import QuickAdd from './QuickAdd.jsx';
 import SwipeRow from './SwipeRow.jsx';
 import ItemRow from './ItemRow.jsx';
 import ItemSheet from './ItemSheet.jsx';
-import { isOnList, isRecentlyBought, markBought, snoozeUntil, takeOffList, putOnList, estimate } from '../data/actions.js';
+import { isOnList, isRecentlyBought, takeBackOps, markBought, snoozeUntil, takeOffList, putOnList, estimate } from '../data/actions.js';
 import Sheet from './Sheet.jsx';
 import SnoozePicker from './SnoozePicker.jsx';
 import { lastPurchaseMap, lastBuy } from '../lib/history.js';
@@ -181,12 +181,37 @@ export default function ListView() {
   }
   async function unbuy(it) {
     // Undo a check-off from the last day: remove that purchase and put the item back.
-    const hist = purchases.filter((x) => x.itemId === it.id).sort((a, b) => b.purchasedAt - a.purchasedAt);
-    const p = hist[0] && now - hist[0].purchasedAt < DAY ? hist[0] : null;
-    const ops = [{ type: 'update', coll: 'items', id: it.id, data: { status: 'needed', lastPurchasedAt: (p ? hist[1] : hist[0])?.purchasedAt ?? null } }];
-    if (p) ops.push({ type: 'remove', coll: 'purchases', id: p.id });
-    await backend.commit(ctx.accountId, ops);
+    await backend.commit(ctx.accountId, takeBackOps(it, purchases, 'list', Date.now()).ops);
     showToast(`${it.name} is back on the list`);
+  }
+  // Got it today: press and hold a row to start picking, then delete the picked purchases in one go.
+  // Delete erases those purchases from history and keeps the items off the list, with Undo.
+  const [picked, setPicked] = useState(null); // null when not picking, else a Set of item ids
+  const [delAsk, setDelAsk] = useState(false);
+  const pickedRows = picked ? recent.filter((it) => picked.has(it.id)) : [];
+  const togglePick = (id) => setPicked((s) => { const n = new Set(s || []); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  const startPick = (id) => setPicked((s) => (s ? s : new Set([id])));
+  const stopPick = () => { setPicked(null); setDelAsk(false); };
+  useEffect(() => { if (picked && !recent.length) stopPick(); }, [picked, recent.length]);
+  async function deletePicked() {
+    const list = pickedRows;
+    setDelAsk(false);
+    if (!list.length) return;
+    const at = Date.now();
+    const ops = [];
+    const back = [];
+    for (const it of list) {
+      const r = takeBackOps(it, purchases, 'gone', at);
+      ops.push(...r.ops);
+      back.push(...r.back);
+    }
+    try {
+      await backend.commit(ctx.accountId, ops);
+      setPicked(null);
+      showToast(`Deleted ${list.length} purchase${list.length === 1 ? '' : 's'} from history`, () => backend.commit(ctx.accountId, back), 12000);
+    } catch (e) {
+      showToast(saveErrorMessage(e, 'delete those purchases'));
+    }
   }
   const act = (fn, msg) => async (it) => { const undo = await fn(ctx, it); showToast(msg(it), undo); };
   // Snoozing asks how long: the clock button, a swipe left and the S key all open the choices.
@@ -351,11 +376,50 @@ export default function ListView() {
 
       {recent.length > 0 && editor && (
         <section aria-labelledby="got-h">
-          <div className="section-h"><h2 id="got-h">Got it today</h2><span className="small muted">tap a check to undo</span></div>
-          <div className="list">
-            {recent.map((it) => <ItemRow key={it.id} item={it} done onToggle={() => unbuy(it)} onOpen={() => open(it.id)} />)}
+          <div className="section-h">
+            <h2 id="got-h">Got it today</h2>
+            {picked ? (
+              <div className="row" style={{ gap: 4 }}>
+                <span className="small" aria-live="polite">{picked.size} selected</span>
+                <button type="button" className="btn ghost" onClick={() => setPicked(picked.size === recent.length ? new Set() : new Set(recent.map((it) => it.id)))}>
+                  {picked.size === recent.length ? 'Select none' : 'Select all'}
+                </button>
+                <button type="button" className="btn ghost" onClick={stopPick}>Cancel</button>
+              </div>
+            ) : (
+              <span className="small muted">tap a check to undo · press and hold to select</span>
+            )}
           </div>
+          <div className="list">
+            {recent.map((it) => (
+              <ItemRow
+                key={it.id} item={it} done selecting={!!picked} selected={!!picked?.has(it.id)}
+                onLongPress={() => startPick(it.id)}
+                onToggle={() => (picked ? togglePick(it.id) : unbuy(it))}
+                onOpen={() => (picked ? togglePick(it.id) : open(it.id))}
+              />
+            ))}
+          </div>
+          {picked && (
+            <div className="pick-bar" role="toolbar" aria-label="Selected purchases">
+              <span>{picked.size} selected</span>
+              <button type="button" className="btn danger" disabled={!picked.size} onClick={() => setDelAsk(true)}>
+                Delete{picked.size ? ` ${picked.size}` : ''}
+              </button>
+            </div>
+          )}
         </section>
+      )}
+
+      {delAsk && pickedRows.length > 0 && (
+        <Sheet title={`Delete ${pickedRows.length} purchase${pickedRows.length === 1 ? '' : 's'}?`} onClose={() => setDelAsk(false)}>
+          <p>This erases today's purchase of {pickedRows.length === 1 ? pickedRows[0].name : `these ${pickedRows.length} items`} from your history for everyone who shares the list. {pickedRows.length === 1 ? 'It stays' : 'They stay'} off the list.</p>
+          <p className="small muted">If one came from a receipt, that line leaves the receipt too. Earlier purchases stay. You can tap Undo for a few seconds after.</p>
+          <div className="row" style={{ gap: 10, marginTop: 14 }}>
+            <button type="button" className="btn grow" onClick={() => setDelAsk(false)}>Cancel</button>
+            <button type="button" className="btn danger grow" onClick={deletePicked}>Delete {pickedRows.length}</button>
+          </div>
+        </Sheet>
       )}
 
       {snoozed.length > 0 && editor && (

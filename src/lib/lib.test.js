@@ -771,3 +771,41 @@ describe('Clear all and Remove from list log nothing as bought', () => {
     expect(writes.some((w) => w.coll === 'purchases')).toBe(true);
   });
 });
+
+import { takeBackOps } from '../data/actions.js';
+describe('Got it today: delete selected purchases', () => {
+  const now = Date.UTC(2026, 10, 28, 12);
+  const item = { id: 'm', name: 'Milk', status: 'stocked', lastPurchasedAt: now - 3600e3, lastPrice: 3.69, lastQty: 1, lastStore: 'Giant' };
+  const purchases = [
+    { id: 'p1', itemId: 'm', purchasedAt: now - 3600e3, unitPrice: 3.69, qty: 1, store: 'Giant' },
+    { id: 'p0', itemId: 'm', purchasedAt: now - 7200e3, unitPrice: 3.5, qty: 2, store: 'Giant' },
+    { id: 'old', itemId: 'm', purchasedAt: now - 3 * DAY, unitPrice: 3.8, qty: 1, store: 'Target' },
+    { id: 'x', itemId: 'other', purchasedAt: now - 60e3 },
+  ];
+  it('erases every purchase from the last day and keeps the item off the list', () => {
+    const { ops } = takeBackOps(item, purchases, 'gone', now);
+    expect(ops.filter((o) => o.type === 'remove').map((o) => o.id).sort()).toEqual(['p0', 'p1']);
+    const up = ops[0].data;
+    expect(up.status).toBe('stocked');
+    expect(up.lastPurchasedAt).toBe(now - 3 * DAY);
+    expect(up.lastPrice).toBe(3.8);
+    expect(up.lastStore).toBe('Target');
+    expect(isRecentlyBought({ ...item, ...up }, now)).toBe(false);
+  });
+  it('Undo puts the purchases and the item back as they were', () => {
+    const { back } = takeBackOps(item, purchases, 'gone', now);
+    expect(back[0].data).toMatchObject({ status: 'stocked', lastPurchasedAt: now - 3600e3, lastPrice: 3.69, removedAt: null });
+    expect(back.filter((o) => o.type === 'set').map((o) => o.id).sort()).toEqual(['p0', 'p1']);
+    expect(back.find((o) => o.id === 'p1').data.id).toBeUndefined();
+  });
+  it('an item never bought before ends with no last purchase', () => {
+    const { ops } = takeBackOps(item, purchases.slice(0, 1), 'gone', now);
+    expect(ops[0].data.lastPurchasedAt).toBe(null);
+    expect(ops[0].data.lastPrice).toBeUndefined();
+  });
+  it('putting one back on the list still removes only the newest purchase', () => {
+    const { ops } = takeBackOps(item, purchases, 'list', now);
+    expect(ops.filter((o) => o.type === 'remove').map((o) => o.id)).toEqual(['p1']);
+    expect(ops[0].data).toEqual({ status: 'needed', lastPurchasedAt: now - 7200e3 });
+  });
+});

@@ -443,3 +443,14 @@ table.data td.num, table.data th.num { text-align: right; }
 .xviewer { display: flex; justify-content: center; background: var(--line); border-radius: 12px; overflow: hidden; }
 .xviewer img { max-width: 100%; max-height: 65vh; object-fit: contain; }
 .print-report .p-sub { margin: 0 0 6px; font-size: 10pt; color: #444; }
+
+/* ---------- Got it today: pick several ---------- */
+.item.holdable { -webkit-touch-callout: none; touch-action: manipulation; }
+.item.selected { background: var(--bb-soft); }
+.check.pick span { border-radius: 7px; }
+.pick-bar {
+  position: sticky; bottom: calc(10px + env(safe-area-inset-bottom)); z-index: 20; margin-top: 10px;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 8px 8px 16px;
+  background: var(--card); border: 1.5px solid var(--line); border-radius: 12px; box-shadow: 0 6px 20px rgba(20, 28, 64, 0.18); font-weight: 600;
+}
+.pick-bar .btn:disabled { opacity: 0.5; cursor: default; }

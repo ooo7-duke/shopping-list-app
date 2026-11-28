@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { describePrediction } from '../lib/predict.js';
 import { fmtMoney, fmtQty, fmtDate } from '../lib/format.js';
@@ -6,8 +6,27 @@ import { seenPrices, refurbPrice } from '../lib/prices.js';
 import { deptOf } from '../lib/tripPlan.js';
 import { ClockIcon, TrashIcon } from './Icons.jsx';
 
-export default function ItemRow({ item, pred, done, last, showHistory = false, onPrices, showStore = true, showCategory = false, onToggle, onOpen, onSnooze, onRemove, onDelete, readOnly, extra }) {
+export default function ItemRow({ item, pred, done, last, showHistory = false, onPrices, showStore = true, showCategory = false, onToggle, onOpen, onSnooze, onRemove, onDelete, readOnly, extra, onLongPress, selecting = false, selected = false }) {
   const [viewing, setViewing] = useState(false);
+  // Press and hold (or right-click) starts picking rows. The tap that ends the hold is swallowed,
+  // so it doesn't also open the item or untick it.
+  const press = useRef({ timer: null, fired: false, x: 0, y: 0 });
+  const stopPress = () => { clearTimeout(press.current.timer); press.current.timer = null; };
+  const hold = onLongPress ? {
+    onPointerDown: (e) => {
+      press.current.fired = false;
+      if (e.button > 0) return;
+      stopPress();
+      press.current.x = e.clientX; press.current.y = e.clientY;
+      press.current.timer = setTimeout(() => { press.current.fired = true; navigator.vibrate?.(15); onLongPress(); }, 500);
+    },
+    onPointerMove: (e) => { if (Math.abs(e.clientX - press.current.x) + Math.abs(e.clientY - press.current.y) > 10) stopPress(); },
+    onPointerUp: stopPress,
+    onPointerCancel: stopPress,
+    onPointerLeave: stopPress,
+    onContextMenu: (e) => { e.preventDefault(); stopPress(); if (!press.current.fired) { press.current.fired = true; onLongPress(); } },
+    onClickCapture: (e) => { if (press.current.fired) { press.current.fired = false; e.stopPropagation(); e.preventDefault(); } },
+  } : {};
   const qty = fmtQty(item.qty, item.unit);
   const predText = pred && pred.basis !== 'off' && pred.basis !== 'learning' ? describePrediction(pred) : '';
   const overdue = pred?.daysLeft != null && pred.daysLeft < 1;
@@ -30,15 +49,16 @@ export default function ItemRow({ item, pred, done, last, showHistory = false, o
   };
 
   return (
-    <div className={`item${done ? ' done' : ''}`} data-item-id={done ? undefined : item.id} onClick={onOpen} onKeyDown={onKeyDown} tabIndex={0} role="group" aria-label={`${item.name}${qty ? `, ${qty}` : ''}${done ? ', bought' : ''}`}>
+    <div className={`item${done ? ' done' : ''}${onLongPress ? ' holdable' : ''}${selected ? ' selected' : ''}`} data-item-id={done ? undefined : item.id} onClick={onOpen} onKeyDown={onKeyDown} {...hold} tabIndex={0} role="group" aria-label={`${item.name}${qty ? `, ${qty}` : ''}${done ? ', bought' : ''}${selected ? ', selected' : ''}`}>
       <button
-        type="button" className={`check${done ? ' on' : ''}`} onClick={(e) => { e.stopPropagation(); onToggle?.(); }}
-        aria-label={done ? `Put ${item.name} back on the list` : `Mark ${item.name} as bought`} disabled={readOnly} style={readOnly ? { visibility: 'hidden' } : undefined}
+        type="button" className={`check${selecting ? ' pick' : ''}${(selecting ? selected : done) ? ' on' : ''}`} onClick={(e) => { e.stopPropagation(); onToggle?.(); }}
+        aria-label={selecting ? `${selected ? 'Unselect' : 'Select'} ${item.name}` : done ? `Put ${item.name} back on the list` : `Mark ${item.name} as bought`} aria-pressed={selecting ? selected : undefined}
+        disabled={readOnly} style={readOnly ? { visibility: 'hidden' } : undefined}
       >
         <span />
       </button>
       {item.photo && (
-        <button type="button" className="thumb" onClick={(e) => { e.stopPropagation(); setViewing(true); }} aria-label={`See the photo of ${item.name}`}>
+        <button type="button" className="thumb" onClick={(e) => { e.stopPropagation(); if (selecting) onToggle?.(); else setViewing(true); }} aria-label={`See the photo of ${item.name}`}>
           <img src={item.photo} alt="" />
         </button>
       )}

@@ -92,6 +92,29 @@ export async function markBought(ctx, item, opts = {}) {
   ]) };
 }
 
+// Got it today: take back the last day's purchases of one item. mode 'list' puts it back on the
+// list, the same as tapping its check (only the newest purchase goes). mode 'gone' erases every
+// purchase from the last day and keeps the item off the list. Returns { ops, back }; back undoes it.
+export function takeBackOps(item, purchases, mode, now = Date.now()) {
+  const hist = purchases.filter((p) => p.itemId === item.id).sort((a, b) => b.purchasedAt - a.purchasedAt);
+  const today = hist.filter((p) => now - p.purchasedAt < DAY);
+  const drop = mode === 'gone' ? today : today.slice(0, 1);
+  const prev = hist.find((p) => !drop.includes(p));
+  const data = mode === 'gone'
+    ? clean({
+      status: 'stocked', removedAt: now, lastPurchasedAt: prev?.purchasedAt ?? null,
+      ...(prev ? { lastQty: prev.qty ?? null, lastStore: prev.store ?? null } : {}),
+      ...(prev?.unitPrice != null ? { lastPrice: prev.unitPrice } : {}),
+    })
+    : { status: 'needed', lastPurchasedAt: prev?.purchasedAt ?? null };
+  const ops = [{ type: 'update', coll: 'items', id: item.id, data }];
+  for (const p of drop) ops.push({ type: 'remove', coll: 'purchases', id: p.id });
+  const was = Object.fromEntries(Object.keys(data).map((k) => [k, item[k] ?? null]));
+  const back = [{ type: 'update', coll: 'items', id: item.id, data: was }];
+  for (const { id, ...rest } of drop) back.push({ type: 'set', coll: 'purchases', id, data: clean(rest) });
+  return { ops, back };
+}
+
 export async function setStatus(ctx, item, status, extra = {}) {
   const prev = { status: item.status, snoozeUntil: item.snoozeUntil ?? null };
   await ctx.backend.update(ctx.accountId, 'items', item.id, { status, ...extra });
