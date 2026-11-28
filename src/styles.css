@@ -513,8 +513,9 @@ table.data td.num, table.data th.num { text-align: right; }
    instead of squeezing it down to one letter. */
 .member-row { flex-wrap: wrap; row-gap: 6px; }
 .member-row > .grow { flex: 1 1 140px; min-width: 0; }
-.member-row > :last-child:not(.grow):not(select ~ *) { margin-left: auto; }
-.member-row > select { margin-left: auto; }
+.member-row > :last-child:not(.grow) { margin-left: auto; }
+/* The role picker and Remove stay together; when they don't fit beside the name they move under it as a pair. */
+.member-actions { flex: none; gap: 8px; }
 
 /* While picking rows, the select bar sits at the bottom; the back-to-top button would cover it. */
 body:has(.pick-bar) .to-top { display: none; }
