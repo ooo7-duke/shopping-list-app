@@ -28,6 +28,21 @@ function shortenWords(text, room, width) {
   }).join('');
 }
 
+// How many lines the words take when wrapped whole into `room`.
+function wrapCount(text, room, width) {
+  const sp = width(' ');
+  let n = 1;
+  let cur = 0;
+  for (const w of text.split(/\s+/)) {
+    if (!w) continue;
+    const ww = width(w);
+    if (!cur) cur = ww;
+    else if (cur + sp + ww <= room) cur += sp + ww;
+    else { n += 1; cur = ww; }
+  }
+  return n;
+}
+
 function fit(el) {
   const inner = el.firstElementChild;
   if (!inner || !el.isConnected) return false;
@@ -45,11 +60,11 @@ function fit(el) {
   const need = lines === 1 ? width(text) : Math.max(0, ...text.split(/\s+/).map(width));
   let s = need <= room ? 1 : Math.max(min, Math.floor((room / need) * 100) / 100);
   const apply = (v) => { el.dataset.fit = String(v); el.style.fontSize = v === 1 ? '' : `${(base * v).toFixed(2)}px`; };
-  if (s !== cur) apply(s);
+  // With fitLines, step the size down until the whole text wraps into its lines (measured, not guessed).
   if (el.dataset.fitLines && lines > 1) {
-    const lh = () => parseFloat(getComputedStyle(el).lineHeight) || base * s * 1.5;
-    while (s > min && el.scrollHeight > lines * lh() + 2) { s = Math.max(min, Math.round((s - 0.03) * 100) / 100); apply(s); }
+    while (s > min && wrapCount(text, room - 1, measurer(cs, base * s)) > lines) s = Math.max(min, Math.round((s - 0.02) * 100) / 100);
   }
+  if (s !== cur) apply(s);
   // Past the smallest size, a word that still can't fit is shortened, never split.
   if (lines > 1 && full != null) {
     // A box narrower than three letters is still being laid out; leave the words whole until it settles.
