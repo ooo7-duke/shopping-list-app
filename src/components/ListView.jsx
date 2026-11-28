@@ -12,6 +12,8 @@ import { describePrediction, DAY } from '../lib/predict.js';
 import { can, DEMO_MODE } from '../lib/config.js';
 import { classifyNames } from '../lib/classify.js';
 import { fmtMoney } from '../lib/format.js';
+import { saveErrorMessage } from '../lib/errors.js';
+import { TrashIcon } from './Icons.jsx';
 import { sharedThemes } from '../lib/themes.js';
 import { guessCategory, HOUSEHOLD_CATEGORIES } from '../lib/categories.js';
 
@@ -197,7 +199,23 @@ export default function ListView() {
     const back = new Date(until).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
     showToast(`Snoozed ${it.name} ${label.startsWith('until') ? '' : `for ${label} `}until ${back}`, undo);
   }
-  const doRemove = act(takeOffList, (it) => `Took ${it.name} off the list`);
+  const doRemove = act(takeOffList, (it) => `Deleted ${it.name} from the list`);
+  // Clear all: asks first, then takes every shown item off the list in one go, with Undo.
+  // Items go to "stocked", like a single delete, so their purchase history and prices stay.
+  const [clearAsk, setClearAsk] = useState(false);
+  async function clearAll() {
+    const list = shown.filter((it) => it.status !== 'ordered');
+    setClearAsk(false);
+    if (!list.length) return;
+    const ops = list.map((it) => ({ type: 'update', coll: 'items', id: it.id, data: { status: 'stocked' } }));
+    const back = list.map((it) => ({ type: 'update', coll: 'items', id: it.id, data: { status: it.status, snoozeUntil: it.snoozeUntil ?? null } }));
+    try {
+      await backend.commit(ctx.accountId, ops);
+      showToast(`Cleared ${list.length} item${list.length === 1 ? '' : 's'} from the list`, () => backend.commit(ctx.accountId, back), 12000);
+    } catch (e) {
+      showToast(saveErrorMessage(e, 'clear the list'));
+    }
+  }
   const doAdd = act(putOnList, (it) => `Added ${it.name}`);
 
   const total = estimate(shown);
@@ -265,6 +283,25 @@ export default function ListView() {
         </div>
       )}
 
+      {editor && shown.length > 0 && (
+        <div className="clear-row">
+          <button type="button" className="btn danger clear-btn" onClick={() => setClearAsk(true)}>
+            <TrashIcon /> {activeFilter.size ? `Clear these ${shown.length}` : 'Clear all'}
+          </button>
+        </div>
+      )}
+
+      {clearAsk && (
+        <Sheet title={activeFilter.size ? `Clear these ${shown.length} items?` : 'Clear the whole list?'} onClose={() => setClearAsk(false)}>
+          <p>This takes {shown.length === 1 ? 'the 1 item' : `all ${shown.length} items`}{activeFilter.size ? ' you are showing' : ''} off the list for everyone who shares it.</p>
+          <p className="small muted">Their purchase history and prices stay, so Running low and price checks still work. You can tap Undo for a few seconds after.</p>
+          <div className="row" style={{ gap: 10, marginTop: 14 }}>
+            <button type="button" className="btn grow" onClick={() => setClearAsk(false)}>Cancel</button>
+            <button type="button" className="btn danger grow" onClick={clearAll}>Clear {shown.length} item{shown.length === 1 ? '' : 's'}</button>
+          </div>
+        </Sheet>
+      )}
+
       {groups.length > 2 && (
         <div className="fold-all">
           {groups.every(([n]) => folded.has(foldId(n)))
@@ -294,7 +331,7 @@ export default function ListView() {
               <SwipeRow key={it.id} disabled={!editor} onRight={() => bought(it)} onLeft={() => doSnooze(it)} onFarLeft={() => doRemove(it)}>
                 <ItemRow item={it} pred={predictions[it.id]} showStore={groupBy !== 'store'} showCategory={groupBy === 'store'} readOnly={!editor}
                   showHistory last={lastBuy(it, latest[it.id])} onPrices={() => open(it.id, 'prices')}
-                  onToggle={() => bought(it)} onOpen={() => open(it.id)} onSnooze={editor ? () => doSnooze(it) : null} onRemove={editor ? () => doRemove(it) : null} />
+                  onToggle={() => bought(it)} onOpen={() => open(it.id)} onSnooze={editor ? () => doSnooze(it) : null} onDelete={editor ? () => doRemove(it) : null} />
               </SwipeRow>
             ))}
           </div>}

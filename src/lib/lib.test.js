@@ -565,3 +565,30 @@ describe('store name only', () => {
     expect(guessStoreType('')).toBe('other');
   });
 });
+
+import { aiErrorMessage, aiErrorDetail } from './errors.js';
+describe('AI error messages', () => {
+  const url = 'https://firebasevertexai.googleapis.com/v1beta/projects/p/models/gemini-2.5-flash:generateContent';
+  const fetchErr = (status, msg, extra = '') => Object.assign(new Error(`AI: Error fetching from ${url}: [${status} ] ${msg}${extra} (AI/fetch-error)`), { code: 'fetch-error', customErrorData: { status } });
+  it('does not blame setup for every error just because of the address', () => {
+    const m = aiErrorMessage(fetchErr(401, 'Firebase App Check token is invalid.'));
+    expect(m).toMatch(/App Check/);
+    expect(m).not.toMatch(/isn't turned on/);
+    expect(m).toMatch(/Details: 401: Firebase App Check token is invalid\./);
+    expect(m).not.toMatch(/googleapis/);
+  });
+  it('says turned off only for the real api-not-enabled error', () => {
+    const e = Object.assign(new Error('AI: The Firebase AI SDK requires ... (AI/api-not-enabled)'), { code: 'api-not-enabled', customErrorData: { status: 403 } });
+    expect(aiErrorMessage(e)).toMatch(/isn't turned on yet/);
+  });
+  it('names limits, permissions and bad photos', () => {
+    expect(aiErrorMessage(fetchErr(429, 'Resource has been exhausted'))).toMatch(/busy/);
+    expect(aiErrorMessage(fetchErr(403, 'Method doesn\'t allow unregistered callers', ' [{"@type":"x"}]'))).toMatch(/refused by Google/);
+    expect(aiErrorMessage(fetchErr(400, 'Unable to process input image'))).toMatch(/couldn't use that photo/);
+    expect(aiErrorDetail(fetchErr(403, 'Denied', ' [{"@type":"x"}]'))).toBe('403: Denied');
+  });
+  it('spots a dropped connection', () => {
+    const e = Object.assign(new Error(`AI: Error fetching from ${url}: Failed to fetch (AI/error)`), { code: 'error' });
+    expect(aiErrorMessage(e)).toMatch(/internet connection/);
+  });
+});

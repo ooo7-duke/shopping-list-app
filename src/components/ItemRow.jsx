@@ -6,7 +6,7 @@ import { seenPrices, refurbPrice } from '../lib/prices.js';
 import { deptOf } from '../lib/tripPlan.js';
 import { ClockIcon, TrashIcon } from './Icons.jsx';
 
-export default function ItemRow({ item, pred, done, last, showHistory = false, onPrices, showStore = true, showCategory = false, onToggle, onOpen, onSnooze, onRemove, readOnly, extra }) {
+export default function ItemRow({ item, pred, done, last, showHistory = false, onPrices, showStore = true, showCategory = false, onToggle, onOpen, onSnooze, onRemove, onDelete, readOnly, extra }) {
   const [viewing, setViewing] = useState(false);
   const qty = fmtQty(item.qty, item.unit);
   const predText = pred && pred.basis !== 'off' && pred.basis !== 'learning' ? describePrediction(pred) : '';
@@ -81,6 +81,9 @@ export default function ItemRow({ item, pred, done, last, showHistory = false, o
           {fmtMoney(total ?? price)}
           {total != null && <small>{fmtMoney(price)} ea</small>}
         </div>
+      )}
+      {!readOnly && onDelete && (
+        <button type="button" className="icon-btn row-del" title="Delete from list" aria-label={`Delete ${item.name} from the list`} onClick={(e) => { e.stopPropagation(); onDelete(); }}><TrashIcon /></button>
       )}
     </div>
   );
