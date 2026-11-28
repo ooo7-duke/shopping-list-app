@@ -113,7 +113,12 @@ export function snoozeEnd(choice, now = Date.now()) {
   return d.getTime();
 }
 export const snoozeUntil = (ctx, item, until) => setStatus(ctx, item, 'snoozed', { snoozeUntil: until });
-export const takeOffList = (ctx, item) => setStatus(ctx, item, 'stocked');
+// Taking an item off the list (Remove from list, Clear all) logs nothing as bought. removedAt keeps
+// an item that was bought earlier, then put back on the list, out of the crossed-off "bought" rows.
+export const takeOffList = (ctx, item) => setStatus(ctx, item, 'stocked', { removedAt: Date.now() });
+// Crossed off in the last day: only a real purchase counts, never a removal after it.
+export const isRecentlyBought = (it, now = Date.now()) => it.status === 'stocked' && !!it.lastPurchasedAt
+  && now - it.lastPurchasedAt < DAY && !((it.removedAt || 0) >= it.lastPurchasedAt);
 export const putOnList = (ctx, item) => setStatus(ctx, item, 'needed', { addedAt: Date.now(), addedBy: ctx.user.uid, addedByName: ctx.user.name });
 
 // Record a price someone saw at a store (after tapping Check price). Undo restores the old one.

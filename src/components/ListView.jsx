@@ -4,7 +4,7 @@ import QuickAdd from './QuickAdd.jsx';
 import SwipeRow from './SwipeRow.jsx';
 import ItemRow from './ItemRow.jsx';
 import ItemSheet from './ItemSheet.jsx';
-import { isOnList, markBought, snoozeUntil, takeOffList, putOnList, estimate } from '../data/actions.js';
+import { isOnList, isRecentlyBought, markBought, snoozeUntil, takeOffList, putOnList, estimate } from '../data/actions.js';
 import Sheet from './Sheet.jsx';
 import SnoozePicker from './SnoozePicker.jsx';
 import { lastPurchaseMap, lastBuy } from '../lib/history.js';
@@ -72,7 +72,7 @@ export default function ListView() {
   const onList = items.filter((it) => isOnList(it, now) && it.status !== 'ordered');
   const ordered = items.filter((it) => it.status === 'ordered');
   const snoozed = items.filter((it) => it.status === 'snoozed' && (it.snoozeUntil || 0) > now);
-  const recent = items.filter((it) => it.status === 'stocked' && it.lastPurchasedAt && now - it.lastPurchasedAt < DAY).sort((a, b) => b.lastPurchasedAt - a.lastPurchasedAt);
+  const recent = items.filter((it) => isRecentlyBought(it, now)).sort((a, b) => b.lastPurchasedAt - a.lastPurchasedAt);
 
   const suggestions = useMemo(() => items
     .filter((it) => !isOnList(it, now) && it.status !== 'snoozed')
@@ -200,15 +200,16 @@ export default function ListView() {
     showToast(`Snoozed ${it.name} ${label.startsWith('until') ? '' : `for ${label} `}until ${back}`, undo);
   }
   const doRemove = act(takeOffList, (it) => `Deleted ${it.name} from the list`);
-  // Clear all: asks first, then takes every shown item off the list in one go, with Undo.
-  // Items go to "stocked", like a single delete, so their purchase history and prices stay.
+  // Clear all purges the list: every shown item comes off in one go, with Undo. Nothing is
+  // logged as bought and nothing shows as crossed off; earlier purchases and prices stay.
   const [clearAsk, setClearAsk] = useState(false);
   async function clearAll() {
     const list = shown.filter((it) => it.status !== 'ordered');
     setClearAsk(false);
     if (!list.length) return;
-    const ops = list.map((it) => ({ type: 'update', coll: 'items', id: it.id, data: { status: 'stocked' } }));
-    const back = list.map((it) => ({ type: 'update', coll: 'items', id: it.id, data: { status: it.status, snoozeUntil: it.snoozeUntil ?? null } }));
+    const at = Date.now();
+    const ops = list.map((it) => ({ type: 'update', coll: 'items', id: it.id, data: { status: 'stocked', removedAt: at } }));
+    const back = list.map((it) => ({ type: 'update', coll: 'items', id: it.id, data: { status: it.status, snoozeUntil: it.snoozeUntil ?? null, removedAt: it.removedAt ?? null } }));
     try {
       await backend.commit(ctx.accountId, ops);
       showToast(`Cleared ${list.length} item${list.length === 1 ? '' : 's'} from the list`, () => backend.commit(ctx.accountId, back), 12000);
@@ -294,7 +295,7 @@ export default function ListView() {
       {clearAsk && (
         <Sheet title={activeFilter.size ? `Clear these ${shown.length} items?` : 'Clear the whole list?'} onClose={() => setClearAsk(false)}>
           <p>This takes {shown.length === 1 ? 'the 1 item' : `all ${shown.length} items`}{activeFilter.size ? ' you are showing' : ''} off the list for everyone who shares it.</p>
-          <p className="small muted">Their purchase history and prices stay, so Running low and price checks still work. You can tap Undo for a few seconds after.</p>
+          <p className="small muted">Nothing is logged as bought. Purchases you logged before stay, so Running low and price checks still work. You can tap Undo for a few seconds after.</p>
           <div className="row" style={{ gap: 10, marginTop: 14 }}>
             <button type="button" className="btn grow" onClick={() => setClearAsk(false)}>Cancel</button>
             <button type="button" className="btn danger grow" onClick={clearAll}>Clear {shown.length} item{shown.length === 1 ? '' : 's'}</button>
