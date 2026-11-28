@@ -512,7 +512,8 @@ table.data td.num, table.data th.num { text-align: right; }
 /* People in the account sheet: on a phone the role picker and Remove move under the name
    instead of squeezing it down to one letter. */
 .member-row { flex-wrap: wrap; row-gap: 6px; }
-.member-row > .grow { flex: 1 1 170px; min-width: 0; }
+.member-row > .grow { flex: 1 1 140px; min-width: 0; }
+.member-row > :last-child:not(.grow) { margin-left: auto; }
 .member-row > select { margin-left: auto; }
 
 /* While picking rows, the select bar sits at the bottom; the back-to-top button would cover it. */
