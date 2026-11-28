@@ -52,7 +52,8 @@ function fit(el) {
   }
   // Past the smallest size, a word that still can't fit is shortened, never split.
   if (lines > 1 && full != null) {
-    const shown = need * s > room ? shortenWords(full, room, measurer(cs, base * s)) : full;
+    // A box narrower than three letters is still being laid out; leave the words whole until it settles.
+    const shown = need * s > room && room >= base * 3 ? shortenWords(full, room, measurer(cs, base * s)) : full;
     const node = inner.firstChild;
     if (node && node.nodeType === 3 && node.nodeValue !== shown) node.nodeValue = shown;
   }

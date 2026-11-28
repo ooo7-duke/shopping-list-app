@@ -462,7 +462,7 @@ function ExpenseRow({ e, all, trip, onOpen, onHold, onToggle, onDelete, picking,
           </div>
         </div>
         {flags.length > 0 && <div className="meta">{flags.map((f) => <span key={f.code} className={`chip ${f.level === 'warn' ? 'warn' : ''}`}>{f.label}</span>)}</div>}
-        {e.notes && <FitText className="tiny muted" style={{ marginTop: 2 }}>{e.notes}</FitText>}
+        {e.notes && <FitText className="tiny muted" lines={2} style={{ marginTop: 2 }}>{e.notes}</FitText>}
       </div>
     </div>
   );

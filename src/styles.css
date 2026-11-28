@@ -179,6 +179,10 @@ label.field > span { display: block; font-size: 0.85rem; color: var(--muted); ma
    its own line under it, on the right. */
 .item { flex-wrap: nowrap; }
 .item > .grow { flex: 1 1 0%; min-width: 0; }
+/* When the amount would squeeze the name, it moves to its own line under the trash can. */
+.item.stack { flex-wrap: wrap; row-gap: 2px; }
+.item.stack > .grow { flex: 1 0 calc(100% - var(--row-fixed, 0px)); }
+.item.stack > .price { order: 1; margin-left: auto; }
 /* Each line of a row stays on one line at the largest size that fits (see FitText.jsx). */
 .fit { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; max-width: 100%; }
 .fit-lines { white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; }

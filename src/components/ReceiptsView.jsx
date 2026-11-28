@@ -17,6 +17,7 @@ import { planLines, alreadySaved, INBOX_ADDRESS } from '../lib/inbox.js';
 import { HOUSEHOLD_CATEGORIES, householdCategories, isHouseholdList, foldCategory } from '../lib/categories.js';
 import { emailTrip, notTravelIds } from '../lib/expenses.js';
 import FitText from './FitText.jsx';
+import useStackPrice from './useStackPrice.js';
 
 export default function ReceiptsView() {
   const { ctx, items, receipts, purchases, backend, showToast } = useApp();
@@ -473,8 +474,9 @@ function Inventory({ purchases }) {
 
 function ReceiptRow({ r, picking, picked, onHold, onOpen, onToggle }) {
   const hold = useHold(onHold);
+  const rowRef = useStackPrice();
   return (
-    <div className={`item holdable${picked ? ' selected' : ''}`} onClick={onOpen} {...hold} tabIndex={0}
+    <div ref={rowRef} className={`item holdable${picked ? ' selected' : ''}`} onClick={onOpen} {...hold} tabIndex={0}
       onKeyDown={(e) => { if (e.key === 'Enter') onOpen(); else if (e.key === ' ' && picking) { e.preventDefault(); onToggle(); } }}
       aria-label={`${r.store || 'Receipt'}${picked ? ', selected' : ''}`}>
       {picking && <PickBox on={picked} name={r.store || 'this receipt'} onToggle={onToggle} />}

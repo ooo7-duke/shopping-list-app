@@ -7,9 +7,11 @@ import { seenPrices, refurbPrice } from '../lib/prices.js';
 import { deptOf } from '../lib/tripPlan.js';
 import { ClockIcon, TrashIcon } from './Icons.jsx';
 import FitText from './FitText.jsx';
+import useStackPrice from './useStackPrice.js';
 
 export default function ItemRow({ item, pred, done, last, showHistory = false, onPrices, showStore = true, showCategory = false, onToggle, onOpen, onSnooze, onRemove, onDelete, readOnly, extra, onLongPress, selecting = false, selected = false }) {
   const [viewing, setViewing] = useState(false);
+  const rowRef = useStackPrice();
   const hold = useHold(onLongPress); // press and hold starts picking rows
   const qty = fmtQty(item.qty, item.unit);
   const predText = pred && pred.basis !== 'off' && pred.basis !== 'learning' ? describePrediction(pred) : '';
@@ -33,7 +35,7 @@ export default function ItemRow({ item, pred, done, last, showHistory = false, o
   };
 
   return (
-    <div className={`item${done ? ' done' : ''}${onLongPress ? ' holdable' : ''}${selected ? ' selected' : ''}`} data-item-id={done ? undefined : item.id} onClick={onOpen} onKeyDown={onKeyDown} {...hold} tabIndex={0} role="group" aria-label={`${item.name}${qty ? `, ${qty}` : ''}${done ? ', bought' : ''}${selected ? ', selected' : ''}`}>
+    <div ref={rowRef} className={`item${done ? ' done' : ''}${onLongPress ? ' holdable' : ''}${selected ? ' selected' : ''}`} data-item-id={done ? undefined : item.id} onClick={onOpen} onKeyDown={onKeyDown} {...hold} tabIndex={0} role="group" aria-label={`${item.name}${qty ? `, ${qty}` : ''}${done ? ', bought' : ''}${selected ? ', selected' : ''}`}>
       <button
         type="button" className={`check${selecting ? ' pick' : ''}${(selecting ? selected : done) ? ' on' : ''}`} onClick={(e) => { e.stopPropagation(); onToggle?.(); }}
         aria-label={selecting ? `${selected ? 'Unselect' : 'Select'} ${item.name}` : done ? `Put ${item.name} back on the list` : `Mark ${item.name} as bought`} aria-pressed={selecting ? selected : undefined}
