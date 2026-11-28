@@ -4,10 +4,7 @@ import backend from '../data/backend.js';
 import { DEMO_MODE } from './config.js';
 
 const URL_ = '/.netlify/functions/feedback';
-const demo = [
-  { id: 'd2', kind: 'idea', message: 'Could the app remind me when Costco has a sale on paper towels?', email: 'spouse@example.com', name: 'Spouse', signedIn: true, at: Date.now() - 3 * 3600e3, handledAt: null },
-  { id: 'd1', kind: 'delete', message: '', email: 'someone@example.com', name: '', signedIn: false, page: 'delete-account', at: Date.now() - 26 * 3600e3, handledAt: null },
-];
+const demo = [];
 
 async function call(method, body) {
   const token = await backend.idToken?.();

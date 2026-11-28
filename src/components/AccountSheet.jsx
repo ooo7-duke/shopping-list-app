@@ -54,16 +54,16 @@ export default function AccountSheet({ onClose }) {
         <div className="card" style={{ background: '#fff' }}>
           <h3 style={{ marginBottom: 8 }}>{account.name} · people</h3>
           {members.map(([uid, m]) => (
-            <div key={uid} className="row" style={{ minHeight: 48 }}>
+            <div key={uid} className="row member-row" style={{ minHeight: 48 }}>
               <div className="avatar">{initials(m.name)}</div>
               <div className="grow"><div className="ellipsis">{m.name}{uid === user.uid ? ' (you)' : ''}</div><div className="small muted ellipsis">{m.email}</div></div>
               {owner && uid !== user.uid ? (
-                <>
+                <div className="row member-actions">
                   <select className="input" style={{ width: 'auto' }} value={m.role} onChange={(e) => backend.updateAccount(account.id, { [`members.${uid}`]: { ...m, role: e.target.value } })} aria-label={`Role for ${m.name}`}>
                     {Object.entries(ROLES).filter(([k, r]) => !r.legacy || k === m.role).map(([k, r]) => <option key={k} value={k}>{r.label}</option>)}
                   </select>
                   <button type="button" className="chip" onClick={() => backend.removeMember(account, uid)}>Remove</button>
-                </>
+                </div>
               ) : <span className="chip">{ROLES[m.role]?.label}</span>}
             </div>
           ))}
@@ -75,15 +75,14 @@ export default function AccountSheet({ onClose }) {
           ))}
           {owner && (
             <form onSubmit={invite} className="stack" style={{ marginTop: 10 }}>
-              <div className="grid2">
-                <label className="field"><span>Invite by Google email</span><input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@gmail.com" /></label>
-                <label className="field"><span>Role</span>
-                  <select className="input" value={inviteRole} onChange={(e) => setInviteRole(e.target.value)}>
-                    <option value="editor">Editor: edits the list and sees spending</option>
-                    <option value="owner">Owner: also manages people</option>
-                  </select>
-                </label>
-              </div>
+              <label className="field"><span>Invite by Google email</span><input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@gmail.com" /></label>
+              <label className="field"><span>Role</span>
+                <select className="input" value={inviteRole} onChange={(e) => setInviteRole(e.target.value)} aria-describedby="invite-role-help">
+                  <option value="editor">Editor</option>
+                  <option value="owner">Owner</option>
+                </select>
+              </label>
+              <p id="invite-role-help" className="small muted" style={{ margin: '-4px 0 0' }}>{inviteRole === 'owner' ? 'Edits the list, sees spending and manages people.' : 'Edits the list and sees spending.'}</p>
               <button type="submit" className="btn primary">Send invite</button>
             </form>
           )}

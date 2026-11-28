@@ -4,7 +4,7 @@ import QuickAdd from './QuickAdd.jsx';
 import SwipeRow from './SwipeRow.jsx';
 import ItemRow from './ItemRow.jsx';
 import ItemSheet from './ItemSheet.jsx';
-import { isOnList, isRecentlyBought, markBought, snoozeUntil, takeOffList, putOnList, estimate } from '../data/actions.js';
+import { isOnList, isRecentlyBought, takeBackOps, markBought, snoozeUntil, takeOffList, putOnList, estimate } from '../data/actions.js';
 import Sheet from './Sheet.jsx';
 import SnoozePicker from './SnoozePicker.jsx';
 import { lastPurchaseMap, lastBuy } from '../lib/history.js';
@@ -14,6 +14,7 @@ import { classifyNames } from '../lib/classify.js';
 import { fmtMoney } from '../lib/format.js';
 import { saveErrorMessage } from '../lib/errors.js';
 import { TrashIcon } from './Icons.jsx';
+import { usePick, PickHeader, PickBar, ConfirmDelete, plural } from './Pick.jsx';
 import { sharedThemes } from '../lib/themes.js';
 import { guessCategory, HOUSEHOLD_CATEGORIES } from '../lib/categories.js';
 
@@ -181,12 +182,49 @@ export default function ListView() {
   }
   async function unbuy(it) {
     // Undo a check-off from the last day: remove that purchase and put the item back.
-    const hist = purchases.filter((x) => x.itemId === it.id).sort((a, b) => b.purchasedAt - a.purchasedAt);
-    const p = hist[0] && now - hist[0].purchasedAt < DAY ? hist[0] : null;
-    const ops = [{ type: 'update', coll: 'items', id: it.id, data: { status: 'needed', lastPurchasedAt: (p ? hist[1] : hist[0])?.purchasedAt ?? null } }];
-    if (p) ops.push({ type: 'remove', coll: 'purchases', id: p.id });
-    await backend.commit(ctx.accountId, ops);
+    await backend.commit(ctx.accountId, takeBackOps(it, purchases, 'list', Date.now()).ops);
     showToast(`${it.name} is back on the list`);
+  }
+  // Press and hold a row to start picking rows, on the list, Got it today and Snoozed alike.
+  // Delete keeps each section's meaning: off the list (nothing logged as bought) for the list and
+  // Snoozed; for Got it today it erases those purchases and the items stay off the list.
+  const listPick = usePick(editor ? shown.filter((it) => it.status !== 'ordered').map((it) => it.id) : []);
+  const gotPick = usePick(recent.map((it) => it.id));
+  const snzPick = usePick(snoozed.map((it) => it.id));
+  const picks = [listPick, gotPick, snzPick];
+  const startIn = (pk, id) => { picks.forEach((o) => o !== pk && o.on && o.stop()); pk.start(id); };
+  const [delAsk, setDelAsk] = useState(null); // 'list' | 'got' | 'snz'
+  const askRows = delAsk === 'got' ? recent.filter((it) => gotPick.has(it.id))
+    : delAsk === 'snz' ? snoozed.filter((it) => snzPick.has(it.id))
+      : delAsk === 'list' ? shown.filter((it) => listPick.has(it.id)) : [];
+  async function deletePicked() {
+    const which = delAsk;
+    const list = askRows;
+    setDelAsk(null);
+    if (!list.length) return;
+    const at = Date.now();
+    const ops = [];
+    const back = [];
+    if (which === 'got') {
+      for (const it of list) {
+        const r = takeBackOps(it, purchases, 'gone', at);
+        ops.push(...r.ops);
+        back.push(...r.back);
+      }
+    } else {
+      for (const it of list) {
+        ops.push({ type: 'update', coll: 'items', id: it.id, data: { status: 'stocked', removedAt: at, snoozeUntil: null } });
+        back.push({ type: 'update', coll: 'items', id: it.id, data: { status: it.status, snoozeUntil: it.snoozeUntil ?? null, removedAt: it.removedAt ?? null } });
+      }
+    }
+    try {
+      await backend.commit(ctx.accountId, ops);
+      (which === 'got' ? gotPick : which === 'snz' ? snzPick : listPick).stop();
+      const msg = which === 'got' ? `Deleted ${plural(list.length, 'purchase')} from history` : `Deleted ${plural(list.length, 'item')} from the ${which === 'snz' ? 'snoozed list' : 'list'}`;
+      showToast(msg, () => backend.commit(ctx.accountId, back), 12000);
+    } catch (e) {
+      showToast(saveErrorMessage(e, 'delete those'));
+    }
   }
   const act = (fn, msg) => async (it) => { const undo = await fn(ctx, it); showToast(msg(it), undo); };
   // Snoozing asks how long: the clock button, a swipe left and the S key all open the choices.
@@ -286,9 +324,11 @@ export default function ListView() {
 
       {editor && shown.length > 0 && (
         <div className="clear-row">
-          <button type="button" className="btn danger clear-btn" onClick={() => setClearAsk(true)}>
-            <TrashIcon /> {activeFilter.size ? `Clear these ${shown.length}` : 'Clear all'}
-          </button>
+          {listPick.on ? <PickHeader pick={listPick} /> : (
+            <button type="button" className="btn danger clear-btn" onClick={() => setClearAsk(true)}>
+              <TrashIcon /> {activeFilter.size ? `Clear these ${shown.length}` : 'Clear all'}
+            </button>
+          )}
         </div>
       )}
 
@@ -329,16 +369,20 @@ export default function ListView() {
           </button>
           {!isFolded && <div className="list">
             {list.map((it) => (
-              <SwipeRow key={it.id} disabled={!editor} onRight={() => bought(it)} onLeft={() => doSnooze(it)} onFarLeft={() => doRemove(it)}>
+              <SwipeRow key={it.id} disabled={!editor || listPick.on} onRight={() => bought(it)} onLeft={() => doSnooze(it)} onFarLeft={() => doRemove(it)}>
                 <ItemRow item={it} pred={predictions[it.id]} showStore={groupBy !== 'store'} showCategory={groupBy === 'store'} readOnly={!editor}
                   showHistory last={lastBuy(it, latest[it.id])} onPrices={() => open(it.id, 'prices')}
-                  onToggle={() => bought(it)} onOpen={() => open(it.id)} onSnooze={editor ? () => doSnooze(it) : null} onDelete={editor ? () => doRemove(it) : null} />
+                  selecting={listPick.on} selected={listPick.has(it.id)} onLongPress={editor && it.status !== 'ordered' ? () => startIn(listPick, it.id) : undefined}
+                  onToggle={() => (listPick.on ? listPick.toggle(it.id) : bought(it))} onOpen={() => (listPick.on ? listPick.toggle(it.id) : open(it.id))}
+                  onSnooze={editor ? () => doSnooze(it) : null} onDelete={editor ? () => doRemove(it) : null} />
               </SwipeRow>
             ))}
           </div>}
         </section>
         );
       })}
+
+      <PickBar pick={listPick} label="Selected items" onDelete={() => setDelAsk('list')} />
 
       {ordered.length > 0 && (
         <section aria-labelledby="ord-h">
@@ -351,11 +395,41 @@ export default function ListView() {
 
       {recent.length > 0 && editor && (
         <section aria-labelledby="got-h">
-          <div className="section-h"><h2 id="got-h">Got it today</h2><span className="small muted">tap a check to undo</span></div>
-          <div className="list">
-            {recent.map((it) => <ItemRow key={it.id} item={it} done onToggle={() => unbuy(it)} onOpen={() => open(it.id)} />)}
+          <div className="section-h">
+            <h2 id="got-h">Got it today</h2>
+            {gotPick.on ? <PickHeader pick={gotPick} /> : <span className="small muted">tap a check to undo · press and hold to select</span>}
           </div>
+          <div className="list">
+            {recent.map((it) => (
+              <ItemRow
+                key={it.id} item={it} done selecting={gotPick.on} selected={gotPick.has(it.id)}
+                onLongPress={() => startIn(gotPick, it.id)}
+                onToggle={() => (gotPick.on ? gotPick.toggle(it.id) : unbuy(it))}
+                onOpen={() => (gotPick.on ? gotPick.toggle(it.id) : open(it.id))}
+              />
+            ))}
+          </div>
+          <PickBar pick={gotPick} label="Selected purchases" onDelete={() => setDelAsk('got')} />
         </section>
+      )}
+
+      {delAsk && askRows.length > 0 && (
+        <ConfirmDelete
+          title={delAsk === 'got' ? `Delete ${plural(askRows.length, 'purchase')}?` : `Delete ${plural(askRows.length, 'item')}?`}
+          count={askRows.length} onCancel={() => setDelAsk(null)} onConfirm={deletePicked}
+        >
+          {delAsk === 'got' ? (
+            <>
+              <p>This erases today's purchase of {askRows.length === 1 ? askRows[0].name : `these ${askRows.length} items`} from your history for everyone who shares the list. {askRows.length === 1 ? 'It stays' : 'They stay'} off the list.</p>
+              <p className="small muted">If one came from a receipt, that line leaves the receipt too. Earlier purchases stay. You can tap Undo for a few seconds after.</p>
+            </>
+          ) : (
+            <>
+              <p>This takes {askRows.length === 1 ? askRows[0].name : `these ${askRows.length} items`} off the {delAsk === 'snz' ? 'snoozed list' : 'list'} for everyone who shares it, as no longer needed.</p>
+              <p className="small muted">Nothing is logged as bought. Purchases you logged before stay. You can tap Undo for a few seconds after.</p>
+            </>
+          )}
+        </ConfirmDelete>
       )}
 
       {snoozed.length > 0 && editor && (
@@ -364,16 +438,20 @@ export default function ListView() {
             <button type="button" className="btn ghost" style={{ padding: 0 }} onClick={() => setShowSnoozed((s) => !s)} aria-expanded={showSnoozed}>
               Snoozed ({snoozed.length}) {showSnoozed ? '▴' : '▾'}
             </button>
+            {snzPick.on && <PickHeader pick={snzPick} />}
           </div>
           {showSnoozed && (
             <div className="list">
               {snoozed.map((it) => (
-                <SwipeRow key={it.id} onRight={() => doAdd(it)} rightLabel="Back on list">
-                  <ItemRow item={it} onToggle={() => doAdd(it)} onOpen={() => open(it.id)} extra={<span>until {new Date(it.snoozeUntil).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>} />
+                <SwipeRow key={it.id} onRight={() => doAdd(it)} rightLabel="Back on list" disabled={snzPick.on}>
+                  <ItemRow item={it} selecting={snzPick.on} selected={snzPick.has(it.id)} onLongPress={() => startIn(snzPick, it.id)}
+                    onToggle={() => (snzPick.on ? snzPick.toggle(it.id) : doAdd(it))} onOpen={() => (snzPick.on ? snzPick.toggle(it.id) : open(it.id))}
+                    extra={<span>until {new Date(it.snoozeUntil).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>} />
                 </SwipeRow>
               ))}
             </div>
           )}
+          {showSnoozed && <PickBar pick={snzPick} label="Selected snoozed items" onDelete={() => setDelAsk('snz')} />}
         </section>
       )}
 

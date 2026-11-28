@@ -146,7 +146,7 @@ export default function TripsView() {
               {g.list.map((it) => (
                 <li key={it.id} className={drag.item?.id === it.id ? 'dragging' : ''}>
                   <button type="button" className="grip" aria-label={`Drag ${it.name} to another store`} title="Drag to another store" onPointerDown={(e) => drag.start(e, it, g.key)} onContextMenu={(e) => e.preventDefault()}><GripIcon /></button>
-                  <button type="button" className="trip-name grow ellipsis" onClick={() => { if (!drag.tookClick()) setMoving(it); }} onPointerDown={(e) => { if (e.pointerType === 'touch') drag.start(e, it, g.key); }} onContextMenu={(e) => e.preventDefault()} title="Move to another store">{it.name}{fmtQty(it.qty, it.unit) ? <span className="muted"> · {fmtQty(it.qty, it.unit)}</span> : null}</button>
+                  <button type="button" className="trip-name grow" onClick={() => { if (!drag.tookClick()) setMoving(it); }} onPointerDown={(e) => { if (e.pointerType === 'touch') drag.start(e, it, g.key); }} onContextMenu={(e) => e.preventDefault()} title="Move to another store"><span className="clamp2">{it.name}{fmtQty(it.qty, it.unit) ? <span className="muted"> · {fmtQty(it.qty, it.unit)}</span> : null}</span></button>
                   <span>{it.lastPrice != null ? fmtMoney(it.lastPrice * (Number(it.qty) || 1)) : ''}</span>
                 </li>
               ))}
@@ -347,9 +347,9 @@ function MoveSheet({ item, stores, saved, onPick, onAddStore, onClose }) {
     <Sheet title={`Where to buy ${item.name}`} onClose={onClose}>
       <div className="stack">
         {!saved && (
-          <form className="row" onSubmit={(e) => { e.preventDefault(); if (typed.trim()) onPick(typed.trim()); }}>
-            <input className="input grow" value={typed} onChange={(e) => setTyped(e.target.value)} placeholder="A new store, like H-Mart" aria-label="A new store" />
-            <button type="submit" className="btn primary" disabled={!typed.trim()}>Add and move</button>
+          <form className="stack" onSubmit={(e) => { e.preventDefault(); if (typed.trim()) onPick(typed.trim()); }}>
+            <input className="input" value={typed} onChange={(e) => setTyped(e.target.value)} placeholder="A new store, like H-Mart" aria-label="A new store" />
+            <button type="submit" className="btn primary block" disabled={!typed.trim()}>Add and move</button>
           </form>
         )}
         {saved && (
@@ -494,7 +494,7 @@ function StoresSheet({ forItem, onAdded, onClose }) {
             <label className="field"><span>Store name</span>
               <select className="input" value={pickOf(r)} onChange={(e) => pick(i, e.target.value)}>
                 <option value="" disabled>Pick your store or add a new one</option>
-                <option value={NEW_STORE}>+ A new store (type its name)</option>
+                <option value={NEW_STORE}>+ A new store</option>
                 {yours.length > 0 && (
                   <optgroup label="Your stores">
                     {yours.map((n, j) => <option key={`${n}${j}`} value={n}>{n}</option>)}
@@ -506,7 +506,7 @@ function StoresSheet({ forItem, onAdded, onClose }) {
               </select>
             </label>
             {pickOf(r) === NEW_STORE && (
-              <input className="input" style={{ marginTop: 8 }} value={r.name || ''} maxLength={30} placeholder="Type the store's name, like H-Mart" aria-label="New store name" autoFocus={!r.name} onChange={(e) => set(i, { name: e.target.value })} />
+              <input className="input" style={{ marginTop: 8 }} value={r.name || ''} maxLength={30} placeholder="Store name" aria-label="New store name" autoFocus={!r.name} onChange={(e) => set(i, { name: e.target.value })} />
             )}
             {pickOf(r) && (
               <div className="grid2" style={{ marginTop: 8 }}>

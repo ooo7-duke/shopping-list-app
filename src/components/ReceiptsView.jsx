@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useApp } from '../AppContext.jsx';
 import Sheet from './Sheet.jsx';
 import { compressImage, extractReceipt, isImageFile, toReadableImage } from '../lib/receipts.js';
 import { decodeQr, parseQr, qrHost } from '../lib/qr.js';
 import { bestMatch } from '../lib/match.js';
-import { saveReceipt, deleteReceipt, isOnList } from '../data/actions.js';
+import { saveReceipt, deleteReceipt, deleteReceipts, isOnList } from '../data/actions.js';
+import { useHold, usePick, PickHeader, PickBar, PickBox, ConfirmDelete, plural } from './Pick.jsx';
 import { fmtMoney, fmtDate, toInputDate, fromInputDate } from '../lib/format.js';
 import { DEMO_MODE } from '../lib/config.js';
 import { aiErrorMessage } from '../lib/errors.js';
@@ -17,6 +19,21 @@ import { emailTrip, notTravelIds } from '../lib/expenses.js';
 
 export default function ReceiptsView() {
   const { ctx, items, receipts, purchases, backend, showToast } = useApp();
+  // Press and hold a receipt to pick several, then delete them together, with Undo.
+  const rPick = usePick(receipts.map((r) => r.id));
+  const [delAsk, setDelAsk] = useState(false);
+  async function deletePicked() {
+    const list = receipts.filter((r) => rPick.has(r.id));
+    setDelAsk(false);
+    if (!list.length) return;
+    try {
+      const undo = await deleteReceipts(ctx, list, purchases);
+      rPick.stop();
+      showToast(`Deleted ${plural(list.length, 'receipt')} and ${list.length === 1 ? 'its' : 'their'} purchases`, undo, 12000);
+    } catch (e) {
+      showToast("Couldn't delete those receipts. Check your connection and try again.");
+    }
+  }
   const [over, setOver] = useState(false);
   const [busy, setBusy] = useState('');
   const [review, setReview] = useState(null);
@@ -125,21 +142,26 @@ export default function ReceiptsView() {
 
       <EmailedReceipts />
 
-      <div className="section-h"><h2>Past receipts</h2><span className="small muted">{receipts.length}</span></div>
+      <div className="section-h">
+        <h2>Past receipts</h2>
+        {rPick.on ? <PickHeader pick={rPick} /> : <span className="small muted">{receipts.length}{receipts.length > 1 ? ' · press and hold to select' : ''}</span>}
+      </div>
       {receipts.length === 0 ? (
         <div className="card empty"><p>No receipts yet. Older receipts work too: the purchase date comes from the receipt.</p></div>
       ) : (
         <div className="list">
           {receipts.map((r) => (
-            <div key={r.id} className="item" onClick={() => setViewing(r)} tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && setViewing(r)}>
-              <div className="grow">
-                <div className="name">{r.store || 'Receipt'}</div>
-                <div className="meta">{fmtDate(r.date, { withYear: true })} · {r.lineCount} items · {r.matched} matched to your list · {r.source === 'email' ? 'emailed' : r.uploadedByName}</div>
-              </div>
-              <div className="price">{fmtMoney(r.total)}</div>
-            </div>
+            <ReceiptRow key={r.id} r={r} picking={rPick.on} picked={rPick.has(r.id)}
+              onHold={() => rPick.start(r.id)} onOpen={() => (rPick.on ? rPick.toggle(r.id) : setViewing(r))} onToggle={() => rPick.toggle(r.id)} />
           ))}
         </div>
+      )}
+      <PickBar pick={rPick} label="Selected receipts" onDelete={() => setDelAsk(true)} />
+      {delAsk && rPick.count > 0 && (
+        <ConfirmDelete title={`Delete ${plural(rPick.count, 'receipt')}?`} count={rPick.count} onCancel={() => setDelAsk(false)} onConfirm={deletePicked}>
+          <p>This deletes {rPick.count === 1 ? 'the receipt' : `these ${rPick.count} receipts`}, {rPick.count === 1 ? 'its photo and the purchases it logged' : 'their photos and the purchases they logged'}, for everyone who shares the list.</p>
+          <p className="small muted">Items stay on or off your list as they are now. You can tap Undo for a few seconds after.</p>
+        </ConfirmDelete>
       )}
 
       <Inventory purchases={purchases} />
@@ -202,8 +224,8 @@ function ReceiptReview({ data, onClose, onSaved }) {
                   <option value="">New item: {ln.newName}</option>
                   {sorted.map((it) => <option key={it.id} value={it.id}>{it.name}</option>)}
                 </select>
-                <input className="input" inputMode="decimal" aria-label="Quantity" value={ln.quantity} onChange={(e) => set(i, { quantity: e.target.value })} />
-                <input className="input" inputMode="decimal" aria-label="Line total" value={ln.lineTotal ?? ''} onChange={(e) => set(i, { lineTotal: e.target.value === '' ? null : Number(e.target.value), unitPrice: null })} />
+                <label className="ctl"><span className="ctl-label">Qty</span><input className="input" inputMode="decimal" aria-label="Quantity" value={ln.quantity} onChange={(e) => set(i, { quantity: e.target.value })} /></label>
+                <label className="ctl"><span className="ctl-label">Line total $</span><input className="input" inputMode="decimal" aria-label="Line total" value={ln.lineTotal ?? ''} onChange={(e) => set(i, { lineTotal: e.target.value === '' ? null : Number(e.target.value), unitPrice: null })} /></label>
               </div>
             )}
           </div>
@@ -221,23 +243,36 @@ function ReceiptReview({ data, onClose, onSaved }) {
 function ReceiptDetail({ receipt, onClose, onDelete }) {
   const { backend, ctx, purchases } = useApp();
   const [img, setImg] = useState(null);
+  const [zoom, setZoom] = useState(false);
   const [confirm, setConfirm] = useState(false);
   const lines = purchases.filter((p) => p.receiptId === receipt.id);
   useEffect(() => {
     if (receipt.hasImage) backend.getDocData(ctx.accountId, 'receiptImages', receipt.id).then((d) => setImg(d?.dataUrl || null));
   }, [receipt.id]);
+  // The lines come first and use the full width, so names and prices are never covered.
+  // The photo sits below as a small picture that opens full screen.
   return (
     <Sheet title={`${receipt.store || 'Receipt'} · ${fmtDate(receipt.date, { withYear: true })}`} onClose={onClose} wide>
-      <div className="grid2" style={{ alignItems: 'start' }}>
-        <table className="data">
-          <tbody>
-            {lines.map((p) => <tr key={p.id}><td className="ellipsis" style={{ maxWidth: 220 }}>{p.name}</td><td className="num">{p.qty}</td><td className="num">{fmtMoney(p.total)}</td></tr>)}
-            <tr><td><strong>Total</strong></td><td /><td className="num"><strong>{fmtMoney(receipt.total)}</strong></td></tr>
-          </tbody>
-        </table>
-        {receipt.qrUrl && <p className="small">QR code on the receipt: <a href={receipt.qrUrl} target="_blank" rel="noopener noreferrer">open on {qrHost(receipt.qrUrl)} ↗</a></p>}
-        {img && <img src={img} alt={`Receipt from ${receipt.store}`} style={{ width: '100%', borderRadius: 10, border: '1px solid var(--line)' }} />}
-      </div>
+      <table className="data receipt-lines">
+        <tbody>
+          {lines.map((p) => <tr key={p.id}><td>{p.name}</td><td className="num">{p.qty}</td><td className="num">{fmtMoney(p.total)}</td></tr>)}
+          <tr><td><strong>Total</strong></td><td /><td className="num"><strong>{fmtMoney(receipt.total)}</strong></td></tr>
+        </tbody>
+      </table>
+      {receipt.qrUrl && <p className="small" style={{ marginTop: 10 }}>QR code on the receipt: <a href={receipt.qrUrl} target="_blank" rel="noopener noreferrer">open on {qrHost(receipt.qrUrl)} ↗</a></p>}
+      {img && (
+        <button type="button" className="receipt-thumb" onClick={() => setZoom(true)} aria-label={`See the full photo of the receipt from ${receipt.store || 'the store'}`}>
+          <img src={img} alt="" />
+          <span className="small">Tap to see the full receipt</span>
+        </button>
+      )}
+      {zoom && img && createPortal(
+        <div className="photo-view" role="dialog" aria-label={`Receipt from ${receipt.store || 'the store'}`} onClick={() => setZoom(false)}>
+          <img src={img} alt={`Receipt from ${receipt.store || 'the store'}`} />
+          <div className="photo-cap"><span className="small">Tap anywhere to close</span></div>
+        </div>,
+        document.body,
+      )}
       <button type="button" className="btn danger block" style={{ marginTop: 14 }} onClick={() => (confirm ? onDelete() : setConfirm(true))}>{confirm ? 'Tap again to delete the receipt and its purchases' : 'Delete receipt'}</button>
     </Sheet>
   );
@@ -360,7 +395,7 @@ function EmailedReceipts() {
             <div className="grow">
               <div className="name">{v.res?.store || storeFromSubject(v.m?.subject) || 'Emailed receipt'}</div>
               <div className="meta">
-                {v.status === 'reading' ? 'Reading…' : v.status === 'error' ? `Couldn't read it. ${v.error}` : `${v.plan.lines.length} items · ${v.plan.weak} best guess${v.plan.weak === 1 ? '' : 'es'} to check`}
+                {v.status === 'reading' ? 'Reading…' : v.status === 'error' ? `Couldn't read it. ${v.error}` : `${plural(v.plan.lines.length, 'item')} · ${v.plan.weak} best guess${v.plan.weak === 1 ? '' : 'es'} to check`}
               </div>
             </div>
             {v.status === 'review' && <button type="button" className="btn primary" onClick={() => openReview(id)}>Check</button>}
@@ -432,5 +467,21 @@ function Inventory({ purchases }) {
         ))}
       </div>
     </>
+  );
+}
+
+function ReceiptRow({ r, picking, picked, onHold, onOpen, onToggle }) {
+  const hold = useHold(onHold);
+  return (
+    <div className={`item holdable${picked ? ' selected' : ''}`} onClick={onOpen} {...hold} tabIndex={0}
+      onKeyDown={(e) => { if (e.key === 'Enter') onOpen(); else if (e.key === ' ' && picking) { e.preventDefault(); onToggle(); } }}
+      aria-label={`${r.store || 'Receipt'}${picked ? ', selected' : ''}`}>
+      {picking && <PickBox on={picked} name={r.store || 'this receipt'} onToggle={onToggle} />}
+      <div className="grow">
+        <div className="name">{r.store || 'Receipt'}</div>
+        <div className="meta">{fmtDate(r.date, { withYear: true })} · {plural(r.lineCount, 'item')} · {r.matched} matched to your list · {r.source === 'email' ? 'emailed' : r.uploadedByName}</div>
+      </div>
+      <div className="price">{fmtMoney(r.total)}</div>
+    </div>
   );
 }

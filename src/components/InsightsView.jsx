@@ -216,7 +216,7 @@ export default function InsightsView() {
           <div className="card" style={{ marginTop: 14 }}>
             <h2 style={{ marginBottom: 8 }}>Purchases <span className="small muted">({rows.length})</span></h2>
             <div className="table-wrap" style={{ maxHeight: 480 }}>
-              <table className="data">
+              <table className="data purchases-table">
                 <thead><tr>{th('purchasedAt', 'Date')}{th('name', 'Item')}{th('category', 'Category')}{th('store', 'Store')}{th('qty', 'Qty', true)}{th('total', 'Cost', true)}</tr></thead>
                 <tbody>
                   {rows.slice(0, 300).map((p) => (

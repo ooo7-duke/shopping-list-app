@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useHold } from './Pick.jsx';
 import { createPortal } from 'react-dom';
 import { describePrediction } from '../lib/predict.js';
 import { fmtMoney, fmtQty, fmtDate } from '../lib/format.js';
@@ -6,8 +7,9 @@ import { seenPrices, refurbPrice } from '../lib/prices.js';
 import { deptOf } from '../lib/tripPlan.js';
 import { ClockIcon, TrashIcon } from './Icons.jsx';
 
-export default function ItemRow({ item, pred, done, last, showHistory = false, onPrices, showStore = true, showCategory = false, onToggle, onOpen, onSnooze, onRemove, onDelete, readOnly, extra }) {
+export default function ItemRow({ item, pred, done, last, showHistory = false, onPrices, showStore = true, showCategory = false, onToggle, onOpen, onSnooze, onRemove, onDelete, readOnly, extra, onLongPress, selecting = false, selected = false }) {
   const [viewing, setViewing] = useState(false);
+  const hold = useHold(onLongPress); // press and hold starts picking rows
   const qty = fmtQty(item.qty, item.unit);
   const predText = pred && pred.basis !== 'off' && pred.basis !== 'learning' ? describePrediction(pred) : '';
   const overdue = pred?.daysLeft != null && pred.daysLeft < 1;
@@ -30,15 +32,16 @@ export default function ItemRow({ item, pred, done, last, showHistory = false, o
   };
 
   return (
-    <div className={`item${done ? ' done' : ''}`} data-item-id={done ? undefined : item.id} onClick={onOpen} onKeyDown={onKeyDown} tabIndex={0} role="group" aria-label={`${item.name}${qty ? `, ${qty}` : ''}${done ? ', bought' : ''}`}>
+    <div className={`item${done ? ' done' : ''}${onLongPress ? ' holdable' : ''}${selected ? ' selected' : ''}`} data-item-id={done ? undefined : item.id} onClick={onOpen} onKeyDown={onKeyDown} {...hold} tabIndex={0} role="group" aria-label={`${item.name}${qty ? `, ${qty}` : ''}${done ? ', bought' : ''}${selected ? ', selected' : ''}`}>
       <button
-        type="button" className={`check${done ? ' on' : ''}`} onClick={(e) => { e.stopPropagation(); onToggle?.(); }}
-        aria-label={done ? `Put ${item.name} back on the list` : `Mark ${item.name} as bought`} disabled={readOnly} style={readOnly ? { visibility: 'hidden' } : undefined}
+        type="button" className={`check${selecting ? ' pick' : ''}${(selecting ? selected : done) ? ' on' : ''}`} onClick={(e) => { e.stopPropagation(); onToggle?.(); }}
+        aria-label={selecting ? `${selected ? 'Unselect' : 'Select'} ${item.name}` : done ? `Put ${item.name} back on the list` : `Mark ${item.name} as bought`} aria-pressed={selecting ? selected : undefined}
+        disabled={readOnly} style={readOnly ? { visibility: 'hidden' } : undefined}
       >
         <span />
       </button>
       {item.photo && (
-        <button type="button" className="thumb" onClick={(e) => { e.stopPropagation(); setViewing(true); }} aria-label={`See the photo of ${item.name}`}>
+        <button type="button" className="thumb" onClick={(e) => { e.stopPropagation(); if (selecting) onToggle?.(); else setViewing(true); }} aria-label={`See the photo of ${item.name}`}>
           <img src={item.photo} alt="" />
         </button>
       )}
@@ -63,7 +66,7 @@ export default function ItemRow({ item, pred, done, last, showHistory = false, o
           </div>
         )}
       </div>
-      {!readOnly && (onSnooze || onRemove) && (
+      {!readOnly && !selecting && (onSnooze || onRemove) && (
         <div className="hover-actions">
           {onSnooze && <button type="button" className="icon-btn" title="Snooze (S)" aria-label={`Snooze ${item.name}`} onClick={(e) => { e.stopPropagation(); onSnooze(); }}><ClockIcon /></button>}
           {onRemove && <button type="button" className="icon-btn" title="Take off list" aria-label={`Take ${item.name} off the list`} onClick={(e) => { e.stopPropagation(); onRemove(); }}><TrashIcon /></button>}
@@ -82,7 +85,7 @@ export default function ItemRow({ item, pred, done, last, showHistory = false, o
           {total != null && <small>{fmtMoney(price)} ea</small>}
         </div>
       )}
-      {!readOnly && onDelete && (
+      {!readOnly && !selecting && onDelete && (
         <button type="button" className="icon-btn row-del" title="Delete from list" aria-label={`Delete ${item.name} from the list`} onClick={(e) => { e.stopPropagation(); onDelete(); }}><TrashIcon /></button>
       )}
     </div>

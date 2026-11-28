@@ -66,7 +66,7 @@ function Shell() {
   return (
     <div className="app">
       <header className="topwrap" ref={headRef}>
-        {DEMO_MODE && <div className="demo-banner">Demo mode · sample data on this device only</div>}
+        {DEMO_MODE && <div className="demo-banner">Demo mode · test data on this device only</div>}
         <div className="topbar">
           <button type="button" className="icon-btn menu-btn" onClick={() => setMenu((m) => !m)} aria-label="Menu" aria-expanded={menu} aria-controls="main-menu">
             <MenuIcon />
@@ -74,7 +74,7 @@ function Shell() {
           </button>
           <button type="button" className="acct grow" onClick={() => setSheet(true)} aria-label="Accounts and people">
             <h1 className="ellipsis">{account.name}</h1>
-            <span className="page-name">· {tabs.find((t) => t.id === current)?.label}</span>
+            <span className={`page-name${current !== 'list' ? ' has-heading' : ''}`}>· {tabs.find((t) => t.id === current)?.label}</span>
             <ChevronDown width="20" height="20" style={{ color: 'var(--bb)', flex: 'none' }} />
           </button>
           <button type="button" className="avatar" onClick={() => setSheet(true)} aria-label="Account menu" style={{ cursor: 'pointer' }}>

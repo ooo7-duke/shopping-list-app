@@ -4,7 +4,6 @@
 import { DEMO_MODE } from './config.js';
 import { generateJSON } from './ai.js';
 import { fmtMoney } from './format.js';
-import { sampleSiteVisitFolio } from '../data/sampleTrips.js';
 
 export const EXPENSE_CATEGORIES = [
   { id: 'airfare', label: 'Airfare', group: 'Travel' },
@@ -294,17 +293,8 @@ function demoRead(kind) {
   const now = Date.now();
   const samples = {
     photo: { isReceipt: true, merchant: 'Lotus of Siam', category: 'dinner', date: dayKey(now), time: '19:42', total: 64.18, currency: 'USD', tip: 10.7, summary: 'Dinner with the booth team' },
-    'demo-hampton': sampleSiteVisitFolio(now).read,
   };
   return new Promise((res) => setTimeout(() => res(normalizeRead(samples[kind] || samples.photo)), 700));
-}
-
-// Sample emails for the demo's emailed-receipts section on the Expense Report page.
-export function demoTravelInbox() {
-  const now = Date.now();
-  let done = [];
-  try { done = JSON.parse(localStorage.getItem('sla-demo-inbox-done') || '[]'); } catch { /* storage blocked */ }
-  return [sampleSiteVisitFolio(now).email].filter((m) => !done.includes(m.id));
 }
 
 // A caption for a receipt photo, built from what was read off it: who, what, how much.

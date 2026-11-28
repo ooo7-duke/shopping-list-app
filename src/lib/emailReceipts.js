@@ -1,29 +1,12 @@
 // Fetches receipts forwarded to the app's inbox (netlify/functions/receipts-inbox.mjs) for the
 // signed-in person, and tells the server once each one is saved or dismissed.
-// The demo keeps three sample emails on this device.
+// The demo has no inbox, so it shows no emails.
 import backend from '../data/backend.js';
 import { DEMO_MODE } from './config.js';
 
 const URL_ = '/.netlify/functions/receipts-inbox';
-const DEMO_DONE = 'sla-demo-inbox-done';
-const day = 864e5;
-
-function demoDone() {
-  try { return JSON.parse(localStorage.getItem(DEMO_DONE) || '[]'); } catch { return []; }
-}
-
-function demoInbox() {
-  const done = demoDone();
-  const now = Date.now();
-  return [
-    { id: 'demo-target', from: 'Demo user <demo@example.com>', subject: 'Fwd: Your Target order #102-4471', date: now - day, text: '(sample order email)', pdfs: [] },
-    { id: 'demo-amazon', from: 'Amazon.com <auto-confirm@amazon.com>', subject: 'Your Amazon.com order of "Post-it Super Sticky Notes..."', date: now - 2 * day, text: '(sample order email)', pdfs: [] },
-    { id: 'demo-delivered', from: 'Amazon.com <shipment-tracking@amazon.com>', subject: 'Delivered: Your Amazon.com order', date: now - 3600e3, text: '(sample delivery notice)', pdfs: [] },
-  ].filter((m) => !done.includes(m.id));
-}
-
 export async function fetchInbox() {
-  if (DEMO_MODE) return { configured: true, email: 'demo@example.com', items: demoInbox() };
+  if (DEMO_MODE) return { configured: true, email: 'demo@example.com', items: [] };
   const token = await backend.idToken?.();
   if (!token) return { configured: false, items: [] };
   const r = await fetch(URL_, { headers: { authorization: `Bearer ${token}` } });
@@ -34,10 +17,7 @@ export async function fetchInbox() {
 }
 
 export async function ackInbox(id) {
-  if (DEMO_MODE) {
-    try { localStorage.setItem(DEMO_DONE, JSON.stringify([...new Set([...demoDone(), id])])); } catch { /* private window */ }
-    return;
-  }
+  if (DEMO_MODE) return;
   const token = await backend.idToken?.();
   await fetch(`${URL_}?id=${encodeURIComponent(id)}`, { method: 'DELETE', headers: { authorization: `Bearer ${token}` } });
 }
