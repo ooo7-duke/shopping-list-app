@@ -137,7 +137,9 @@ function inspect(win) {
     // Text that runs past the edge of a box that hides its overflow (a card), so the end is cut off.
     if (hasText && s.textOverflow !== 'ellipsis') {
       for (let a = el.parentElement; a && a !== root; a = a.parentElement) {
-        if (!/(hidden|clip)/.test(getComputedStyle(a).overflowX)) continue;
+        const as = getComputedStyle(a);
+        if (!/(hidden|clip)/.test(as.overflowX)) continue;
+        if (as.textOverflow === 'ellipsis' || as.webkitLineClamp !== 'none' && as.webkitLineClamp) break; // the box ends the text in "…" itself
         const ar = a.getBoundingClientRect();
         if (r.right > ar.right + 1 || r.left < ar.left - 1) issues.push(['cut-off', `${desc(el)} runs past ${desc(a)}`]);
         break;
