@@ -222,6 +222,9 @@ function seedInbox() {
     { id: 'qa-mail-1', from: 'demo@example.com', subject: 'Your Home Depot order has shipped and is on its way to you', date: now - 36e5, text: '' },
     { id: 'qa-mail-2', from: 'demo@example.com', subject: 'Your Giant Food receipt', date: now - 72e5, text: '' },
     { id: 'qa-mail-3', from: 'Frankfurt Marriott Hotel <demo@example.com>', subject: 'Your Frankfurt Marriott Hotel folio and receipt for your recent stay', date: now - 5 * 864e5, text: '' },
+    // A flight bought three weeks ago for the Warsaw trip that starts in 20 days: matched by its travel dates.
+    { id: 'qa-mail-4', from: 'LOT Polish Airlines <demo@example.com>', subject: 'Your flight to Warsaw is booked', date: now - 21 * 864e5,
+      text: `Departs ${new Date(now + 20 * 864e5).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} from Washington Dulles. Returns ${new Date(now + 24 * 864e5).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}.` },
   ]));
   localStorage.setItem('sla-email-reads', JSON.stringify({
     'qa-mail-1': { isReceipt: false, store: '', items: [] },
