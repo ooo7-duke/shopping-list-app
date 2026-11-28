@@ -388,8 +388,12 @@ function EmailedReceipts() {
                 {v.m?.date ? ` · emailed ${fmtDate(v.m.date)}` : ''}
               </div>
             </div>
-            {v.status === 'review' && v.plan?.lines.length > 0 && <button type="button" className={`btn${v.why ? '' : ' primary'}`} onClick={() => openReview(id)}>Include</button>}
-            {['review', 'error'].includes(v.status) && <button type="button" className="btn" onClick={() => finish(id, false)}>Exclude</button>}
+            {['review', 'error'].includes(v.status) && (
+              <div className="email-acts">
+                {v.status === 'review' && v.plan?.lines.length > 0 && <button type="button" className={`btn${v.why ? '' : ' primary'}`} onClick={() => openReview(id)}>Include</button>}
+                <button type="button" className="btn" onClick={() => finish(id, false)}>Exclude</button>
+              </div>
+            )}
           </div>
         ))}
         {nothingYet && <p className="small">No emailed receipts waiting.</p>}

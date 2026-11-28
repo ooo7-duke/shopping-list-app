@@ -431,7 +431,12 @@ table.data td.num, table.data th.num { text-align: right; }
 
 /* Emailed receipts and the bought-items inventory on the Receipts tab */
 .email-card { display: grid; gap: 8px; }
-.email-row { display: flex; gap: 8px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line-soft); }
+.email-row { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line-soft); }
+.email-row > .grow { flex: 1 1 100%; }
+.email-acts { display: flex; gap: 8px; margin-left: auto; }
+.email-item { flex-wrap: wrap; row-gap: 6px; }
+.email-item > .grow { flex: 1 1 100%; }
+.email-item > .row { margin-left: auto; }
 .email-row:first-of-type { border-top: 0; }
 .email-row .meta { color: var(--muted); font-size: 0.85rem; }
 .email-how summary { cursor: pointer; color: var(--bb); font-weight: 600; min-height: var(--tap); display: flex; align-items: center; }

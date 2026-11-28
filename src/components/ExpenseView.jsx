@@ -705,7 +705,7 @@ function TravelInbox({ tripId, onReview }) {
       <div className="section-h"><h2>Emailed receipts for {tripId ? 'this trip' : 'your trips'}</h2><span className="small muted">{matches.length}</span></div>
       <div className="list">
         {matches.map(({ m, trip }) => (
-          <div key={m.id} className="item">
+          <div key={m.id} className="item email-item">
             <div className="grow" style={{ minWidth: 0 }}>
               <FitText className="name" lines={2}>{m.subject || '(no subject)'}</FitText>
               <div className="meta"><span>{String(m.from || '').replace(/<.*>/, '').trim()}</span>{m.date && <span>{fmtDate(m.date, { withYear: true })}</span>}{!tripId && <span className="chip blue">{trip.name}</span>}</div>
