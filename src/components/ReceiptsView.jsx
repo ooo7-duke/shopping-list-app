@@ -223,7 +223,7 @@ function ReceiptReview({ data, onClose, onSaved }) {
             {!ln.skip && (
               <div className="controls">
                 <select className="input" value={ln.itemId} onChange={(e) => set(i, { itemId: e.target.value })} aria-label={`Match for ${ln.rawText}`}>
-                  <option value="">New item: {ln.newName}</option>
+                  <option value="">Add as a new item</option>
                   {sorted.map((it) => <option key={it.id} value={it.id}>{it.name}</option>)}
                 </select>
                 <label className="ctl"><span className="ctl-label">Qty</span><input className="input" inputMode="decimal" aria-label="Quantity" value={ln.quantity} onChange={(e) => set(i, { quantity: e.target.value })} /></label>
