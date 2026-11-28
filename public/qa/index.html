@@ -92,6 +92,8 @@ function inspect(win) {
   for (const el of all) {
     const r = el.getBoundingClientRect();
     const tag = el.tagName;
+    // Screen-reader-only labels are hidden on purpose.
+    if (el.matches('.sr-only, .visually-hidden')) continue;
     if (['svg', 'path', 'circle', 'line', 'rect', 'polyline', 'g', 'text', 'canvas'].includes(tag.toLowerCase())) continue;
     // Out of the screen sideways, and nothing that scrolls it into view.
     if ((r.right > W + 1 || r.left < -1) && !clippers(el)) {
@@ -127,7 +129,9 @@ function inspect(win) {
     }
     // Covered: text or controls that another element sits on top of.
     if ((hasText && r.height < 200) || ['BUTTON', 'INPUT', 'SELECT', 'TEXTAREA', 'A'].includes(tag)) {
-      const pts = [[r.left + Math.min(8, r.width / 2), r.top + r.height / 2], [r.left + r.width / 2, r.top + r.height / 2], [r.right - Math.min(8, r.width / 2), r.top + r.height / 2]];
+      // Text that wraps onto two lines has one box per line; test each line, not the space between them.
+      const boxes = s.display === 'inline' ? [...el.getClientRects()] : [r];
+      const pts = boxes.flatMap((b) => [[b.left + Math.min(8, b.width / 2), b.top + b.height / 2], [b.left + b.width / 2, b.top + b.height / 2], [b.right - Math.min(8, b.width / 2), b.top + b.height / 2]]);
       for (const [x, y] of pts) {
         if (x < 0 || y < 0 || x >= W || y >= H) continue;
         const top = document.elementFromPoint(x, y);
@@ -153,7 +157,7 @@ function inspect(win) {
     const t = el.type;
     if (el.tagName === 'INPUT' && !['text', 'email', 'search', 'tel', 'url', 'number', 'password', 'date', ''].includes(t)) continue;
     const isDate = t === 'date';
-    const text = el.tagName === 'SELECT' ? (el.selectedOptions[0]?.text || '') : isDate ? 'mm/dd/yyyy' : (el.value || el.placeholder || '');
+    const text = el.tagName === 'SELECT' ? (el.selectedOptions[0]?.text || '') : isDate ? 'mm/dd/yyyy' : (el.value && el.value.length <= 20 ? el.value : el.value ? '' : el.placeholder || ''); // a long typed value scrolls inside its box, as it should
     if (!text.trim()) continue;
     const s = getComputedStyle(el);
     cv.font = `${s.fontStyle} ${s.fontWeight} ${s.fontSize} ${s.fontFamily}`;

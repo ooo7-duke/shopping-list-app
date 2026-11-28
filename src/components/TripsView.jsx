@@ -494,7 +494,7 @@ function StoresSheet({ forItem, onAdded, onClose }) {
             <label className="field"><span>Store name</span>
               <select className="input" value={pickOf(r)} onChange={(e) => pick(i, e.target.value)}>
                 <option value="" disabled>Pick your store or add a new one</option>
-                <option value={NEW_STORE}>+ A new store (type its name)</option>
+                <option value={NEW_STORE}>+ A new store</option>
                 {yours.length > 0 && (
                   <optgroup label="Your stores">
                     {yours.map((n, j) => <option key={`${n}${j}`} value={n}>{n}</option>)}
@@ -506,7 +506,7 @@ function StoresSheet({ forItem, onAdded, onClose }) {
               </select>
             </label>
             {pickOf(r) === NEW_STORE && (
-              <input className="input" style={{ marginTop: 8 }} value={r.name || ''} maxLength={30} placeholder="Type the store's name, like H-Mart" aria-label="New store name" autoFocus={!r.name} onChange={(e) => set(i, { name: e.target.value })} />
+              <input className="input" style={{ marginTop: 8 }} value={r.name || ''} maxLength={30} placeholder="Store name, like H-Mart" aria-label="New store name" autoFocus={!r.name} onChange={(e) => set(i, { name: e.target.value })} />
             )}
             {pickOf(r) && (
               <div className="grid2" style={{ marginTop: 8 }}>
