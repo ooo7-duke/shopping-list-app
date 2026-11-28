@@ -68,7 +68,7 @@ a { color: var(--bb); }
 .icon-btn:hover { background: var(--bb-soft); }
 .icon-btn svg, .menu svg { width: 24px; height: 24px; }
 
-main { flex: 1; width: 100%; max-width: 860px; margin: 0 auto; padding: 14px 16px 40px; }
+main { flex: 1; width: 100%; max-width: 860px; margin: 0 auto; padding: 14px 16px 88px; }
 main.wide { max-width: 1240px; }
 
 /* menu: a hamburger at the top left on a phone; always open on the left on a wider screen */
