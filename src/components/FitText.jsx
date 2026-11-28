@@ -67,7 +67,15 @@ function fit(el) {
   if (s !== cur) apply(s);
   // The page's own wrapping is the final word: if the box still holds more lines than it shows, step down again.
   if (el.dataset.fitLines && lines > 1) {
-    for (let i = 0; i < 12 && s > min && el.scrollHeight > el.clientHeight + 1; i += 1) {
+    // Count the lines the words really take, with the line limit lifted for a moment.
+    const used = () => {
+      const was = el.style.display;
+      el.style.display = 'block';
+      const n = new Set([...inner.getClientRects()].map((r) => Math.round(r.top))).size;
+      el.style.display = was;
+      return n;
+    };
+    for (let i = 0; i < 12 && s > min && used() > lines; i += 1) {
       s = Math.max(min, Math.round((s - 0.02) * 100) / 100);
       apply(s);
     }
@@ -109,7 +117,7 @@ function watchTextSize() {
   let last = 0;
   new ResizeObserver(() => {
     const w = sentinel.offsetWidth;
-    if (w && w !== last) { if (last) { refitAll(); remListeners.forEach((fn) => fn()); } last = w; }
+    if (w && w !== last) { refitAll(); remListeners.forEach((fn) => fn()); last = w; }
   }).observe(sentinel);
 }
 export function onTextSizeChange(fn) { watchTextSize(); remListeners.add(fn); return () => remListeners.delete(fn); }
