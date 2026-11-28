@@ -75,7 +75,7 @@ export default function AccountSheet({ onClose }) {
           ))}
           {owner && (
             <form onSubmit={invite} className="stack" style={{ marginTop: 10 }}>
-              <label className="field"><span>Invite by Google email</span><input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@gmail.com" /></label>
+              <label className="field"><span>Invite by Google email</span><input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="off" /></label>
               <label className="field"><span>Role</span>
                 <select className="input" value={inviteRole} onChange={(e) => setInviteRole(e.target.value)} aria-describedby="invite-role-help">
                   <option value="editor">Editor</option>

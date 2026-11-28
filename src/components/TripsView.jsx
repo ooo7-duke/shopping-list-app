@@ -349,7 +349,7 @@ function MoveSheet({ item, stores, saved, onPick, onAddStore, onClose }) {
       <div className="stack">
         {!saved && (
           <form className="stack" onSubmit={(e) => { e.preventDefault(); if (typed.trim()) onPick(typed.trim()); }}>
-            <input className="input" value={typed} onChange={(e) => setTyped(e.target.value)} placeholder="A new store, like H-Mart" aria-label="A new store" />
+            <input className="input" value={typed} onChange={(e) => setTyped(e.target.value)} placeholder="New store name" aria-label="A new store" />
             <button type="submit" className="btn primary block" disabled={!typed.trim()}>Add and move</button>
           </form>
         )}

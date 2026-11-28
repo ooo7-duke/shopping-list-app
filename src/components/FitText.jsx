@@ -48,7 +48,15 @@ function fit(el) {
   if (!inner || !el.isConnected) return false;
   const room = el.clientWidth - 1;
   if (room <= 0) return false;
-  const lines = Number(el.dataset.lines) || 1;
+  // A wider box may no longer need the extra line: start over from the base line count.
+  if (el.dataset.spilled === '1' && Math.round(el.clientWidth) !== Number(el.dataset.spillW)) {
+    if (el.dataset.spillW) { delete el.dataset.spilled; el.style.WebkitLineClamp = el.dataset.lines; }
+    el.dataset.spillW = String(Math.round(el.clientWidth));
+  }
+  // A name that still can't fit its lines at the smallest size may take one more line (spill) before "…".
+  const spill = Number(el.dataset.spill) || 0;
+  let lines = Number(el.dataset.lines) || 1;
+  if (spill > lines && el.dataset.spilled === '1') lines = spill;
   const min = Number(el.dataset.min) || 0.8;
   const cur = Number(el.dataset.fit) || 1;
   const cs = getComputedStyle(el);
@@ -78,6 +86,13 @@ function fit(el) {
     for (let i = 0; i < 12 && s > min && used() > lines; i += 1) {
       s = Math.max(min, Math.round((s - 0.02) * 100) / 100);
       apply(s);
+    }
+    // Still too long at the smallest size: allow the extra line and fit again from full size.
+    if (spill > lines && el.dataset.spilled !== '1' && used() > lines) {
+      el.dataset.spilled = '1';
+      el.style.WebkitLineClamp = String(spill);
+      apply(1);
+      return true;
     }
   }
   // Past the smallest size, a word that still can't fit is shortened, never split.
@@ -127,7 +142,7 @@ if (typeof window !== 'undefined') {
   window.addEventListener('resize', refitAll);
 }
 
-export default function FitText({ as: Tag = 'div', className = '', lines = 1, fitLines = false, min, children, style, ...rest }) {
+export default function FitText({ as: Tag = 'div', className = '', lines = 1, fitLines = false, min, spill, children, style, ...rest }) {
   const ref = useRef(null);
   useLayoutEffect(() => {
     const el = ref.current;
@@ -147,7 +162,7 @@ export default function FitText({ as: Tag = 'div', className = '', lines = 1, fi
   useLayoutEffect(() => { if (ref.current) queue(ref.current); });
   const plain = typeof children === 'string';
   return (
-    <Tag ref={ref} className={`fit${lines > 1 ? ' fit-lines' : ''} ${className}`} data-lines={lines} data-min={min} data-fit-lines={fitLines || undefined}
+    <Tag ref={ref} className={`fit${lines > 1 ? ' fit-lines' : ''} ${className}`} data-lines={lines} data-min={min} data-spill={spill} data-fit-lines={fitLines || undefined}
       data-full={plain && lines > 1 ? children : undefined} style={lines > 1 ? { ...style, WebkitLineClamp: lines } : style} {...rest}>
       <span className="fit-in">{children}</span>
     </Tag>

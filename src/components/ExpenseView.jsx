@@ -160,7 +160,7 @@ function TripCard({ trip, expenses, onOpen, onHold, onDelete, picking, picked })
       {picking && <span className={`check pick${picked ? ' on' : ''}`} aria-hidden="true"><span /></span>}
       <div className="grow" style={{ minWidth: 0 }}>
         <div className="row-top">
-          <FitText className="xfolder-name" lines={2} fitLines min={0.7} title={trip.name}>{trip.name}</FitText>
+          <FitText className="xfolder-name" lines={2} fitLines min={0.7} spill={3} title={trip.name}>{trip.name}</FitText>
           {!picking && onDelete && <RowTrash label={`Delete ${trip.name}`} onDelete={onDelete} />}
         </div>
         <FitText className="small muted">{trip.location} · {fmtRange(trip.startDate, trip.endDate)}</FitText>
