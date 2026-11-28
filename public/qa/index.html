@@ -151,13 +151,14 @@ function inspect(win) {
   for (const el of root.querySelectorAll('input, select')) {
     if (!vis(el)) continue;
     const t = el.type;
-    if (el.tagName === 'INPUT' && !['text', 'email', 'search', 'tel', 'url', 'number', 'password', ''].includes(t)) continue;
-    const text = el.tagName === 'SELECT' ? (el.selectedOptions[0]?.text || '') : (el.value || el.placeholder || '');
+    if (el.tagName === 'INPUT' && !['text', 'email', 'search', 'tel', 'url', 'number', 'password', 'date', ''].includes(t)) continue;
+    const isDate = t === 'date';
+    const text = el.tagName === 'SELECT' ? (el.selectedOptions[0]?.text || '') : isDate ? 'mm/dd/yyyy' : (el.value || el.placeholder || '');
     if (!text.trim()) continue;
     const s = getComputedStyle(el);
     cv.font = `${s.fontStyle} ${s.fontWeight} ${s.fontSize} ${s.fontFamily}`;
     const need = cv.measureText(text).width;
-    const room = el.clientWidth - parseFloat(s.paddingLeft) - parseFloat(s.paddingRight) - (el.tagName === 'SELECT' ? 22 : 0);
+    const room = el.clientWidth - parseFloat(s.paddingLeft) - parseFloat(s.paddingRight) - (el.tagName === 'SELECT' ? 22 : isDate ? 28 : 0);
     if (need > room + 1) issues.push(['field-clipped', `${el.tagName.toLowerCase()} "${text.slice(0, 50)}" needs ${Math.round(need)}px, has ${Math.round(room)}px`]);
   }
   return [...new Map(issues.map((i) => [i.join('|'), i])).values()];
@@ -171,7 +172,7 @@ const tabs = ['list', 'trips', 'receipts', 'insights', 'expenses'];
 document.getElementById('bar').innerHTML =
   link('360', { w: 360 }, w === 360) + link('412', { w: 412 }, w === 412) + link('normal text', { big: 0 }, !big) + link('large text', { big: 1 }, big) +
   tabs.map((t) => link(t, { hash: t }, t === hash)).join('') +
-  link('load test data', { seed: 1 }) + link('clear test data', { clear: 1 }) + '<button id="chk" type="button">Check this screen</button>';
+  link('load test data', { seed: 1 }) + link('clear test data', { clear: 1 }) + '<button id="chk" type="button">Check this screen</button><button id="sweep" type="button">Sweep all fields</button>';
 const f = document.getElementById('f');
 f.width = w; f.height = h; f.style.width = w + 'px'; f.style.height = h + 'px';
 const errs = [];
@@ -186,6 +187,49 @@ f.addEventListener('load', () => {
 });
 f.addEventListener('load', () => { if (big) { const s = f.contentDocument.createElement('style'); s.textContent = 'html{font-size:22px !important}'; f.contentDocument.head.appendChild(s); } });
 f.src = `/?demo#/${hash}`;
+// Sweep: open each screen and sheet that has text boxes or pickers, check it, close it.
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+async function sweep() {
+  const out = [];
+  const win = f.contentWindow;
+  const doc = () => f.contentDocument;
+  const waitFor = async (fn, ms = 5000) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { const v = fn(); if (v) return v; await sleep(150); } return null; };
+  const byText = (sel, re) => [...doc().querySelectorAll(sel)].find((e) => re.test((e.getAttribute('aria-label') || '') + ' ' + e.textContent));
+  const click = async (sel, re) => { const el = await waitFor(() => byText(sel, re)); if (!el) return false; el.click(); await sleep(700); return true; };
+  const closeAll = async () => { for (let i = 0; i < 4; i++) { const sheets = doc().querySelectorAll('[role=dialog] button[aria-label=Close], .sheet button[aria-label=Close]'); if (!sheets.length) break; sheets[sheets.length - 1].click(); await sleep(400); } };
+  const go = async (h) => { await closeAll(); win.location.hash = '#/' + h; await sleep(900); };
+  const check = (name) => { const found = inspect(win).filter(([k]) => k !== 'small-tap'); out.push(`${name}: ${found.length ? found.map(([k, d]) => k + ' ' + d).join(' | ') : 'ok'}`); };
+  const step = async (name, fn) => { try { const ok = await fn(); if (ok === false) out.push(`${name}: could not open`); else check(name); } catch (e) { out.push(`${name}: error ${e.message}`); } };
+  await step('list page', async () => { await go('list'); });
+  await step('item sheet', async () => { await go('list'); return click('.item .name, .item [class*=name]', /Milk/); });
+  await step('snooze picker', async () => click('button', /^\s*Snooze/));
+  await step('accounts sheet', async () => { await go('list'); return click('button', /Accounts and people/); });
+  await step('trips page', async () => { await go('trips'); });
+  await step('stores sheet', async () => { await go('trips'); return click('button', /Add your stores|Edit stores/); });
+  await step('stores sheet new store', async () => { const sel = doc().querySelector('[role=dialog] select'); if (!sel) return false; const o = [...sel.options].find((x) => /new store/i.test(x.text)); if (!o) return false; const set = Object.getOwnPropertyDescriptor(win.HTMLSelectElement.prototype, 'value').set; set.call(sel, o.value); sel.dispatchEvent(new win.Event('change', { bubbles: true })); await sleep(600); });
+  await step('move sheet', async () => { await go('trips'); return click('.trip button', /^\s*Milk/); });
+  await step('receipts page', async () => { await go('receipts'); });
+  await step('receipt review', async () => {
+    await go('receipts');
+    const inp = doc().querySelectorAll('input[type=file]')[1] || doc().querySelector('input[type=file]'); if (!inp) return false;
+    const c = doc().createElement('canvas'); c.width = 400; c.height = 800; const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, 400, 800); g.fillStyle = '#000'; g.fillText('RECEIPT', 20, 40);
+    const blob = await new Promise((r) => c.toBlob(r, 'image/png'));
+    const dt = new win.DataTransfer(); dt.items.add(new win.File([blob], 'r.png', { type: 'image/png' })); inp.files = dt.files; inp.dispatchEvent(new win.Event('change', { bubbles: true }));
+    return !!(await waitFor(() => doc().querySelector('[role=dialog] input, [role=dialog] select'), 8000));
+  });
+  await step('insights page', async () => { await go('insights'); await sleep(800); });
+  await step('expenses page', async () => { await go('expenses'); await sleep(1200); });
+  await step('trip form', async () => { await go('expenses'); await sleep(800); return click('button', /New trip folder/); });
+  await step('trip folder', async () => { await go('expenses'); await sleep(800); return click('[role=button], button, .card, article', /Annual International/); });
+  await step('expense sheet', async () => click('[role=button], button, .item, .card', /Lufthansa/));
+  await closeAll();
+  return out;
+}
+document.getElementById('sweep').onclick = async () => {
+  document.getElementById('out').textContent = 'Sweeping...';
+  const lines = await sweep();
+  document.getElementById('out').textContent = `${w}px${big ? ' large text' : ''} sweep\n` + lines.join('\n') + (errs.length ? '\n\nApp errors:\n' + errs.join('\n') : '');
+};
 document.getElementById('chk').onclick = () => {
   const found = inspect(f.contentWindow);
   const keep = found.filter(([k]) => k !== 'small-tap' || q.get('taps') === '1');
