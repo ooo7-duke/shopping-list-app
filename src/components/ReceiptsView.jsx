@@ -322,7 +322,7 @@ function EmailedReceipts() {
     let data;
     try { data = await fetchInbox(); } catch (e) { setInbox({ loading: false, error: e.message, items: [] }); return; }
     setInbox({ loading: false, ...data });
-    const out = { receipts: 0, checked: [], held: 0, waiting: 0, travel: 0 };
+    const out = { found: 0, travel: 0 };
     const notTravel = notTravelIds();
     for (const m of data.items || []) {
       if (!notTravel.includes(m.id) && emailTrip(m, latest.current.expenseTrips, latest.current.expenses)) { out.travel++; continue; }
@@ -334,33 +334,17 @@ function EmailedReceipts() {
           cacheRead(m.id, res);
         }
         const plan = planLines(res, latest.current.items, cats);
-        // An email that doesn't look like a receipt, or matches one already saved, stays here with
-        // the reason until the person checks or dismisses it. Nothing is set aside out of sight.
+        // Nothing from email is saved on its own. Every email waits here for the person to include
+        // or exclude it, with a note when it doesn't look like a receipt or looks already saved.
         const dup = res.isReceipt && alreadySaved(latest.current.receipts, { emailId: m.id, orderId: res.orderId, store: res.store });
-        if (!res.isReceipt || dup) {
-          out.held++;
-          setOne(m.id, { status: 'held', why: dup ? 'dup' : 'other', m, res, plan });
-          continue;
-        }
-        if (plan.weak) {
-          out.waiting++;
-          setOne(m.id, { status: 'review', m, res, plan });
-          continue;
-        }
-        const onList = plan.lines.filter((l) => l.itemId).map((l) => latest.current.items.find((i) => i.id === l.itemId)).filter((it) => it && isOnList(it));
-        await saveReceipt(latest.current.ctx, receiptOf(res, m), plan.lines);
-        await ackInbox(m.id);
-        dropRead(m.id);
-        out.receipts++;
-        out.checked.push(...onList.map((it) => it.name));
-        setOne(m.id, { status: 'saved', m, res });
+        out.found++;
+        setOne(m.id, { status: 'review', why: !res.isReceipt ? 'other' : dup ? 'dup' : '', m, res, plan });
       } catch (e) {
         console.error(e);
         setOne(m.id, { status: 'error', m, error: aiErrorMessage(e, 'Receipt reading') });
       }
     }
-    if (out.receipts || out.held || out.waiting || out.travel) setDone(out);
-    if (out.receipts) showToast(`Added ${out.receipts} emailed receipt${out.receipts === 1 ? '' : 's'}`);
+    if (out.found || out.travel) setDone(out);
   }
 
   function openReview(id) {
@@ -374,7 +358,7 @@ function EmailedReceipts() {
     setReview(null);
   }
 
-  const waiting = Object.entries(state).filter(([, v]) => ['review', 'held', 'reading', 'error'].includes(v.status));
+  const waiting = Object.entries(state).filter(([, v]) => ['review', 'reading', 'error'].includes(v.status));
   const nothingYet = !inbox.loading && !waiting.length && !done;
 
   return (
@@ -386,10 +370,8 @@ function EmailedReceipts() {
         {done && (
           <p className="small" style={{ marginBottom: waiting.length ? 10 : 0 }}>
             {[
-              done.receipts ? `Added ${done.receipts} receipt${done.receipts === 1 ? '' : 's'}${done.checked.length ? ` and checked off ${listNames(done.checked)}` : ''}.` : '',
-              done.waiting ? `${done.waiting} ${done.waiting === 1 ? 'needs' : 'need'} your OK below.` : '',
+              done.found ? `Found ${plural(done.found, 'email')}. Include the ones you want on the record and exclude the rest.` : '',
               done.travel ? `${done.travel} look${done.travel === 1 ? 's' : ''} like travel and ${done.travel === 1 ? 'is' : 'are'} waiting on the Expense Report page.` : '',
-              done.held ? `${done.held} email${done.held === 1 ? '' : 's'} below ${done.held === 1 ? 'doesn\'t look' : 'don\'t look'} like a new receipt. Check or dismiss ${done.held === 1 ? 'it' : 'them'}.` : '',
             ].filter(Boolean).join(' ')}
           </p>
         )}
@@ -400,13 +382,14 @@ function EmailedReceipts() {
               <div className="meta">
                 {v.status === 'reading' ? 'Reading…'
                   : v.status === 'error' ? `Couldn't read it. ${v.error}`
-                  : v.status === 'held' ? (v.why === 'dup' ? 'Looks already saved' : 'Doesn\'t look like a receipt')
-                  : `${plural(v.plan.lines.length, 'item')} · ${v.plan.weak} best guess${v.plan.weak === 1 ? '' : 'es'} to check`}
+                  : v.why === 'dup' ? 'Looks already saved'
+                  : v.why === 'other' ? 'Doesn\'t look like a receipt'
+                  : `${plural(v.plan.lines.length, 'item')}${v.plan.weak ? ` · ${v.plan.weak} best guess${v.plan.weak === 1 ? '' : 'es'} to check` : ''}`}
                 {v.m?.date ? ` · emailed ${fmtDate(v.m.date)}` : ''}
               </div>
             </div>
-            {(v.status === 'review' || (v.status === 'held' && v.plan?.lines.length > 0)) && <button type="button" className={`btn${v.status === 'review' ? ' primary' : ''}`} onClick={() => openReview(id)}>Check</button>}
-            {['review', 'held', 'error'].includes(v.status) && <button type="button" className="btn" onClick={() => finish(id, false)}>Dismiss</button>}
+            {v.status === 'review' && v.plan?.lines.length > 0 && <button type="button" className={`btn${v.why ? '' : ' primary'}`} onClick={() => openReview(id)}>Include</button>}
+            {['review', 'error'].includes(v.status) && <button type="button" className="btn" onClick={() => finish(id, false)}>Exclude</button>}
           </div>
         ))}
         {nothingYet && <p className="small">No emailed receipts waiting.</p>}
@@ -415,7 +398,7 @@ function EmailedReceipts() {
           <ol className="small">
             <li>Forward a receipt or order email to <strong>{INBOX_ADDRESS}</strong>{inbox.email ? <> from <strong>{inbox.email}</strong>, the address you sign in with</> : ' from the address you sign in with'}.</li>
             <li>To skip forwarding by hand, set up a Gmail filter that forwards order emails there.</li>
-            <li>Within about 15 minutes, open this tab. Items that clearly match your list are checked off for you. Anything the app isn't sure about waits here for your OK.</li>
+            <li>Within about 15 minutes, open this tab. Each email it finds waits here: tap Include to check it and add it to the record, or Exclude to drop it. Nothing is added without you.</li>
           </ol>
           <p className="tiny muted">Paper receipts from the store don't come by email, so snap those above.</p>
           {!inbox.loading && inbox.configured === false && <p className="tiny muted">The inbox isn't switched on yet.</p>}

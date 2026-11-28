@@ -711,7 +711,7 @@ function TravelInbox({ tripId, onReview }) {
               <div className="meta"><span>{String(m.from || '').replace(/<.*>/, '').trim()}</span>{m.date && <span>{fmtDate(m.date, { withYear: true })}</span>}{!tripId && <span className="chip blue">{trip.name}</span>}</div>
             </div>
             <div className="row" style={{ gap: 6, flex: 'none' }}>
-              <button type="button" className="btn primary" disabled={!!reading} onClick={() => review({ m, trip })}>{reading === m.id ? 'Reading…' : 'Check'}</button>
+              <button type="button" className="btn primary" disabled={!!reading} onClick={() => review({ m, trip })}>{reading === m.id ? 'Reading…' : 'Include'}</button>
               <button type="button" className="btn ghost" onClick={() => { markNotTravel(m.id); setHidden(notTravelIds()); showToast('Moved back to Receipts', () => { try { localStorage.setItem('sla-not-travel', JSON.stringify(notTravelIds().filter((x) => x !== m.id))); } catch { /* storage blocked */ } setHidden(notTravelIds()); }); }}>Not travel</button>
             </div>
           </div>
