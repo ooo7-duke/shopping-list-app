@@ -7,6 +7,7 @@ import { bestMatch } from '../lib/match.js';
 import { saveReceipt, deleteReceipt, isOnList } from '../data/actions.js';
 import { fmtMoney, fmtDate, toInputDate, fromInputDate } from '../lib/format.js';
 import { DEMO_MODE } from '../lib/config.js';
+import { aiErrorMessage } from '../lib/errors.js';
 import { CameraIcon } from './Icons.jsx';
 import { extractReceiptText } from '../lib/receipts.js';
 import { fetchInbox, ackInbox, cachedRead, cacheRead, dropRead } from '../lib/emailReceipts.js';
@@ -65,7 +66,7 @@ export default function ReceiptsView() {
       if (readError) showToast("Couldn't read the printed lines, but the QR code was read.");
     } catch (e) {
       console.error(e);
-      showToast(e?.message?.includes('App Check') ? 'Receipt reading is blocked by App Check. See the setup guide.' : `Couldn't read that receipt. ${e?.message || 'Try a clearer photo.'}`);
+      showToast(aiErrorMessage(e, 'Receipt reading'));
     } finally {
       setBusy('');
       if (fileRef.current) fileRef.current.value = '';
@@ -287,7 +288,7 @@ function EmailedReceipts() {
         setOne(m.id, { status: 'saved', m, res });
       } catch (e) {
         console.error(e);
-        setOne(m.id, { status: 'error', m, error: e?.message || 'Couldn\'t read it.' });
+        setOne(m.id, { status: 'error', m, error: aiErrorMessage(e, 'Receipt reading') });
       }
     }
     if (out.receipts || out.skipped || out.waiting) setDone(out);

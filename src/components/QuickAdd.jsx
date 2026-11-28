@@ -5,7 +5,7 @@ import { addEntries, isOnList } from '../data/actions.js';
 import { fmtMoney, fmtQty } from '../lib/format.js';
 import { MicIcon, PlusIcon, CameraIcon, CloseIcon } from './Icons.jsx';
 import { compressImage } from '../lib/receipts.js';
-import { saveErrorMessage } from '../lib/errors.js';
+import { saveErrorMessage, aiErrorMessage } from '../lib/errors.js';
 import { findDuplicates, listMatches } from '../lib/dupes.js';
 import { guessCategory, HOUSEHOLD_CATEGORIES } from '../lib/categories.js';
 import { classifyNames, nameProduct } from '../lib/classify.js';
@@ -228,7 +228,7 @@ export default function QuickAdd({ onJump }) {
         } else showToast("Couldn't tell what the product is. Type its name; the photo goes with it.");
       } catch (err) {
         console.warn('Naming the photo failed', err);
-        showToast('Type the product name; the photo goes with it.');
+        showToast(`${aiErrorMessage(err, 'Photo reading')} For now, type the product name; the photo goes with it.`);
       }
       inputRef.current?.focus();
     } catch {
